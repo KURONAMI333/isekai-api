@@ -3,9 +3,12 @@ package com.kuronami.isekaiapi.biomemodifier.phase;
 import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
 import com.kuronami.isekaiapi.impl.RemapEngine;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.biome.MobSpawnSettings;
 import net.neoforged.neoforge.common.world.ModifiableBiomeInfo;
+
+import java.util.Set;
 
 /**
  * MODIFY-phase logic for {@code isekai_api:apply_worldshape}. Two concerns:
@@ -26,6 +29,20 @@ public final class ModifyPhase {
     public static void mobSpawnStrategy(WorldshapeDescriptor descriptor,
                                          ModifiableBiomeInfo.BiomeInfo.Builder builder) {
         var spawnBuilder = builder.getMobSpawnSettings();
+
+        // Step 1: drop excluded entries entirely (consumer said "no zombies in my plains").
+        Set<EntityType<?>> excludedTypes = descriptor.exclusions().mobSpawns();
+        int removed = 0;
+        if (!excludedTypes.isEmpty()) {
+            for (MobCategory category : MobCategory.values()) {
+                var list = spawnBuilder.getSpawner(category);
+                int before = list.size();
+                list.removeIf(sd -> excludedTypes.contains(sd.type));
+                removed += before - list.size();
+            }
+        }
+
+        // Step 2: scale remaining entry weights per the strategy's CountScale factor.
         int rebuilt = 0;
         for (MobCategory category : MobCategory.values()) {
             double factor = RemapEngine.effectiveCountFactor(descriptor.resolveMobSpawnStrategy(category));
@@ -41,11 +58,20 @@ public final class ModifyPhase {
                 rebuilt++;
             }
         }
-        if (rebuilt > 0) {
+
+        // Step 3: inject any additional entries the consumer wants (custom mob, or
+        // re-adding vanilla mob with new weight/count after exclusion).
+        int added = 0;
+        for (var add : descriptor.additions().mobSpawns()) {
+            spawnBuilder.getSpawner(add.category()).add(new MobSpawnSettings.SpawnerData(
+                    add.type(), add.weight(), add.minCount(), add.maxCount()));
+            added++;
+        }
+
+        if (removed > 0 || rebuilt > 0 || added > 0) {
             IsekaiApi.LOGGER.debug(
-                    "[Isekai] scaled {} mob spawn weights (dim={}, per-category overrides={})",
-                    rebuilt, descriptor.dimension().location(),
-                    descriptor.mobSpawnStrategyByCategory().keySet());
+                    "[Isekai] mob spawn modify (dim={}): removed={}, rescaled={}, added={}",
+                    descriptor.dimension().location(), removed, rebuilt, added);
         }
     }
 
@@ -65,6 +91,12 @@ public final class ModifyPhase {
         atmos.waterFogColor().ifPresent(effects::waterFogColor);
         atmos.foliageColor().ifPresent(effects::foliageColorOverride);
         atmos.grassColor().ifPresent(effects::grassColorOverride);
+
+        // creature_generation_probability lives on MobSpawnSettings, not BiomeSpecialEffects;
+        // grouped here with the other atmospheric tunables since it's a per-biome scalar
+        // governing how often passive-creature chunk-population runs.
+        atmos.creatureGenerationProbability().ifPresent(p ->
+                builder.getMobSpawnSettings().creatureGenerationProbability(p));
 
         IsekaiApi.LOGGER.debug("[Isekai] applied atmosphere override (dim={})",
                 descriptor.dimension().location());
