@@ -1,0 +1,6 @@
+{
+  "pack": {
+    "pack_format": 48,
+    "description": "Isekai example: underground-only worldshape (overworld y=-64..40, inverted ores so deepslate ores rise)"
+  }
+}
