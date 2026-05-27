@@ -61,7 +61,7 @@ import java.util.Set;
 public final class VanillaRuleSnapshot {
 
     public static final VanillaRuleSnapshot EMPTY =
-            new VanillaRuleSnapshot(List.of(), List.of(), Map.of(), Map.of(), -64, 320);
+            new VanillaRuleSnapshot(List.of(), List.of(), Map.of(), Map.of(), Map.of(), -64, 320);
 
     /**
      * Overworld defaults used by {@link #anchorToY} when no per-call dimension override is
@@ -84,6 +84,7 @@ public final class VanillaRuleSnapshot {
     private final List<PlacedFeatureInfo> ores;
     private final List<StructurePlacementInfo> structures;
     private final Map<MobCategory, List<MobSpawnInfo>> mobsByCategory;
+    private final Map<ResourceKey<Biome>, List<MobSpawnInfo>> mobsByBiome;
     /**
      * Reverse index: which decoration step(s) each PlacedFeature appears in across all
      * biomes. A feature can sit in multiple steps (rare but possible); the set captures
@@ -97,15 +98,23 @@ public final class VanillaRuleSnapshot {
     public VanillaRuleSnapshot(List<PlacedFeatureInfo> ores,
                                 List<StructurePlacementInfo> structures,
                                 Map<MobCategory, List<MobSpawnInfo>> mobsByCategory,
+                                Map<ResourceKey<Biome>, List<MobSpawnInfo>> mobsByBiome,
                                 Map<ResourceKey<PlacedFeature>, Set<GenerationStep.Decoration>> stepsByFeature,
                                 int worldBottom,
                                 int worldTop) {
         this.ores = List.copyOf(ores);
         this.structures = List.copyOf(structures);
         this.mobsByCategory = Map.copyOf(mobsByCategory);
+        this.mobsByBiome = copyOfListMap(mobsByBiome);
         this.stepsByFeature = copyOfStepsMap(stepsByFeature);
         this.worldBottom = worldBottom;
         this.worldTop = worldTop;
+    }
+
+    private static <K, V> Map<K, List<V>> copyOfListMap(Map<K, List<V>> src) {
+        Map<K, List<V>> copy = new HashMap<>(src.size());
+        src.forEach((k, v) -> copy.put(k, List.copyOf(v)));
+        return Map.copyOf(copy);
     }
 
     private static Map<ResourceKey<PlacedFeature>, Set<GenerationStep.Decoration>> copyOfStepsMap(
@@ -127,7 +136,9 @@ public final class VanillaRuleSnapshot {
 
         List<PlacedFeatureInfo> features = scanPlacedFeatures(server, overworldBottom, overworldTop);
         List<StructurePlacementInfo> structures = scanStructures(server);
-        Map<MobCategory, List<MobSpawnInfo>> mobs = scanMobSpawns(server);
+        var mobScan = scanMobSpawns(server);
+        Map<MobCategory, List<MobSpawnInfo>> mobs = mobScan.byCategory();
+        Map<ResourceKey<Biome>, List<MobSpawnInfo>> mobsBiome = mobScan.byBiome();
         Map<ResourceKey<PlacedFeature>, Set<GenerationStep.Decoration>> stepsByFeature = scanFeatureSteps(server);
 
         long withRange = features.stream().filter(info -> info.range() != FALLBACK_RANGE).count();
@@ -140,8 +151,12 @@ public final class VanillaRuleSnapshot {
                 structures.size(), mobTotal, mobs.size(),
                 overworldBottom, overworldTop);
 
-        return new VanillaRuleSnapshot(features, structures, mobs, stepsByFeature, overworldBottom, overworldTop);
+        return new VanillaRuleSnapshot(features, structures, mobs, mobsBiome, stepsByFeature, overworldBottom, overworldTop);
     }
+
+    /** Group result for {@link #scanMobSpawns}: spawns are indexed two ways simultaneously. */
+    private record MobScan(Map<MobCategory, List<MobSpawnInfo>> byCategory,
+                            Map<ResourceKey<Biome>, List<MobSpawnInfo>> byBiome) {}
 
     /** Walk PLACED_FEATURE; extract VerticalRange via the Access Transformer-exposed fields. */
     private static List<PlacedFeatureInfo> scanPlacedFeatures(MinecraftServer server, int worldBottom, int worldTop) {
@@ -247,25 +262,30 @@ public final class VanillaRuleSnapshot {
      * duplicate entries — this is intentional, since per-biome spawn density compounds the
      * effective rate. Consumers that want unique entity types should de-dup downstream.
      */
-    private static Map<MobCategory, List<MobSpawnInfo>> scanMobSpawns(MinecraftServer server) {
+    private static MobScan scanMobSpawns(MinecraftServer server) {
         HolderLookup.RegistryLookup<Biome> biomeLookup =
                 server.registryAccess().lookupOrThrow(Registries.BIOME);
 
         Map<MobCategory, List<MobSpawnInfo>> byCategory = new HashMap<>();
+        Map<ResourceKey<Biome>, List<MobSpawnInfo>> byBiome = new HashMap<>();
         biomeLookup.listElements().forEach(ref -> {
+            ResourceKey<Biome> biomeKey = ref.unwrapKey().orElseThrow();
             Biome biome = ref.value();
             MobSpawnSettings mobSettings = biome.getMobSettings();
             for (MobCategory category : MobCategory.values()) {
                 var spawners = mobSettings.getMobs(category).unwrap();
                 if (spawners.isEmpty()) continue;
-                List<MobSpawnInfo> bucket = byCategory.computeIfAbsent(category, k -> new ArrayList<>());
+                List<MobSpawnInfo> categoryBucket = byCategory.computeIfAbsent(category, k -> new ArrayList<>());
+                List<MobSpawnInfo> biomeBucket = byBiome.computeIfAbsent(biomeKey, k -> new ArrayList<>());
                 for (MobSpawnSettings.SpawnerData sd : spawners) {
-                    bucket.add(new MobSpawnInfo(
-                            sd.type, category, sd.getWeight().asInt(), sd.minCount, sd.maxCount));
+                    MobSpawnInfo info = new MobSpawnInfo(
+                            sd.type, category, sd.getWeight().asInt(), sd.minCount, sd.maxCount);
+                    categoryBucket.add(info);
+                    biomeBucket.add(info);
                 }
             }
         });
-        return byCategory;
+        return new MobScan(byCategory, byBiome);
     }
 
     private static VerticalRange extractVerticalRange(PlacedFeature pf, int worldBottom, int worldTop) {
@@ -347,16 +367,21 @@ public final class VanillaRuleSnapshot {
         return mobsByCategory.getOrDefault(category, List.of());
     }
 
+    /** Spawn entries originally defined in the given biome's MobSpawnSettings. */
+    public List<MobSpawnInfo> mobsForBiome(ResourceKey<Biome> biome) {
+        return mobsByBiome.getOrDefault(biome, List.of());
+    }
+
     public boolean isEmpty() {
         return ores.isEmpty() && structures.isEmpty() && mobsByCategory.isEmpty();
     }
 
-    /** v0.6 backwards-compat constructor — kept for tests / fixed snapshots that pre-date the step index. */
+    /** v0.6 backwards-compat constructor — kept for tests / fixed snapshots that pre-date the step + biome indices. */
     public VanillaRuleSnapshot(List<PlacedFeatureInfo> ores,
                                 List<StructurePlacementInfo> structures,
                                 Map<MobCategory, List<MobSpawnInfo>> mobsByCategory,
                                 int worldBottom,
                                 int worldTop) {
-        this(ores, structures, mobsByCategory, Map.of(), worldBottom, worldTop);
+        this(ores, structures, mobsByCategory, Map.of(), Map.of(), worldBottom, worldTop);
     }
 }
