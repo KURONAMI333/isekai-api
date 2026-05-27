@@ -3,6 +3,8 @@ package com.kuronami.isekaiapi.api.predicate;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.RegistryCodecs;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -83,10 +85,14 @@ public sealed interface SpatialPredicate {
         @Override public MapCodec<? extends SpatialPredicate> codec() { return MAP_CODEC; }
     }
 
-    /** Block matches {@code target} within {@code maxDistance}. */
-    record NearBlock(Block target, int maxDistance) implements SpatialPredicate {
+    /**
+     * Block matches any entry in {@code targets} within {@code maxDistance}. {@code targets}
+     * accepts the standard {@link HolderSet} JSON shapes: a single block id, a list of
+     * block ids, or a tag reference like {@code "#minecraft:logs"}.
+     */
+    record NearBlock(HolderSet<Block> targets, int maxDistance) implements SpatialPredicate {
         public static final MapCodec<NearBlock> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
-                BuiltInRegistries.BLOCK.byNameCodec().fieldOf("target").forGetter(NearBlock::target),
+                RegistryCodecs.homogeneousList(Registries.BLOCK).fieldOf("targets").forGetter(NearBlock::targets),
                 Codec.INT.fieldOf("max_distance").forGetter(NearBlock::maxDistance)
         ).apply(i, NearBlock::new));
 
