@@ -17,9 +17,11 @@ import java.util.stream.Stream;
  * vanilla {@code HeightRangePlacement.uniform(...)} when the consumer's playable range
  * is anchored to terrain surface rather than a fixed Y range.
  *
- * <p>v0.1: anchor is hardcoded to {@link Heightmap.Types#WORLD_SURFACE_WG}. v0.2 will
- * add the {@link com.kuronami.isekaiapi.api.remap.SurfaceAnchor} dispatch codec so the
- * anchor can be selected from datapack JSON.
+ * <p>Anchor is currently hardcoded to {@link Heightmap.Types#WORLD_SURFACE_WG}.
+ * A future enhancement would let the codec accept any {@code Heightmap.Types} value (or
+ * route through {@link com.kuronami.isekaiapi.api.remap.SurfaceAnchor} for parity with
+ * the descriptor side, which already supports {@code WorldSurface} / {@code BelowFluid}
+ * / {@code FixedY}).
  */
 public class SurfaceRelativeModifier extends PlacementModifier {
     public static final MapCodec<SurfaceRelativeModifier> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(

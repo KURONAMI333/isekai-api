@@ -21,24 +21,22 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Registers {@code /isekai} subcommand tree.
+ * Registers the {@code /isekai} subcommand tree:
  *
- * <p>v0.1 (implemented):
  * <ul>
- *   <li>{@code /isekai version}</li>
- *   <li>{@code /isekai reload} (stub — full datapack reload lands v0.2)</li>
- *   <li>{@code /isekai query dimensions}</li>
- *   <li>{@code /isekai validate <namespace>} (stub — schema validator lands v0.2)</li>
+ *   <li>{@code /isekai version} — print mod version</li>
+ *   <li>{@code /isekai reload} — trigger {@code server.reloadResources(...)}</li>
+ *   <li>{@code /isekai stats} — concise snapshot health report</li>
+ *   <li>{@code /isekai query dimensions} — list dimensions with declared worldshape</li>
+ *   <li>{@code /isekai query worldshape <dim>} — inspect a single dimension's declaration</li>
+ *   <li>{@code /isekai validate <namespace>} — validate every isekai/*.json under that namespace</li>
+ *   <li>{@code /isekai preview range <id> [dim]} — show overworld-resolved + per-dim VerticalRange</li>
+ *   <li>{@code /isekai dump worldgen} — write the full snapshot to {@code <world>/isekai_dump/worldgen.txt}</li>
+ *   <li>{@code /isekai dump ore <id>} — single-feature query</li>
+ *   <li>{@code /isekai dump structure <id>} — single-structure query</li>
  * </ul>
  *
- * <p>v0.2 (planned):
- * <ul>
- *   <li>{@code /isekai dump worldgen [dim]}</li>
- *   <li>{@code /isekai dump ore <id>}</li>
- *   <li>{@code /isekai dump structure <id>}</li>
- * </ul>
- *
- * <p>v1.1: {@code /isekai preview <descriptor_id>}.
+ * <p>All subcommands require permission level 2 (operators).
  */
 @EventBusSubscriber(modid = IsekaiApi.MODID)
 public final class IsekaiCommand {

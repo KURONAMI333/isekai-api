@@ -25,14 +25,19 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * v0.2 implementation backed by {@link VanillaRuleSnapshot}. The lifecycle hook
- * ({@link com.kuronami.isekaiapi.lifecycle.IsekaiLifecycle#onServerAboutToStart})
- * scans the registries and calls {@link #setSnapshot} to populate the cache;
- * queries then read from it in O(1).
+ * {@link IsekaiQuery} implementation backed by an immutable {@link VanillaRuleSnapshot}.
+ * The lifecycle hook ({@link com.kuronami.isekaiapi.lifecycle.IsekaiLifecycle#onServerAboutToStart})
+ * scans the registries at server start and calls {@link #setSnapshot} to populate the
+ * cache; subsequent datapack reloads rebuild it via
+ * {@link com.kuronami.isekaiapi.lifecycle.SnapshotRefreshListener}. Reads are O(1) once
+ * the cache is populated.
  *
- * <p>Before the lifecycle has fired (cold start), the snapshot is
- * {@link VanillaRuleSnapshot#EMPTY} and all queries return empty results — the
- * same behavior as the v0.1 stub.
+ * <p>Before the first scan completes (very early lifecycle stages), the snapshot is
+ * {@link VanillaRuleSnapshot#EMPTY} and all queries return empty results.
+ *
+ * <p>Density function and noise settings lookups bypass the snapshot and read directly
+ * from the live registry via {@link ServerLifecycleHooks#getCurrentServer()}, so they
+ * always reflect the post-reload state without needing a fresh scan.
  */
 public final class IsekaiQueryImpl implements IsekaiQuery {
 
@@ -120,13 +125,33 @@ public final class IsekaiQueryImpl implements IsekaiQuery {
                 .get(key).map(net.minecraft.core.Holder::value);
     }
 
+    /**
+     * Per-dimension snapshot. Filters the global feature list down to entries whose Y
+     * range overlaps the dimension's build height, and pulls the per-dim VerticalRange
+     * override (set by {@link VanillaRuleSnapshot#oreRangeInDimension}) when available.
+     * Structures pass through unchanged; mob spawn entries are absent here (callers should
+     * use {@link #getMobSpawnsForBiome} for per-biome spawn data).
+     *
+     * <p>This view is purely diagnostic — it's the input data {@code IsekaiRemap} would
+     * see for that dimension, not the post-modifier result. Use the corresponding biome
+     * modifier output to inspect what actually generates.
+     */
     @Override
     public WorldshapeSnapshot getSnapshot(ResourceKey<Level> dimension) {
-        // The per-dimension WorldshapeSnapshot is a different concept from the global
-        // VanillaRuleSnapshot — it's the consumer's declared remap applied to vanilla.
-        // Lands in v0.3 alongside the biome modifier generator.
-        return new WorldshapeSnapshot(dimension, List.of(), List.of(), List.of());
+        VanillaRuleSnapshot snap = snapshot.get();
+        List<PlacedFeatureInfo> dimOres = snap.ores().stream().map(info -> {
+            var override = snap.oreRangeInDimension(info.key(), dimension);
+            return override.isPresent()
+                    ? new PlacedFeatureInfo(info.key(), override.get(), info.count(), info.biomes())
+                    : info;
+        }).toList();
+        return new WorldshapeSnapshot(dimension, dimOres, snap.structures(), List.of());
     }
 
-    @Override public Set<ResourceKey<Level>> getDimensionsWithWorldshape() { return Set.of(); }
+    @Override
+    public Set<ResourceKey<Level>> getDimensionsWithWorldshape() {
+        // Delegate to the remap-side registry, which is the canonical source for
+        // 'which dimensions have a declaration'. IsekaiRemapImpl tracks single + layered.
+        return com.kuronami.isekaiapi.api.Isekai.remap().getDeclaredDimensions();
+    }
 }
