@@ -10,7 +10,9 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.VerticalAnchor;
 import net.minecraft.world.level.levelgen.heightproviders.HeightProvider;
 import net.minecraft.world.level.levelgen.heightproviders.TrapezoidHeight;
@@ -18,8 +20,13 @@ import net.minecraft.world.level.levelgen.heightproviders.UniformHeight;
 import net.minecraft.world.level.levelgen.placement.HeightRangePlacement;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.placement.PlacementModifier;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureSet;
+import net.minecraft.world.level.levelgen.structure.placement.StructurePlacement;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -68,11 +75,24 @@ public final class VanillaRuleSnapshot {
     }
 
     public static VanillaRuleSnapshot scan(MinecraftServer server) {
-        IsekaiApi.LOGGER.info("[Isekai v0.4] VanillaRuleSnapshot.scan: walking PLACED_FEATURE registry");
+        IsekaiApi.LOGGER.info("[Isekai v0.6] VanillaRuleSnapshot.scan: walking PLACED_FEATURE + STRUCTURE registries");
 
+        List<PlacedFeatureInfo> features = scanPlacedFeatures(server);
+        List<StructurePlacementInfo> structures = scanStructures(server);
+
+        long withRange = features.stream().filter(info -> info.range() != FALLBACK_RANGE).count();
+        IsekaiApi.LOGGER.info(
+                "[Isekai v0.6] Scanned {} placed features ({} with extracted VerticalRange, "
+                        + "{} with fallback) + {} structure placements; mob-spawns deferred",
+                features.size(), withRange, features.size() - withRange, structures.size());
+
+        return new VanillaRuleSnapshot(features, structures, Map.of());
+    }
+
+    /** Walk PLACED_FEATURE; extract VerticalRange via the Access Transformer-exposed fields. */
+    private static List<PlacedFeatureInfo> scanPlacedFeatures(MinecraftServer server) {
         HolderLookup.RegistryLookup<PlacedFeature> lookup =
                 server.registryAccess().lookupOrThrow(Registries.PLACED_FEATURE);
-
         List<PlacedFeatureInfo> features = new ArrayList<>();
         lookup.listElements().forEach(ref -> {
             ResourceKey<PlacedFeature> key = ref.unwrapKey().orElseThrow();
@@ -80,14 +100,59 @@ public final class VanillaRuleSnapshot {
             VerticalRange range = extractVerticalRange(pf);
             features.add(new PlacedFeatureInfo(key, range != null ? range : FALLBACK_RANGE, 1, Set.of()));
         });
-        long withRange = features.stream().filter(info -> info.range() != FALLBACK_RANGE).count();
+        return features;
+    }
 
-        IsekaiApi.LOGGER.info(
-                "[Isekai v0.4] Scanned {} placed features ({} with extracted VerticalRange, "
-                        + "{} with fallback); structures + mob-spawns deferred to v0.5",
-                features.size(), withRange, features.size() - withRange);
+    /**
+     * Walk STRUCTURE_SET to build a Structure -> StructurePlacement reverse map, then walk
+     * STRUCTURE to emit one {@link StructurePlacementInfo} per (structure, set) pairing.
+     * Structures not in any set are skipped (they would never generate). Structures in
+     * multiple sets emit one entry per set, so callers see every placement variant.
+     */
+    private static List<StructurePlacementInfo> scanStructures(MinecraftServer server) {
+        var registryAccess = server.registryAccess();
+        HolderLookup.RegistryLookup<StructureSet> setLookup =
+                registryAccess.lookupOrThrow(Registries.STRUCTURE_SET);
+        HolderLookup.RegistryLookup<Structure> structureLookup =
+                registryAccess.lookupOrThrow(Registries.STRUCTURE);
 
-        return new VanillaRuleSnapshot(features, List.of(), Map.of());
+        // Build structure-key -> list-of-placements via the StructureSet entries.
+        Map<ResourceKey<Structure>, List<StructurePlacement>> placementsByStructure = new HashMap<>();
+        setLookup.listElements().forEach(setRef -> {
+            StructureSet set = setRef.value();
+            StructurePlacement placement = set.placement();
+            for (StructureSet.StructureSelectionEntry entry : set.structures()) {
+                entry.structure().unwrapKey().ifPresent(key ->
+                        placementsByStructure.computeIfAbsent(key, k -> new ArrayList<>()).add(placement));
+            }
+        });
+
+        List<StructurePlacementInfo> infos = new ArrayList<>();
+        structureLookup.listElements().forEach(ref -> {
+            ResourceKey<Structure> key = ref.unwrapKey().orElseThrow();
+            Structure structure = ref.value();
+            List<StructurePlacement> placements = placementsByStructure.get(key);
+            if (placements == null || placements.isEmpty()) {
+                // Defined but not bound to any set — silently skip; it wouldn't generate.
+                return;
+            }
+            Set<TagKey<Biome>> biomeTags = extractBiomeTags(structure);
+            for (StructurePlacement placement : placements) {
+                infos.add(new StructurePlacementInfo(key, placement, biomeTags));
+            }
+        });
+        return infos;
+    }
+
+    /**
+     * Extract biome tag references from a Structure's biome filter. HolderSet can be either
+     * a tag-backed view ({@code Either.left}) or a direct list of holders; only the tag-backed
+     * form yields a {@link TagKey}, so this returns an empty set otherwise.
+     */
+    private static Set<TagKey<Biome>> extractBiomeTags(Structure structure) {
+        Set<TagKey<Biome>> tags = new HashSet<>();
+        structure.biomes().unwrap().ifLeft(tags::add);
+        return tags;
     }
 
     private static VerticalRange extractVerticalRange(PlacedFeature pf) {
