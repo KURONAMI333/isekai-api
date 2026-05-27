@@ -69,6 +69,6 @@ public final class IsekaiDensityFunctions {
 
     public static void register(IEventBus modBus) {
         CODECS.register(modBus);
-        IsekaiApi.LOGGER.info("Isekai density function primitives registered: 16 neutral primitives");
+        IsekaiApi.LOGGER.info("[Isekai] density function primitives registered: 16 neutral primitives");
     }
 }

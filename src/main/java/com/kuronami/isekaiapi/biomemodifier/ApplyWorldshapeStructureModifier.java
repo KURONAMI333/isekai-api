@@ -54,11 +54,11 @@ public record ApplyWorldshapeStructureModifier(WorldshapeDescriptor worldshape) 
     }
 
     private boolean isExcluded(Holder<Structure> structure) {
-        return structure.unwrapKey().map(worldshape.excludedStructures()::contains).orElse(false);
+        return structure.unwrapKey().map(worldshape.exclusions().structures()::contains).orElse(false);
     }
 
     @Override
     public MapCodec<? extends StructureModifier> codec() {
-        return IsekaiBiomeModifiers.APPLY_WORLDSHAPE_STRUCTURES.get();
+        return IsekaiStructureModifiers.APPLY_WORLDSHAPE_STRUCTURES.get();
     }
 }

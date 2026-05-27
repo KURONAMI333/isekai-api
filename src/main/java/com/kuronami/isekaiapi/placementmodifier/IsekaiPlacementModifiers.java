@@ -42,6 +42,6 @@ public final class IsekaiPlacementModifiers {
 
     public static void register(IEventBus modBus) {
         TYPES.register(modBus);
-        IsekaiApi.LOGGER.info("Isekai placement modifiers registered: surface_relative, fluid_relative, in_block_context");
+        IsekaiApi.LOGGER.info("[Isekai] placement modifiers registered: surface_relative, fluid_relative, in_block_context");
     }
 }
