@@ -16,7 +16,19 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * v0.1 stub. Records declarations in-memory; biome modifier generation lands in v0.2.
+ * Concurrent in-memory registry of consumer-declared worldshape descriptors. Single-layer
+ * declarations enforce {@link WorldshapeDescriptor#priority()} ties via
+ * {@link Map#compute}; layered declarations replace on conflict (per spec — multi-layer
+ * stacks are typically one-per-dimension by design).
+ *
+ * <p>Reads are O(1) via the two ConcurrentHashMaps; writes are O(1) amortised. The maps
+ * are the canonical store backing both the Java {@link IsekaiRemap} API and the JSON
+ * reload pipeline ({@link com.kuronami.isekaiapi.lifecycle.IsekaiReloadListener}).
+ *
+ * <p>Actual chunk-gen effect of declared descriptors flows through NeoForge biome /
+ * structure modifiers ({@link com.kuronami.isekaiapi.biomemodifier.ApplyWorldshapeBiomeModifier}
+ * and {@link com.kuronami.isekaiapi.biomemodifier.ApplyWorldshapeStructureModifier}) — this
+ * class only owns the registry, not the application.
  */
 public final class IsekaiRemapImpl implements IsekaiRemap {
 
@@ -37,7 +49,7 @@ public final class IsekaiRemapImpl implements IsekaiRemap {
                         "[Isekai] Replacing single-layer descriptor for {} (priority {} -> {})",
                         descriptor.dimension(), existing.priority(), descriptor.priority());
             }
-            IsekaiApi.LOGGER.info("[Isekai v0.1 stub] declareWorldshape: dim={}, range={}, priority={}",
+            IsekaiApi.LOGGER.info("[Isekai] declareWorldshape: dim={}, range={}, priority={}",
                     descriptor.dimension(), descriptor.playableRange(), descriptor.priority());
             return descriptor;
         });
@@ -48,21 +60,21 @@ public final class IsekaiRemapImpl implements IsekaiRemap {
                                           List<LayeredDescriptor> layers,
                                           TransitionRule transition) {
         multiLayer.put(dimension, List.copyOf(layers));
-        IsekaiApi.LOGGER.info("[Isekai v0.1 stub] declareLayeredWorldshape: dim={}, layers={}, transition={}",
+        IsekaiApi.LOGGER.info("[Isekai] declareLayeredWorldshape: dim={}, layers={}, transition={}",
                 dimension, layers.size(), transition.getClass().getSimpleName());
     }
 
     @Override
     public void updateWorldshape(ResourceKey<Level> dimension, WorldshapeDescriptor newDescriptor) {
         singleLayer.put(dimension, newDescriptor);
-        IsekaiApi.LOGGER.info("[Isekai v0.1 stub] updateWorldshape: dim={}", dimension);
+        IsekaiApi.LOGGER.info("[Isekai] updateWorldshape: dim={}", dimension);
     }
 
     @Override
     public void removeWorldshape(ResourceKey<Level> dimension) {
         singleLayer.remove(dimension);
         multiLayer.remove(dimension);
-        IsekaiApi.LOGGER.info("[Isekai v0.1 stub] removeWorldshape: dim={}", dimension);
+        IsekaiApi.LOGGER.info("[Isekai] removeWorldshape: dim={}", dimension);
     }
 
     @Override

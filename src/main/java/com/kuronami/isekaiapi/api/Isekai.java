@@ -13,9 +13,11 @@ import com.kuronami.isekaiapi.impl.VanillaRuleSnapshot;
  *   <li>{@link #remap()} — declare your worldshape transformation</li>
  * </ul>
  *
- * <p>v0.1: API surface frozen; density function primitives are registered and usable.
- * Query and Remap return immutable no-op stubs — the vanilla rule scanner and biome
- * modifier generator land in v0.2.
+ * <p>Both facades are backed by snapshot/registry state populated at
+ * {@code ServerAboutToStartEvent} and refreshed on every datapack reload — queries
+ * return real data once the server has started, and declarations take effect via the
+ * accompanying NeoForge biome / structure modifiers
+ * ({@code isekai_api:apply_worldshape} / {@code isekai_api:apply_worldshape_structures}).
  */
 public final class Isekai {
     private static final IsekaiQuery QUERY = new IsekaiQueryImpl();
