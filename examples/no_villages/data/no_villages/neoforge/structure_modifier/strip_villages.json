@@ -1,0 +1,23 @@
+{
+  "type": "isekai_api:apply_worldshape_structures",
+  "worldshape": {
+    "dimension": "minecraft:overworld",
+    "playable_range": {
+      "min_y": -64,
+      "max_y": 320,
+      "distribution": "uniform"
+    },
+    "surface_anchor": { "type": "isekai:world_surface" },
+    "ore_strategy":       { "type": "isekai:identity" },
+    "structure_strategy": { "type": "isekai:identity" },
+    "mob_spawn_strategy": { "type": "isekai:identity" },
+    "default_structure_predicate": { "type": "isekai:always" },
+    "excluded_structures": [
+      "minecraft:village_plains",
+      "minecraft:village_desert",
+      "minecraft:village_savanna",
+      "minecraft:village_snowy",
+      "minecraft:village_taiga"
+    ]
+  }
+}
