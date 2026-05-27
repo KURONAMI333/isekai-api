@@ -151,13 +151,11 @@ public record ApplyWorldshapeBiomeModifier(WorldshapeDescriptor worldshape) impl
     /**
      * ADD phase: for each snapshot ore feature, apply the descriptor's ore strategy to its
      * vanilla VerticalRange, rebuild the PlacedFeature with the new HeightRangePlacement,
-     * and inject it into the {@code UNDERGROUND_ORES} step as a direct holder.
+     * and inject it into <em>each decoration step the original feature lived in</em>
+     * (recorded at scan time, queried via {@link VanillaRuleSnapshot#stepsFor}).
      *
-     * <p>v0.7 limitation: all remapped features land in {@code UNDERGROUND_ORES} regardless
-     * of their original decoration step, since PlacedFeatures don't store their own step
-     * (that's a per-biome property). For features whose actual step matters (e.g. surface
-     * vegetation features), this would generate at the wrong phase. Per-step preservation
-     * lands in v0.8 alongside a step-aware snapshot rebuild.
+     * <p>Features the snapshot didn't see in any biome at scan time (e.g. ones added by a
+     * later biome modifier) fall back to {@code UNDERGROUND_ORES} so they still generate.
      */
     private void addRemappedOreFeatures(ModifiableBiomeInfo.BiomeInfo.Builder builder) {
         if (worldshape.oreStrategy() instanceof RemapStrategy.Identity) {
@@ -178,13 +176,10 @@ public record ApplyWorldshapeBiomeModifier(WorldshapeDescriptor worldshape) impl
         var strategy = worldshape.oreStrategy();
         var playable = worldshape.playableRange();
         int added = 0;
-        int skipped = 0;
         for (PlacedFeatureInfo info : snapshot.ores()) {
             // Only remap features whose vanilla VerticalRange we successfully extracted;
-            // anything else doesn't have a HRP to swap, so the rebuilder would no-op.
-            if (info.range().minY() == -64 && info.range().maxY() == 320) {
-                // Fallback range — skip.
-                skipped++;
+            // anything else doesn't have a HRP to swap.
+            if (snapshot.isFallback(info)) {
                 continue;
             }
             var original = lookup.get(info.key()).orElse(null);
@@ -195,10 +190,17 @@ public record ApplyWorldshapeBiomeModifier(WorldshapeDescriptor worldshape) impl
                     snapshot.worldBottom(), snapshot.worldTop());
             PlacedFeature rebuilt = PlacedFeatureRebuilder.withNewRange(original.value(), newRange);
             if (rebuilt == null) {
-                // No HRP to swap — caller can't sensibly remap, leave as-is.
                 continue;
             }
-            generation.addFeature(GenerationStep.Decoration.UNDERGROUND_ORES, Holder.direct(rebuilt));
+            Holder<PlacedFeature> rebuiltHolder = Holder.direct(rebuilt);
+            Set<GenerationStep.Decoration> steps = snapshot.stepsFor(info.key());
+            if (steps.isEmpty()) {
+                generation.addFeature(GenerationStep.Decoration.UNDERGROUND_ORES, rebuiltHolder);
+            } else {
+                for (GenerationStep.Decoration step : steps) {
+                    generation.addFeature(step, rebuiltHolder);
+                }
+            }
             added++;
         }
         if (added > 0) {
@@ -214,7 +216,7 @@ public record ApplyWorldshapeBiomeModifier(WorldshapeDescriptor worldshape) impl
         if (snapshot == null) return Set.of();
         Set<ResourceKey<PlacedFeature>> set = new HashSet<>();
         for (PlacedFeatureInfo info : snapshot.ores()) {
-            if (info.range().minY() == -64 && info.range().maxY() == 320) continue; // fallback
+            if (snapshot.isFallback(info)) continue;
             set.add(info.key());
         }
         return set;
