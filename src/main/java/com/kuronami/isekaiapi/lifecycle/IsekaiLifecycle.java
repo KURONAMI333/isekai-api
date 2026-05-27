@@ -1,7 +1,7 @@
 package com.kuronami.isekaiapi.lifecycle;
 
 import com.kuronami.isekaiapi.IsekaiApi;
-import com.kuronami.isekaiapi.api.Isekai;
+import com.kuronami.isekaiapi.impl.IsekaiInternal;
 import com.kuronami.isekaiapi.impl.VanillaRuleSnapshot;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -29,7 +29,7 @@ public final class IsekaiLifecycle {
     public static void onServerAboutToStart(ServerAboutToStartEvent event) {
         IsekaiApi.LOGGER.info("[Isekai] ServerAboutToStartEvent: scanning vanilla worldgen rules");
         var snapshot = VanillaRuleSnapshot.scan(event.getServer());
-        Isekai.publishSnapshot(snapshot);
+        IsekaiInternal.publishSnapshot(snapshot);
         IsekaiApi.LOGGER.info("[Isekai] Snapshot published (empty={}); query API now backed by cache",
                 snapshot.isEmpty());
     }

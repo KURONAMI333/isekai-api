@@ -138,6 +138,32 @@ public final class IsekaiValidator {
         // Walk per-category overrides too — each is an independent strategy tree.
         d.mobSpawnStrategyByCategory().forEach((cat, strat) ->
                 crossCheckStrategy("mob_spawn_strategy_by_category[" + cat.getSerializedName() + "]", strat));
+        // structure_strategy only reaches RandomSpreadStructurePlacement.spacing via the
+        // CountScale factor — Linear / Inverted / FixedRange / BandSplit have no semantic
+        // meaning for structure spawn frequency and are silently ignored at chunk gen.
+        // Warn the consumer so the no-op isn't surprising.
+        verifyStructureStrategyMeaningful(d.structureStrategy());
+    }
+
+    /**
+     * Walk a structure_strategy tree and reject any variant other than Identity,
+     * CountScale, or Pipe-of-meaningful. Linear / Inverted / FixedRange / BandSplit are
+     * legal in the codec but have no effect on structure placement; rather than letting
+     * a consumer wonder why their structure_strategy 'didn't do anything', surface this
+     * as a validation error.
+     */
+    private static void verifyStructureStrategyMeaningful(com.kuronami.isekaiapi.api.remap.RemapStrategy s) {
+        if (s instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.Identity) return;
+        if (s instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.CountScale) return;
+        if (s instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.Pipe p) {
+            for (var child : p.chain()) verifyStructureStrategyMeaningful(child);
+            return;
+        }
+        throw new IllegalArgumentException(
+                "structure_strategy: " + s.getClass().getSimpleName()
+                        + " has no effect on structure placement; only Identity, CountScale, "
+                        + "and Pipe (of those) are meaningful for the spacing/separation hook. "
+                        + "Use ore_strategy / mob_spawn_strategy for Linear-style remap.");
     }
 
     /** Cross-field checks for a {@code LayeredFile}: non-overlapping y_ranges, monotone. */
