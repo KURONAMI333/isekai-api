@@ -1,5 +1,6 @@
 package com.kuronami.isekaiapi;
 
+import com.kuronami.isekaiapi.biomemodifier.IsekaiBiomeModifiers;
 import com.kuronami.isekaiapi.densityfunction.IsekaiDensityFunctions;
 import com.kuronami.isekaiapi.placementmodifier.IsekaiPlacementModifiers;
 import com.mojang.logging.LogUtils;
@@ -17,6 +18,6 @@ public final class IsekaiApi {
         LOGGER.info("Isekai API v{} loading", VERSION);
         IsekaiDensityFunctions.register(modBus);
         IsekaiPlacementModifiers.register(modBus);
-        // v0.2: vanilla rule snapshot scanner + datapack reload pipeline.
+        IsekaiBiomeModifiers.register(modBus);
     }
 }
