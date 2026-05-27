@@ -1,0 +1,26 @@
+{
+  "dimension": "minecraft:overworld",
+  "playable_range": {
+    "min_y": 100,
+    "max_y": 200,
+    "distribution": "uniform"
+  },
+  "surface_anchor": {
+    "type": "isekai:fixed_y",
+    "y": 150
+  },
+  "ore_strategy": {
+    "type": "isekai:linear"
+  },
+  "structure_strategy": {
+    "type": "isekai:linear"
+  },
+  "mob_spawn_strategy": {
+    "type": "isekai:linear"
+  },
+  "default_structure_predicate": {
+    "type": "isekai:y_in_range",
+    "min": 100,
+    "max": 200
+  }
+}

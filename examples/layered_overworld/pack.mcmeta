@@ -1,0 +1,6 @@
+{
+  "pack": {
+    "pack_format": 48,
+    "description": "Isekai example: layered overworld (skyland y=120..200 on top of normal terrain y=-64..70 with a 4-block blend at the seam)"
+  }
+}
