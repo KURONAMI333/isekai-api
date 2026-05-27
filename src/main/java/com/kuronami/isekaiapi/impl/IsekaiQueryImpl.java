@@ -65,6 +65,17 @@ public final class IsekaiQueryImpl implements IsekaiQuery {
     @Override public List<PlacedFeatureInfo> getAllOres() { return snapshot.get().ores(); }
 
     @Override
+    public Optional<VerticalRange> getOreVerticalRangeInDimension(ResourceKey<PlacedFeature> ore,
+                                                                   ResourceKey<Level> dimension) {
+        // Try the per-dim override first; fall back to the global (overworld-resolved) entry
+        // when the dimension shares overworld bounds (no override stored).
+        VanillaRuleSnapshot snap = snapshot.get();
+        var override = snap.oreRangeInDimension(ore, dimension);
+        if (override.isPresent()) return override;
+        return getOreVerticalRange(ore);
+    }
+
+    @Override
     public List<PlacedFeatureInfo> getOresByTag(TagKey<PlacedFeature> tag) {
         return snapshot.get().oresForTag(tag);
     }

@@ -26,6 +26,16 @@ public interface IsekaiQuery {
     List<PlacedFeatureInfo> getAllOres();
     List<PlacedFeatureInfo> getOresByTag(TagKey<PlacedFeature> tag);
 
+    /**
+     * Per-dimension VerticalRange resolution. Features with {@code VerticalAnchor.AboveBottom}
+     * or {@code BelowTop} resolve against the named dimension's build height instead of the
+     * overworld defaults. Features with absolute anchors return the same Y regardless of
+     * dimension. Returns {@code Optional.empty()} if the feature wasn't scanned or the
+     * dimension wasn't loaded at scan time.
+     */
+    Optional<VerticalRange> getOreVerticalRangeInDimension(ResourceKey<PlacedFeature> ore,
+                                                            ResourceKey<Level> dimension);
+
     // structures
     Optional<StructurePlacementInfo> getStructurePlacement(ResourceKey<Structure> structure);
     List<StructurePlacementInfo> getAllStructures();
