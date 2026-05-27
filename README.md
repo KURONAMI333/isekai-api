@@ -101,22 +101,21 @@ Isekai.query().getOreVerticalRangeInDimension(featureKey, Level.NETHER);
 Isekai.query().getMobsByCategory(MobCategory.MONSTER);
 
 // Declare a worldshape from Java (alternative to datapack JSON)
-Isekai.remap().declareWorldshape(new WorldshapeDescriptor(
-    Level.OVERWORLD,
-    new VerticalRange(80, 200, HeightDistribution.UNIFORM),
-    new SurfaceAnchor.FixedY(150),
-    new RemapStrategy.Linear(),         // oreStrategy
-    new RemapStrategy.Identity(),       // structureStrategy
-    new RemapStrategy.Identity(),       // mobSpawnStrategy
-    Map.of(),                           // structurePredicates (per-structure overrides)
-    new SpatialPredicate.YInRange(80, 200),   // defaultStructurePredicate
-    Set.of(),                           // appliesTo (empty = every biome)
-    Set.of(),                           // excludedFeatures
-    Set.of(),                           // excludedStructures
-    Map.of(),                           // mobSpawnStrategyByCategory
-    List.of(),                          // additionalFeatures
-    100));                              // priority
+Isekai.remap().declareWorldshape(WorldshapeDescriptor.builder()
+    .dimension(Level.OVERWORLD)
+    .playableRange(new VerticalRange(80, 200, HeightDistribution.UNIFORM))
+    .surfaceAnchor(new SurfaceAnchor.FixedY(150))
+    .oreStrategy(new RemapStrategy.Linear())
+    .structureStrategy(new RemapStrategy.Identity())
+    .mobSpawnStrategy(new RemapStrategy.Identity())
+    .defaultStructurePredicate(new SpatialPredicate.YInRange(80, 200))
+    .priority(110)
+    .build());
 ```
+
+Optional fields (`appliesTo`, `exclusions`, `additions`, `atmosphere`,
+`structurePredicates`, `mobSpawnStrategyByCategory`) default to empty / EMPTY when
+omitted from the builder chain.
 
 ### Commands
 
