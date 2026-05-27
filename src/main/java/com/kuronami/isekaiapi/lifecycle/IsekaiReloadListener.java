@@ -31,8 +31,9 @@ import java.util.Set;
  *   <li>Java-side declarations (consumers calling {@code declareWorldshape} directly)
  *       are <b>not</b> touched — this listener only owns JSON-sourced state.</li>
  *   <li>If a JSON file fails to decode, that single entry is skipped with an error log;
- *       the rest still apply. This matches the {@code validation_strict_mode = false}
- *       default; strict mode lands in v0.6 alongside the config.</li>
+ *       the rest still apply. Set system property {@code -Disekai.strict=true} to flip
+ *       this — under strict mode, any decode failure throws and aborts the entire reload,
+ *       preventing a partially-applied pack from going live.</li>
  * </ul>
  *
  * <p>The companion {@code layered_worldshape/} directory is handled the same way; each
@@ -47,6 +48,15 @@ public final class IsekaiReloadListener extends SimpleJsonResourceReloadListener
 
     /** Directory under {@code data/<ns>/} scanned for multi-layer worldshape JSON. */
     public static final String LAYERED_DIR = "isekai/layered_worldshape";
+
+    /**
+     * Strict validation mode toggle. Read once at class load from
+     * {@code -Disekai.strict=true}; flipping at runtime is not supported. When enabled,
+     * any decode/declare failure during reload throws and aborts the whole reload —
+     * Minecraft falls back to the previously-good pack state, surfacing the underlying
+     * exception in the server log instead of letting a half-applied pack go live.
+     */
+    public static final boolean STRICT_MODE = Boolean.getBoolean("isekai.strict");
 
     /**
      * Per-dimension keys most recently loaded from JSON. We retain this so a subsequent
@@ -76,20 +86,30 @@ public final class IsekaiReloadListener extends SimpleJsonResourceReloadListener
 
     @Override
     protected void apply(Map<ResourceLocation, JsonElement> entries, ResourceManager rm, ProfilerFiller profiler) {
-        IsekaiApi.LOGGER.info("[Isekai] reload: {} mode={}, {} entries",
-                mode == Mode.SINGLE ? WORLDSHAPE_DIR : LAYERED_DIR, mode, entries.size());
+        IsekaiApi.LOGGER.info("[Isekai] reload: {} mode={}, {} entries (strict={})",
+                mode == Mode.SINGLE ? WORLDSHAPE_DIR : LAYERED_DIR, mode, entries.size(), STRICT_MODE);
 
         Set<net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>> previous = Set.copyOf(lastJsonDimensions);
         lastJsonDimensions.clear();
 
+        java.util.List<String> failedIds = new java.util.ArrayList<>();
         if (mode == Mode.SINGLE) {
             for (Map.Entry<ResourceLocation, JsonElement> e : entries.entrySet()) {
-                applySingle(e.getKey(), e.getValue());
+                applySingle(e.getKey(), e.getValue(), failedIds);
             }
         } else {
             for (Map.Entry<ResourceLocation, JsonElement> e : entries.entrySet()) {
-                applyLayered(e.getKey(), e.getValue());
+                applyLayered(e.getKey(), e.getValue(), failedIds);
             }
+        }
+
+        if (STRICT_MODE && !failedIds.isEmpty()) {
+            // Throwing here aborts the entire reload; Minecraft restores the previous pack
+            // state and logs the failure. Lenient mode just continues with whatever succeeded.
+            throw new IllegalStateException(
+                    "Isekai strict mode: aborting reload — " + failedIds.size()
+                            + " " + (mode == Mode.SINGLE ? WORLDSHAPE_DIR : LAYERED_DIR)
+                            + " entries failed: " + failedIds);
         }
 
         // Remove dimensions that were in JSON before but not in the new pack.
@@ -101,8 +121,9 @@ public final class IsekaiReloadListener extends SimpleJsonResourceReloadListener
         }
     }
 
-    private void applySingle(ResourceLocation entryId, JsonElement json) {
+    private void applySingle(ResourceLocation entryId, JsonElement json, java.util.List<String> failedIds) {
         DataResult<WorldshapeDescriptor> result = decode(WorldshapeDescriptor.CODEC, json, entryId);
+        boolean[] failed = {false};
         result.ifSuccess(d -> {
             try {
                 Isekai.remap().declareWorldshape(d);
@@ -110,10 +131,14 @@ public final class IsekaiReloadListener extends SimpleJsonResourceReloadListener
             } catch (RuntimeException ex) {
                 IsekaiApi.LOGGER.error("[Isekai] reload: declareWorldshape failed for {}: {}",
                         entryId, ex.getMessage());
+                failed[0] = true;
             }
         });
-        result.ifError(err -> IsekaiApi.LOGGER.error("[Isekai] reload: failed to decode {}: {}",
-                entryId, err.message()));
+        result.ifError(err -> {
+            IsekaiApi.LOGGER.error("[Isekai] reload: failed to decode {}: {}", entryId, err.message());
+            failed[0] = true;
+        });
+        if (failed[0]) failedIds.add(entryId.toString());
     }
 
     /**
@@ -126,8 +151,9 @@ public final class IsekaiReloadListener extends SimpleJsonResourceReloadListener
      * }
      * </pre>
      */
-    private void applyLayered(ResourceLocation entryId, JsonElement json) {
+    private void applyLayered(ResourceLocation entryId, JsonElement json, java.util.List<String> failedIds) {
         DataResult<LayeredFile> result = decode(LayeredFile.CODEC, json, entryId);
+        boolean[] failed = {false};
         result.ifSuccess(f -> {
             try {
                 Isekai.remap().declareLayeredWorldshape(f.dimension(), f.layers(), f.transition());
@@ -135,10 +161,14 @@ public final class IsekaiReloadListener extends SimpleJsonResourceReloadListener
             } catch (RuntimeException ex) {
                 IsekaiApi.LOGGER.error("[Isekai] reload: declareLayeredWorldshape failed for {}: {}",
                         entryId, ex.getMessage());
+                failed[0] = true;
             }
         });
-        result.ifError(err -> IsekaiApi.LOGGER.error("[Isekai] reload: failed to decode {}: {}",
-                entryId, err.message()));
+        result.ifError(err -> {
+            IsekaiApi.LOGGER.error("[Isekai] reload: failed to decode {}: {}", entryId, err.message());
+            failed[0] = true;
+        });
+        if (failed[0]) failedIds.add(entryId.toString());
     }
 
     private static <T> DataResult<T> decode(Codec<T> codec, JsonElement json, ResourceLocation id) {
