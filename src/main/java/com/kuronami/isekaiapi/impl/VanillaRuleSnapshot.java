@@ -153,14 +153,23 @@ public final class VanillaRuleSnapshot {
     }
 
     public static VanillaRuleSnapshot scan(MinecraftServer server) {
-        IsekaiApi.LOGGER.info("[Isekai v0.8] VanillaRuleSnapshot.scan: walking PLACED_FEATURE + STRUCTURE + BIOME registries");
+        IsekaiApi.LOGGER.info("[Isekai] VanillaRuleSnapshot.scan: walking PLACED_FEATURE + STRUCTURE + BIOME registries");
 
-        // Resolve the overworld's actual build height range — vanilla 1.21.1 ships -64..320
-        // but cubic-chunks or world height mods can change this. PlacedFeatures scanned here
-        // are typically authored against the overworld even when reused in modded dimensions
-        // (the Y range absoluteness is set at server startup, not per-level visit).
-        int overworldBottom = server.overworld().getMinBuildHeight();
-        int overworldTop = server.overworld().getMaxBuildHeight();
+        // Resolve the overworld's actual build height range. At ServerAboutToStartEvent
+        // (the first scan trigger), the worlds map hasn't been populated yet — overworld()
+        // returns null. Fall back to vanilla 1.21.1 defaults in that case; the snapshot
+        // gets rebuilt on every datapack reload (SnapshotRefreshListener) when worlds are
+        // available and would catch any custom build heights then.
+        int overworldBottom = -64;
+        int overworldTop = 320;
+        var overworldLevel = server.overworld();
+        if (overworldLevel != null) {
+            overworldBottom = overworldLevel.getMinBuildHeight();
+            overworldTop = overworldLevel.getMaxBuildHeight();
+        } else {
+            IsekaiApi.LOGGER.debug("[Isekai] scan at pre-world lifecycle stage; using overworld defaults {}..{}",
+                    overworldBottom, overworldTop);
+        }
 
         var placedScan = scanPlacedFeatures(server, overworldBottom, overworldTop);
         List<PlacedFeatureInfo> features = placedScan.features();
