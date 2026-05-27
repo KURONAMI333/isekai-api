@@ -76,7 +76,35 @@ public record ApplyWorldshapeBiomeModifier(WorldshapeDescriptor worldshape) impl
             addRemappedOreFeatures(builder);
         } else if (phase == Phase.MODIFY) {
             applyMobSpawnStrategy(builder);
+            applyAtmosphereOverride(builder);
         }
+    }
+
+    /**
+     * MODIFY phase: apply any set fields of {@link WorldshapeDescriptor#atmosphere()} to
+     * the biome's {@code ClimateSettings} and {@code BiomeSpecialEffects}. Unset fields
+     * (Optional.empty()) leave the biome's value unchanged.
+     */
+    private void applyAtmosphereOverride(ModifiableBiomeInfo.BiomeInfo.Builder builder) {
+        var atmos = worldshape.atmosphere();
+        if (atmos.isNoOp()) {
+            return;
+        }
+        var climate = builder.getClimateSettings();
+        atmos.hasPrecipitation().ifPresent(climate::setHasPrecipitation);
+        atmos.temperature().ifPresent(climate::setTemperature);
+        atmos.downfall().ifPresent(climate::setDownfall);
+
+        var effects = builder.getSpecialEffects();
+        atmos.skyColor().ifPresent(effects::skyColor);
+        atmos.fogColor().ifPresent(effects::fogColor);
+        atmos.waterColor().ifPresent(effects::waterColor);
+        atmos.waterFogColor().ifPresent(effects::waterFogColor);
+        atmos.foliageColor().ifPresent(effects::foliageColorOverride);
+        atmos.grassColor().ifPresent(effects::grassColorOverride);
+
+        IsekaiApi.LOGGER.debug("[Isekai] applied atmosphere override (descriptor dim={})",
+                worldshape.dimension().location());
     }
 
     /**
