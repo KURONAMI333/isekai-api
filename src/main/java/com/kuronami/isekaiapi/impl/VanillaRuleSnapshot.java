@@ -11,7 +11,13 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.level.levelgen.VerticalAnchor;
+import net.minecraft.world.level.levelgen.heightproviders.HeightProvider;
+import net.minecraft.world.level.levelgen.heightproviders.TrapezoidHeight;
+import net.minecraft.world.level.levelgen.heightproviders.UniformHeight;
+import net.minecraft.world.level.levelgen.placement.HeightRangePlacement;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
+import net.minecraft.world.level.levelgen.placement.PlacementModifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,33 +29,31 @@ import java.util.Set;
  * {@code ServerAboutToStartEvent}. Backs all
  * {@link com.kuronami.isekaiapi.api.query.IsekaiQuery} methods in O(1).
  *
- * <p>v0.3: walks the PLACED_FEATURE registry and enumerates every key. Each entry
- * gets a {@link VerticalRange} placeholder of (-64..320). The actual
- * VerticalRange extraction is blocked until v0.4 because the necessary fields are
- * Mojang-private with no public accessor:
- * <ul>
- *   <li>{@code HeightRangePlacement.height} (HeightProvider) — private final, no getter</li>
- *   <li>{@code UniformHeight.minInclusive} / {@code maxInclusive} — private final, no getter</li>
- *   <li>{@code TrapezoidHeight.minInclusive} / {@code maxInclusive} — private final, no getter</li>
- * </ul>
+ * <p>v0.4: walks {@code PLACED_FEATURE} registry and extracts actual
+ * {@link VerticalRange} from each feature's {@link HeightRangePlacement} via the
+ * Access Transformer in {@code src/main/resources/META-INF/accesstransformer.cfg}
+ * (which exposes the otherwise-private {@code height}, {@code minInclusive},
+ * {@code maxInclusive} fields). Features without a {@link HeightRangePlacement}
+ * modifier still get a {@link PlacedFeatureInfo} entry with a fallback range so
+ * the full key list remains queryable.
  *
- * <p>v0.4 will ship a NeoForge Access Transformer that exposes these fields, then this
- * scanner will inspect each {@code PlacementModifier} for {@code HeightRangePlacement},
- * decode its {@code HeightProvider}, and resolve {@code VerticalAnchor.Absolute.y()} /
- * {@code AboveBottom.offset()} / {@code BelowTop.offset()} into an actual range.
+ * <p>{@link VerticalAnchor} resolution uses overworld defaults (-64..320) since
+ * {@code WorldGenerationContext} isn't available at scan time. Features anchored
+ * via {@link VerticalAnchor.AboveBottom} / {@link VerticalAnchor.BelowTop} in
+ * non-overworld dimensions report overworld-relative values; per-dimension scan
+ * lands in v0.5.
  *
- * <p>API references verified by reading the extracted Mojang source under
- * {@code .gradle/caches/neoformruntime/intermediate_results/sourcesAndCompiledWithNeoForge*.jar}
- * — the third verification pass after two reference-search attempts that failed due to
- * mapping mismatches.
+ * <p>Structures and mob-spawn walks are still pending (v0.5).
  */
 public final class VanillaRuleSnapshot {
 
     public static final VanillaRuleSnapshot EMPTY =
             new VanillaRuleSnapshot(List.of(), List.of(), Map.of());
 
+    private static final int APPROX_WORLD_BOTTOM = -64;
+    private static final int APPROX_WORLD_TOP = 320;
     private static final VerticalRange FALLBACK_RANGE =
-            new VerticalRange(-64, 320, HeightDistribution.UNIFORM);
+            new VerticalRange(APPROX_WORLD_BOTTOM, APPROX_WORLD_TOP, HeightDistribution.UNIFORM);
 
     private final List<PlacedFeatureInfo> ores;
     private final List<StructurePlacementInfo> structures;
@@ -63,14 +67,8 @@ public final class VanillaRuleSnapshot {
         this.mobsByCategory = Map.copyOf(mobsByCategory);
     }
 
-    /**
-     * Walks {@code PLACED_FEATURE} and produces a {@link PlacedFeatureInfo} entry per
-     * key with the fallback range. Consumers see the full key list (e.g. which ores /
-     * features exist in this server's loaded data) but not their actual Y ranges
-     * until v0.4 lands the Access Transformer.
-     */
     public static VanillaRuleSnapshot scan(MinecraftServer server) {
-        IsekaiApi.LOGGER.info("[Isekai v0.3] VanillaRuleSnapshot.scan: walking PLACED_FEATURE registry");
+        IsekaiApi.LOGGER.info("[Isekai v0.4] VanillaRuleSnapshot.scan: walking PLACED_FEATURE registry");
 
         HolderLookup.RegistryLookup<PlacedFeature> lookup =
                 server.registryAccess().lookupOrThrow(Registries.PLACED_FEATURE);
@@ -78,15 +76,52 @@ public final class VanillaRuleSnapshot {
         List<PlacedFeatureInfo> features = new ArrayList<>();
         lookup.listElements().forEach(ref -> {
             ResourceKey<PlacedFeature> key = ref.unwrapKey().orElseThrow();
-            features.add(new PlacedFeatureInfo(key, FALLBACK_RANGE, 1, Set.of()));
+            PlacedFeature pf = ref.value();
+            VerticalRange range = extractVerticalRange(pf);
+            features.add(new PlacedFeatureInfo(key, range != null ? range : FALLBACK_RANGE, 1, Set.of()));
         });
+        long withRange = features.stream().filter(info -> info.range() != FALLBACK_RANGE).count();
 
         IsekaiApi.LOGGER.info(
-                "[Isekai v0.3] Scanned {} placed feature keys "
-                        + "(actual VerticalRange extraction deferred to v0.4 pending Access Transformer)",
-                features.size());
+                "[Isekai v0.4] Scanned {} placed features ({} with extracted VerticalRange, "
+                        + "{} with fallback); structures + mob-spawns deferred to v0.5",
+                features.size(), withRange, features.size() - withRange);
 
         return new VanillaRuleSnapshot(features, List.of(), Map.of());
+    }
+
+    private static VerticalRange extractVerticalRange(PlacedFeature pf) {
+        for (PlacementModifier mod : pf.placement()) {
+            if (mod instanceof HeightRangePlacement hrp) {
+                return convertHeightProvider(hrp.height);
+            }
+        }
+        return null;
+    }
+
+    private static VerticalRange convertHeightProvider(HeightProvider hp) {
+        if (hp instanceof UniformHeight uh) {
+            return new VerticalRange(
+                    anchorToY(uh.minInclusive),
+                    anchorToY(uh.maxInclusive),
+                    HeightDistribution.UNIFORM);
+        }
+        if (hp instanceof TrapezoidHeight th) {
+            return new VerticalRange(
+                    anchorToY(th.minInclusive),
+                    anchorToY(th.maxInclusive),
+                    HeightDistribution.TRAPEZOID);
+        }
+        // ConstantHeight / BiasedToBottomHeight / VeryBiasedToBottomHeight / WeightedListHeight
+        // are not yet supported; their fields aren't in the AT. v0.5 will extend the AT.
+        return FALLBACK_RANGE;
+    }
+
+    private static int anchorToY(VerticalAnchor anchor) {
+        if (anchor instanceof VerticalAnchor.Absolute a) return a.y();
+        if (anchor instanceof VerticalAnchor.AboveBottom ab) return APPROX_WORLD_BOTTOM + ab.offset();
+        if (anchor instanceof VerticalAnchor.BelowTop bt) return APPROX_WORLD_TOP - bt.offset();
+        return 0;
     }
 
     public List<PlacedFeatureInfo> ores() { return ores; }
