@@ -29,6 +29,7 @@ public interface IsekaiQuery {
     // structures
     Optional<StructurePlacementInfo> getStructurePlacement(ResourceKey<Structure> structure);
     List<StructurePlacementInfo> getAllStructures();
+    List<StructurePlacementInfo> getStructuresByTag(TagKey<Structure> tag);
 
     // mob spawns
     List<MobSpawnInfo> getMobSpawnsForBiome(ResourceKey<Biome> biome);
