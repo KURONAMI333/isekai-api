@@ -21,7 +21,7 @@ import net.neoforged.neoforge.registries.NeoForgeRegistries;
  *       atmosphere). See {@link ApplyWorldshapeBiomeModifier} for behavior.</li>
  * </ul>
  *
- * <p>Structure-side serializers live in {@link IsekaiStructureModifiers}.
+ * <p>Structure-side serializers live in {@link com.kuronami.isekaiapi.structuremodifier.IsekaiStructureModifiers}.
  */
 public final class IsekaiBiomeModifiers {
 
