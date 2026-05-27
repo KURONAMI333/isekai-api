@@ -26,6 +26,17 @@ compose two leaf predicates (`y_in_range` + `solid_ceiling`) so structures
 only spawn in roofed chambers. `count_scale` 1.5x amplifies mob spawning.
 `priority=110` wins ties against the default-priority skyland_minimal pack.
 
+## no_villages/
+
+A NeoForge **structure** modifier (note: different registry path from biome
+modifier — `neoforge/structure_modifier/`) using
+`isekai_api:apply_worldshape_structures`. Removes all five village
+variants by clearing their biome filter to empty.
+
+This demonstrates the v0.9 `excluded_structures` field, the
+structure-side counterpart of `excluded_features`. Use it for "I want a
+worldshape where this kind of structure shouldn't spawn at all."
+
 ## biome_modifier_demo/
 
 A NeoForge biome modifier referencing Isekai's `isekai_api:apply_worldshape`
@@ -71,6 +82,8 @@ transition}`).
   "default_structure_predicate": SpatialPredicate,      // required
   "applies_to":             ["<biome key>", ...],       // optional, default [] (dimension-wide)
   "excluded_features":      ["<feature key>", ...],     // optional, default []
+  "excluded_structures":    ["<structure key>", ...],   // optional, default []
+  "additional_features":    [{ "feature": "<feature key>", "step": "<decoration step>" }, ...], // optional, default []
   "priority":               <int>                        // optional, default 100
 }
 ```
