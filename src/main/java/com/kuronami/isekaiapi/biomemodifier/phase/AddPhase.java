@@ -1,10 +1,10 @@
 package com.kuronami.isekaiapi.biomemodifier.phase;
 
 import com.kuronami.isekaiapi.IsekaiApi;
-import com.kuronami.isekaiapi.api.Isekai;
 import com.kuronami.isekaiapi.api.query.PlacedFeatureInfo;
 import com.kuronami.isekaiapi.api.remap.RemapStrategy;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
+import com.kuronami.isekaiapi.impl.IsekaiInternal;
 import com.kuronami.isekaiapi.impl.PlacedFeatureRebuilder;
 import com.kuronami.isekaiapi.impl.RemapEngine;
 import com.kuronami.isekaiapi.impl.VanillaRuleSnapshot;
@@ -98,7 +98,7 @@ public final class AddPhase {
         if (descriptor.oreStrategy() instanceof RemapStrategy.Identity) return;
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
         if (server == null) return;
-        VanillaRuleSnapshot snapshot = Isekai.currentSnapshot();
+        VanillaRuleSnapshot snapshot = IsekaiInternal.currentSnapshot();
         if (snapshot == null || snapshot.isEmpty()) return;
 
         HolderLookup.RegistryLookup<PlacedFeature> lookup =

@@ -1,4 +1,4 @@
-package com.kuronami.isekaiapi.biomemodifier;
+package com.kuronami.isekaiapi.structuremodifier;
 
 import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;

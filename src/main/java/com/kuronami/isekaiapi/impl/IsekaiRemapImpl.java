@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>Actual chunk-gen effect of declared descriptors flows through NeoForge biome /
  * structure modifiers ({@link com.kuronami.isekaiapi.biomemodifier.ApplyWorldshapeBiomeModifier}
- * and {@link com.kuronami.isekaiapi.biomemodifier.ApplyWorldshapeStructureModifier}) — this
+ * and {@link com.kuronami.isekaiapi.structuremodifier.ApplyWorldshapeStructureModifier}) — this
  * class only owns the registry, not the application.
  */
 public final class IsekaiRemapImpl implements IsekaiRemap {
