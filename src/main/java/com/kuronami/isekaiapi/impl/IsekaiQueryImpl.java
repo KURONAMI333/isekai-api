@@ -79,8 +79,7 @@ public final class IsekaiQueryImpl implements IsekaiQuery {
 
     @Override
     public List<MobSpawnInfo> getMobSpawnsForBiome(ResourceKey<Biome> biome) {
-        // Per-biome mob spawn lookup needs the per-biome cache (deferred to v0.3).
-        return List.of();
+        return snapshot.get().mobsForBiome(biome);
     }
 
     @Override
