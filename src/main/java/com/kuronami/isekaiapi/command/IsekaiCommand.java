@@ -11,9 +11,14 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.storage.LevelResource;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
  * Registers {@code /isekai} subcommand tree.
@@ -82,10 +87,29 @@ public final class IsekaiCommand {
                         })))
                 .then(Commands.literal("dump")
                         .then(Commands.literal("worldgen").executes(ctx -> {
-                            ctx.getSource().sendSuccess(() ->
-                                    Component.literal("[Isekai v0.1 stub] dump worldgen — vanilla rule scanner lands v0.2, will write JSON to <world>/isekai_dump/"), false);
-                            IsekaiApi.LOGGER.info("Isekai dump worldgen invoked by {}", ctx.getSource().getTextName());
-                            return 1;
+                            var server = ctx.getSource().getServer();
+                            var ores = Isekai.query().getAllOres();
+                            Path dumpDir = server.getWorldPath(LevelResource.ROOT).resolve("isekai_dump");
+                            Path dumpFile = dumpDir.resolve("worldgen.txt");
+
+                            StringBuilder sb = new StringBuilder();
+                            sb.append("=== Isekai API worldgen dump (v0.4) ===\n");
+                            sb.append("PlacedFeatures with VerticalRange: ").append(ores.size()).append("\n\n");
+                            for (var info : ores) {
+                                sb.append(info.key().location()).append(" -> ").append(info.range()).append("\n");
+                            }
+
+                            try {
+                                Files.createDirectories(dumpDir);
+                                Files.writeString(dumpFile, sb.toString());
+                                ctx.getSource().sendSuccess(() ->
+                                        Component.literal("Dumped " + ores.size() + " features to " + dumpFile), false);
+                                return 1;
+                            } catch (IOException e) {
+                                IsekaiApi.LOGGER.error("dump worldgen failed", e);
+                                ctx.getSource().sendFailure(Component.literal("dump worldgen failed: " + e.getMessage()));
+                                return 0;
+                            }
                         }))
                         .then(Commands.literal("ore")
                                 .then(Commands.argument("id", ResourceLocationArgument.id()).executes(ctx -> {
