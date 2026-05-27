@@ -48,6 +48,7 @@ public record WorldshapeDescriptor(
         SpatialPredicate defaultStructurePredicate,
         Set<ResourceKey<Biome>> appliesTo,
         Set<ResourceKey<PlacedFeature>> excludedFeatures,
+        Set<ResourceKey<Structure>> excludedStructures,
         List<AdditionalFeature> additionalFeatures,
         int priority
 ) {
@@ -55,6 +56,7 @@ public record WorldshapeDescriptor(
         structurePredicates = Map.copyOf(structurePredicates);
         appliesTo = Set.copyOf(appliesTo);
         excludedFeatures = Set.copyOf(excludedFeatures);
+        excludedStructures = Set.copyOf(excludedStructures);
         additionalFeatures = List.copyOf(additionalFeatures);
     }
 
@@ -116,6 +118,11 @@ public record WorldshapeDescriptor(
                     .xmap(list -> (Set<ResourceKey<PlacedFeature>>) new HashSet<>(list),
                           set -> List.copyOf(set))
                     .forGetter(WorldshapeDescriptor::excludedFeatures),
+            ResourceKey.codec(Registries.STRUCTURE).listOf()
+                    .optionalFieldOf("excluded_structures", List.of())
+                    .xmap(list -> (Set<ResourceKey<Structure>>) new HashSet<>(list),
+                          set -> List.copyOf(set))
+                    .forGetter(WorldshapeDescriptor::excludedStructures),
             AdditionalFeature.CODEC.listOf()
                     .optionalFieldOf("additional_features", List.of())
                     .forGetter(WorldshapeDescriptor::additionalFeatures),
