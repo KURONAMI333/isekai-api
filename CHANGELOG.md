@@ -40,11 +40,17 @@ First public release. Universal worldgen library for NeoForge 1.21.1.
   - per-category weight scaling via `mob_spawn_strategy` and
     `mob_spawn_strategy_by_category`
   - `atmosphere` overrides: sky/fog/water/foliage/grass colors,
-    temperature, downfall, has_precipitation, creature_generation_probability
+    temperature, downfall, has_precipitation,
+    creature_generation_probability, per-entity `mob_spawn_costs`
+    (energy budget / charge for spawn-cap tuning)
 
 ### Structure modifier (`isekai_api:apply_worldshape_structures`)
-- REMOVE phase: clears matched structures' biome filter to make them
-  unspawnable.
+- REMOVE phase: clears matched structures' biome filter (from
+  `exclusions.structures`) to make them unspawnable.
+- MODIFY phase: applies per-(structure, MobCategory) spawn overrides
+  from `structure_spawn_overrides` — bounded by `piece` or `full`
+  bounding-box scope, with `replace=true` clearing the existing
+  override before injecting consumer spawns.
 
 ### Mixins
 - `Structure.findValidGenerationPoint` — enforces all 12
@@ -81,11 +87,5 @@ First public release. Universal worldgen library for NeoForge 1.21.1.
   FixedRange / BandSplit) have no semantic meaning for structure
   placement frequency; the validator rejects them rather than letting
   the descriptor silently no-op.
-- Per-structure `StructureSpawnOverride` configuration (e.g., "no
-  creepers in pillager outposts") not exposed via descriptor. Consumers
-  can use vanilla's `neoforge:remove_spawns` biome modifier as a
-  workaround for now.
-- `MobSpawnSettings.MobSpawnCost` (per-entity energy budget / charge)
-  not exposed. Advanced spawn-cap tuning.
 - Surface rules, sea level, BiomeSource — explicitly out of scope
   (these are vanilla `noise_settings` JSON or TerraBlender territory).
