@@ -26,6 +26,16 @@ compose two leaf predicates (`y_in_range` + `solid_ceiling`) so structures
 only spawn in roofed chambers. `count_scale` 1.5x amplifies mob spawning.
 `priority=110` wins ties against the default-priority skyland_minimal pack.
 
+## peaceful_plains/
+
+Demonstrates `mob_spawn_strategy_by_category` (v0.11). In `minecraft:plains`,
+passive creatures spawn 1.5× more often and hostile monsters spawn at 25%.
+Other categories (water creatures, ambient, etc.) keep vanilla weights.
+
+The global `mob_spawn_strategy` is `isekai:identity` (no-op) — the
+per-category overrides do all the work. This is the pattern for "scale
+some categories but leave others alone."
+
 ## no_villages/
 
 A NeoForge **structure** modifier (note: different registry path from biome
