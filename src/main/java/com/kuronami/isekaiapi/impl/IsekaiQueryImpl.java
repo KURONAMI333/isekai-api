@@ -64,8 +64,7 @@ public final class IsekaiQueryImpl implements IsekaiQuery {
 
     @Override
     public List<PlacedFeatureInfo> getOresByTag(TagKey<PlacedFeature> tag) {
-        // Tag membership lookup needs HolderLookup access (deferred to v0.3 alongside the scanner).
-        return List.of();
+        return snapshot.get().oresForTag(tag);
     }
 
     @Override
