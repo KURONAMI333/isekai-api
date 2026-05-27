@@ -10,17 +10,19 @@ import java.util.function.Supplier;
 
 /**
  * Registry of Isekai-provided placement modifier types. Datapack consumers invoke these
- * via {@code "type": "isekai:<name>"} in their PlacedFeature JSON.
+ * via {@code "type": "isekai_api:<name>"} in their PlacedFeature JSON (the namespace is
+ * the mod id, not the bare {@code "isekai"} prefix used by the in-house dispatch codecs
+ * such as {@code SpatialPredicate}).
  *
- * <p>Three modifiers in v0.1:
+ * <p>Currently registered:
  * <ul>
- *   <li>{@code isekai:surface_relative} — anchor to WORLD_SURFACE_WG + offset</li>
- *   <li>{@code isekai:fluid_relative} — anchor to water top/bottom + offset</li>
- *   <li>{@code isekai:in_block_context} — filter by surrounding block context</li>
+ *   <li>{@code isekai_api:surface_relative} — anchor to WORLD_SURFACE_WG + offset</li>
+ *   <li>{@code isekai_api:fluid_relative} — anchor to water top/bottom + offset</li>
+ *   <li>{@code isekai_api:in_block_context} — filter by surrounding block context</li>
  * </ul>
  *
- * <p>v0.2 will broaden: arbitrary SurfaceAnchor variants (now hardcoded), arbitrary
- * fluid (now water-only), additional context predicates.
+ * <p>Future enhancements: arbitrary {@code Heightmap.Types} for surface_relative,
+ * arbitrary fluid for fluid_relative, additional context predicates.
  */
 public final class IsekaiPlacementModifiers {
 

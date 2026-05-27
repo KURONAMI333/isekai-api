@@ -9,8 +9,16 @@ import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
 
 /**
- * Server lifecycle hooks. v0.2 wires up the vanilla rule snapshot scanner;
- * the datapack reload pipeline ships in v0.3 alongside the JSON schema validator.
+ * Server lifecycle hooks:
+ * <ul>
+ *   <li>{@code ServerAboutToStartEvent} — scans the vanilla rule registries via
+ *       {@link VanillaRuleSnapshot#scan} and publishes the result for {@code IsekaiQuery}.</li>
+ *   <li>{@code AddReloadListenerEvent} — registers the two
+ *       {@link IsekaiReloadListener} instances (worldshape / layered_worldshape JSON
+ *       loading) plus {@link SnapshotRefreshListener} (rebuild the snapshot on every
+ *       datapack reload so tag indices, biome step indices, and per-dim VerticalRange
+ *       overrides stay current).</li>
+ * </ul>
  */
 @EventBusSubscriber(modid = IsekaiApi.MODID)
 public final class IsekaiLifecycle {
