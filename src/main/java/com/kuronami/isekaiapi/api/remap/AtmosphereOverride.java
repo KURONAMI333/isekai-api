@@ -2,7 +2,11 @@ package com.kuronami.isekaiapi.api.remap;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.biome.MobSpawnSettings;
 
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -34,13 +38,18 @@ public record AtmosphereOverride(
         Optional<Integer> waterFogColor,
         Optional<Integer> foliageColor,
         Optional<Integer> grassColor,
-        Optional<Float> creatureGenerationProbability
+        Optional<Float> creatureGenerationProbability,
+        Map<EntityType<?>, MobSpawnSettings.MobSpawnCost> mobSpawnCosts
 ) {
+    public AtmosphereOverride {
+        mobSpawnCosts = Map.copyOf(mobSpawnCosts);
+    }
+
     public static final AtmosphereOverride EMPTY = new AtmosphereOverride(
             Optional.empty(), Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(),
-            Optional.empty());
+            Optional.empty(), Map.of());
 
     public static final Codec<AtmosphereOverride> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.BOOL.optionalFieldOf("has_precipitation").forGetter(AtmosphereOverride::hasPrecipitation),
@@ -53,7 +62,10 @@ public record AtmosphereOverride(
             Codec.INT.optionalFieldOf("foliage_color").forGetter(AtmosphereOverride::foliageColor),
             Codec.INT.optionalFieldOf("grass_color").forGetter(AtmosphereOverride::grassColor),
             Codec.floatRange(0f, 1f).optionalFieldOf("creature_generation_probability")
-                    .forGetter(AtmosphereOverride::creatureGenerationProbability)
+                    .forGetter(AtmosphereOverride::creatureGenerationProbability),
+            Codec.unboundedMap(BuiltInRegistries.ENTITY_TYPE.byNameCodec(), MobSpawnSettings.MobSpawnCost.CODEC)
+                    .optionalFieldOf("mob_spawn_costs", Map.of())
+                    .forGetter(AtmosphereOverride::mobSpawnCosts)
     ).apply(i, AtmosphereOverride::new));
 
     /** {@code true} when every field is empty — biome's atmosphere stays untouched. */
@@ -62,6 +74,7 @@ public record AtmosphereOverride(
                 && skyColor.isEmpty() && fogColor.isEmpty()
                 && waterColor.isEmpty() && waterFogColor.isEmpty()
                 && foliageColor.isEmpty() && grassColor.isEmpty()
-                && creatureGenerationProbability.isEmpty();
+                && creatureGenerationProbability.isEmpty()
+                && mobSpawnCosts.isEmpty();
     }
 }
