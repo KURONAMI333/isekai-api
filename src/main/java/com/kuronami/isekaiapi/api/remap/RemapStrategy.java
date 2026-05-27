@@ -39,19 +39,53 @@ public sealed interface RemapStrategy {
     }
 
     /**
-     * Partition the target range into bands with the given proportional weights.
-     * The {@code ratios} sum should be 1.0 (validated). Order corresponds to vanilla
-     * low -> high; each weight defines the fraction of the target range that band gets.
-     * Band names are not part of the API — callers map ratios to vanilla bands externally.
+     * Partition the target range into bands. Each {@link Band} declares the vanilla Y
+     * subrange it covers plus the fraction of the playable range it should occupy. The
+     * bands' {@code targetRatio}s should sum to 1.0 (validated by IsekaiValidator's
+     * cross-field checks); their {@code vanillaSource} ranges should be ordered
+     * low-to-high and non-overlapping (validator enforces).
+     *
+     * <p>RemapEngine dispatches: for a feature with original Y range, find the band whose
+     * {@code vanillaSource} contains the feature's midpoint, then map proportionally into
+     * the playable range slice corresponding to that band's cumulative ratio offset.
+     *
+     * <p>JSON:
+     * <pre>{@code
+     * {
+     *   "type": "isekai:band_split",
+     *   "bands": [
+     *     { "vanilla_source": { "min_y": -64, "max_y": 0,   "distribution": "uniform" }, "target_ratio": 0.5 },
+     *     { "vanilla_source": { "min_y": 0,   "max_y": 320, "distribution": "uniform" }, "target_ratio": 0.5 }
+     *   ]
+     * }
+     * }</pre>
      */
-    record BandSplit(List<Float> ratios) implements RemapStrategy {
-        public BandSplit { ratios = List.copyOf(ratios); }
+    record BandSplit(List<Band> bands) implements RemapStrategy {
+        public BandSplit {
+            bands = List.copyOf(bands);
+            if (bands.isEmpty()) {
+                throw new IllegalArgumentException("BandSplit requires at least one band");
+            }
+        }
         public static final MapCodec<BandSplit> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
-                Codec.FLOAT.listOf().fieldOf("ratios").forGetter(BandSplit::ratios)
+                Band.CODEC.listOf().fieldOf("bands").forGetter(BandSplit::bands)
         ).apply(i, BandSplit::new));
 
         @Override public String typeId() { return "isekai:band_split"; }
         @Override public MapCodec<? extends RemapStrategy> codec() { return MAP_CODEC; }
+
+        /** One band in a {@link BandSplit}: a vanilla source range + its target ratio. */
+        public record Band(com.kuronami.isekaiapi.api.query.VerticalRange vanillaSource, float targetRatio) {
+            public Band {
+                if (targetRatio < 0) {
+                    throw new IllegalArgumentException("Band.targetRatio < 0: " + targetRatio);
+                }
+            }
+            public static final com.mojang.serialization.Codec<Band> CODEC = RecordCodecBuilder.create(i -> i.group(
+                    com.kuronami.isekaiapi.api.query.VerticalRange.CODEC.fieldOf("vanilla_source").forGetter(Band::vanillaSource),
+                    Codec.FLOAT.fieldOf("target_ratio").forGetter(Band::targetRatio)
+            ).apply(i, Band::new));
+        }
     }
 
     /** Hard-coded target range, ignoring vanilla. */

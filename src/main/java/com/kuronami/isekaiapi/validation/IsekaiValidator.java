@@ -171,16 +171,23 @@ public final class IsekaiValidator {
                                            com.kuronami.isekaiapi.api.remap.RemapStrategy s) {
         if (s instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.BandSplit bs) {
             double sum = 0.0;
-            for (float r : bs.ratios()) {
-                if (r < 0) {
+            int prevMaxY = Integer.MIN_VALUE;
+            for (int i = 0; i < bs.bands().size(); i++) {
+                var band = bs.bands().get(i);
+                if (band.targetRatio() < 0) {
                     throw new IllegalArgumentException(
-                            fieldLabel + ".BandSplit.ratios contains negative: " + r);
+                            fieldLabel + ".BandSplit.bands[" + i + "].target_ratio < 0: " + band.targetRatio());
                 }
-                sum += r;
+                sum += band.targetRatio();
+                if (band.vanillaSource().minY() < prevMaxY) {
+                    throw new IllegalArgumentException(
+                            fieldLabel + ".BandSplit.bands[" + i + "] vanilla_source overlaps previous band");
+                }
+                prevMaxY = band.vanillaSource().maxY();
             }
             if (Math.abs(sum - 1.0) > 0.01) {
                 throw new IllegalArgumentException(
-                        fieldLabel + ".BandSplit.ratios sum=" + sum + " (must be 1.0 ± 0.01)");
+                        fieldLabel + ".BandSplit.bands target_ratio sum=" + sum + " (must be 1.0 ± 0.01)");
             }
         } else if (s instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.Pipe p) {
             for (var child : p.chain()) {
