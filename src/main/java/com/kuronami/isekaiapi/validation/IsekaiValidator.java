@@ -135,6 +135,9 @@ public final class IsekaiValidator {
         crossCheckStrategy("ore_strategy", d.oreStrategy());
         crossCheckStrategy("structure_strategy", d.structureStrategy());
         crossCheckStrategy("mob_spawn_strategy", d.mobSpawnStrategy());
+        // Walk per-category overrides too — each is an independent strategy tree.
+        d.mobSpawnStrategyByCategory().forEach((cat, strat) ->
+                crossCheckStrategy("mob_spawn_strategy_by_category[" + cat.getSerializedName() + "]", strat));
     }
 
     /** Cross-field checks for a {@code LayeredFile}: non-overlapping y_ranges, monotone. */
