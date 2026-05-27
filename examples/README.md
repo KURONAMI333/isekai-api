@@ -20,11 +20,17 @@ sets / `priority=100`).
 
 ## underground_only/
 
-Inverted+linear pipe for ore remapping: deepslate-band ores get pulled
-toward the surface relative to the playable range. Uses `isekai:and` to
-compose two leaf predicates (`y_in_range` + `solid_ceiling`) so structures
-only spawn in roofed chambers. `count_scale` 1.5x amplifies mob spawning.
-`priority=110` wins ties against the default-priority skyland_minimal pack.
+Registry-only example showing what the JSON for an underground worldshape
+*would* contain — `isekai:pipe` of `inverted` + `linear` for ore remapping
+(deepslate-band ores would get pulled toward the surface relative to the
+playable range), `isekai:and`-composed default structure predicate
+(`y_in_range` + `solid_ceiling`, so structures only spawn in roofed
+chambers), `count_scale` 1.5× for mob density, `priority=110` so it wins
+ties against the default-priority skyland_minimal pack.
+
+To turn this into an observable effect, copy the `worldshape` JSON content
+into a `neoforge/biome_modifier/` file under the `isekai_api:apply_worldshape`
+type (see `biome_modifier_demo/` for the wrapping pattern).
 
 ## peaceful_plains/
 
@@ -52,13 +58,6 @@ worldshape where this kind of structure shouldn't spawn at all."
 A NeoForge biome modifier referencing Isekai's `isekai_api:apply_worldshape`
 type. Removes `minecraft:lake_lava_surface` from `minecraft:desert` biomes.
 
-This is the only example that produces an **observable in-game effect**;
-the other examples populate Isekai's runtime registry (queryable via
-`/isekai query worldshape`) but don't yet alter biome generation. v0.6
-biome-modifier behavior is limited to the REMOVE phase
-(`excluded_features`); ADD-phase remapping for ore/structure/mob_spawn
-strategies lands in v0.7.
-
 When this pack is loaded, look for log lines like
 `[Isekai] removed N excluded placed features (descriptor dim=...)` at
 debug level.
@@ -66,6 +65,24 @@ debug level.
 The JSON is wrapped in `{ "type": "isekai_api:apply_worldshape",
 "worldshape": { ... } }`. Inside `worldshape`, you write the same fields
 documented below for `WorldshapeDescriptor`.
+
+### Where observable effects come from
+
+Datapacks under `neoforge/biome_modifier/` or `neoforge/structure_modifier/`
+hit chunk generation directly. Examples in this category produce visible
+in-game changes:
+
+- `biome_modifier_demo/` — REMOVE phase (drops listed PlacedFeatures)
+- `peaceful_plains/` — MODIFY phase (scales mob spawn weights)
+- `no_villages/` — Structure modifier (clears the structure's biome filter)
+
+Datapacks under `isekai/worldshape/` or `isekai/layered_worldshape/`
+populate Isekai's runtime registry only — queryable via
+`/isekai query worldshape` and `/isekai stats`, but no chunk-gen effect
+unless you also wrap the same worldshape in an `apply_worldshape`
+biome modifier. Examples in this category:
+
+- `skyland_minimal/`, `underground_only/`, `layered_overworld/`
 
 ## layered_overworld/
 
