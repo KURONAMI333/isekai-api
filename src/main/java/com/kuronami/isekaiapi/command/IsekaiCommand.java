@@ -8,7 +8,9 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -77,9 +79,30 @@ public final class IsekaiCommand {
                                     Component.literal(String.format("Validated %d files, %d errors found",
                                             result.filesChecked(), result.errorsFound())), false);
                             return result.isOk() ? 1 : 0;
-                        })));
+                        })))
+                .then(Commands.literal("dump")
+                        .then(Commands.literal("worldgen").executes(ctx -> {
+                            ctx.getSource().sendSuccess(() ->
+                                    Component.literal("[Isekai v0.1 stub] dump worldgen — vanilla rule scanner lands v0.2, will write JSON to <world>/isekai_dump/"), false);
+                            IsekaiApi.LOGGER.info("Isekai dump worldgen invoked by {}", ctx.getSource().getTextName());
+                            return 1;
+                        }))
+                        .then(Commands.literal("ore")
+                                .then(Commands.argument("id", ResourceLocationArgument.id()).executes(ctx -> {
+                                    ResourceLocation id = ResourceLocationArgument.getId(ctx, "id");
+                                    ctx.getSource().sendSuccess(() ->
+                                            Component.literal("[Isekai v0.1 stub] dump ore " + id + " — vanilla rule scanner lands v0.2"), false);
+                                    return 1;
+                                })))
+                        .then(Commands.literal("structure")
+                                .then(Commands.argument("id", ResourceLocationArgument.id()).executes(ctx -> {
+                                    ResourceLocation id = ResourceLocationArgument.getId(ctx, "id");
+                                    ctx.getSource().sendSuccess(() ->
+                                            Component.literal("[Isekai v0.1 stub] dump structure " + id + " — vanilla rule scanner lands v0.2"), false);
+                                    return 1;
+                                }))));
 
         dispatcher.register(root);
-        IsekaiApi.LOGGER.info("Isekai commands registered: /isekai version|reload|query dimensions|validate");
+        IsekaiApi.LOGGER.info("Isekai commands registered: /isekai version|reload|query dimensions|validate|dump worldgen|dump ore|dump structure");
     }
 }
