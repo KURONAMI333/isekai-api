@@ -1,6 +1,7 @@
 package com.kuronami.isekaiapi;
 
 import com.kuronami.isekaiapi.densityfunction.IsekaiDensityFunctions;
+import com.kuronami.isekaiapi.placementmodifier.IsekaiPlacementModifiers;
 import com.mojang.logging.LogUtils;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
@@ -15,7 +16,7 @@ public final class IsekaiApi {
     public IsekaiApi(IEventBus modBus) {
         LOGGER.info("Isekai API v{} loading", VERSION);
         IsekaiDensityFunctions.register(modBus);
-        // v0.2: vanilla rule snapshot scanner, datapack reload pipeline,
-        // and isekai:surface_relative / fluid_relative / in_block_context placement modifiers.
+        IsekaiPlacementModifiers.register(modBus);
+        // v0.2: vanilla rule snapshot scanner + datapack reload pipeline.
     }
 }
