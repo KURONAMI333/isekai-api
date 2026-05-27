@@ -4,6 +4,8 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * Declare worldshape transformations. Consumer entry point for the remap pipeline.
@@ -32,4 +34,13 @@ public interface IsekaiRemap {
 
     /** Withdraw a consumer's declaration. Worldgen reload required. */
     void removeWorldshape(ResourceKey<Level> dimension);
+
+    /** Currently-active single-layer descriptor for the given dimension, if any. */
+    Optional<WorldshapeDescriptor> getActiveDescriptor(ResourceKey<Level> dimension);
+
+    /** Currently-active layered descriptors for the given dimension, if any. */
+    List<LayeredDescriptor> getActiveLayers(ResourceKey<Level> dimension);
+
+    /** All dimensions that currently have any worldshape declaration (single or layered). */
+    Set<ResourceKey<Level>> getDeclaredDimensions();
 }

@@ -8,8 +8,11 @@ import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -60,5 +63,22 @@ public final class IsekaiRemapImpl implements IsekaiRemap {
         singleLayer.remove(dimension);
         multiLayer.remove(dimension);
         IsekaiApi.LOGGER.info("[Isekai v0.1 stub] removeWorldshape: dim={}", dimension);
+    }
+
+    @Override
+    public Optional<WorldshapeDescriptor> getActiveDescriptor(ResourceKey<Level> dimension) {
+        return Optional.ofNullable(singleLayer.get(dimension));
+    }
+
+    @Override
+    public List<LayeredDescriptor> getActiveLayers(ResourceKey<Level> dimension) {
+        return multiLayer.getOrDefault(dimension, List.of());
+    }
+
+    @Override
+    public Set<ResourceKey<Level>> getDeclaredDimensions() {
+        Set<ResourceKey<Level>> all = new HashSet<>(singleLayer.keySet());
+        all.addAll(multiLayer.keySet());
+        return Set.copyOf(all);
     }
 }
