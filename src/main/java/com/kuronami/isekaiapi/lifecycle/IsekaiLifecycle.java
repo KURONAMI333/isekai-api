@@ -31,7 +31,10 @@ public final class IsekaiLifecycle {
         // Register one listener per JSON directory so each runs on its own worker batch.
         event.addListener(IsekaiReloadListener.forSingleLayer());
         event.addListener(IsekaiReloadListener.forLayered());
-        IsekaiApi.LOGGER.info("[Isekai] reload listeners registered: {} + {}",
+        // Refresh the VanillaRuleSnapshot so tag indices, biome step indices, and
+        // per-dim VerticalRange overrides reflect the post-reload registry state.
+        event.addListener(new SnapshotRefreshListener());
+        IsekaiApi.LOGGER.info("[Isekai] reload listeners registered: {} + {} + snapshot-refresh",
                 IsekaiReloadListener.WORLDSHAPE_DIR, IsekaiReloadListener.LAYERED_DIR);
     }
 }
