@@ -8,7 +8,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.levelgen.feature.Feature;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.structure.Structure;
 
 import java.util.HashSet;
@@ -28,6 +28,10 @@ import java.util.Set;
  * sensibly. {@code structureStrategy} additionally controls Y-range remapping for any
  * structure that survives the predicate filter.
  *
+ * <p>{@code excludedFeatures} lists {@link PlacedFeature} registry keys to drop from the
+ * biome's generation settings. Use this for vanilla features that conflict with the
+ * worldshape (e.g. surface lakes when the playable range is underground).
+ *
  * <p>If two consumers register a descriptor for the same dimension, the one with the
  * higher {@link #priority} wins. Ties replace.
  */
@@ -41,7 +45,7 @@ public record WorldshapeDescriptor(
         Map<ResourceKey<Structure>, SpatialPredicate> structurePredicates,
         SpatialPredicate defaultStructurePredicate,
         Set<ResourceKey<Biome>> appliesTo,
-        Set<ResourceKey<Feature<?>>> excludedFeatures,
+        Set<ResourceKey<PlacedFeature>> excludedFeatures,
         int priority
 ) {
     public WorldshapeDescriptor {
@@ -87,9 +91,9 @@ public record WorldshapeDescriptor(
                     .xmap(list -> (Set<ResourceKey<Biome>>) new HashSet<>(list),
                           set -> java.util.List.copyOf(set))
                     .forGetter(WorldshapeDescriptor::appliesTo),
-            ResourceKey.codec(Registries.FEATURE).listOf()
+            ResourceKey.codec(Registries.PLACED_FEATURE).listOf()
                     .optionalFieldOf("excluded_features", java.util.List.of())
-                    .xmap(list -> (Set<ResourceKey<Feature<?>>>) new HashSet<>(list),
+                    .xmap(list -> (Set<ResourceKey<PlacedFeature>>) new HashSet<>(list),
                           set -> java.util.List.copyOf(set))
                     .forGetter(WorldshapeDescriptor::excludedFeatures),
             Codec.INT.optionalFieldOf("priority", DEFAULT_PRIORITY)
