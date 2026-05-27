@@ -15,6 +15,7 @@ import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.carver.ConfiguredWorldCarver;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureSpawnOverride;
 
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -55,6 +56,7 @@ public record WorldshapeDescriptor(
         Map<MobCategory, RemapStrategy> mobSpawnStrategyByCategory,
         Additions additions,
         AtmosphereOverride atmosphere,
+        List<StructureSpawnConfig> structureSpawnOverrides,
         int priority
 ) {
     public WorldshapeDescriptor {
@@ -64,6 +66,43 @@ public record WorldshapeDescriptor(
         if (exclusions == null) exclusions = Exclusions.EMPTY;
         if (additions == null) additions = Additions.EMPTY;
         if (atmosphere == null) atmosphere = AtmosphereOverride.EMPTY;
+        structureSpawnOverrides = List.copyOf(structureSpawnOverrides);
+    }
+
+    /**
+     * Per-structure mob spawn override entry. Applied by {@code apply_worldshape_structures}
+     * to the named structure's {@code StructureSettings.spawnOverrides()} during the MODIFY
+     * phase. Each entry binds one (structure, category) pair to a bounding-box scope and a
+     * list of spawn entries; when {@code replace} is true the existing override for that
+     * (structure, category) is cleared before our spawns are added, when false our spawns
+     * are appended on top of the existing list.
+     *
+     * <p>Use case: "no creepers in pillager outposts" — set
+     * {@code structure=pillager_outpost, category=monster, replace=true, spawns=[only the
+     * mobs you want]}; or "pillager outposts also spawn extra mobs" — same but
+     * {@code replace=false}.
+     */
+    public record StructureSpawnConfig(
+            ResourceKey<Structure> structure,
+            MobCategory category,
+            StructureSpawnOverride.BoundingBoxType boundingBox,
+            List<AdditionalMobSpawn> spawns,
+            boolean replace
+    ) {
+        public StructureSpawnConfig { spawns = List.copyOf(spawns); }
+
+        public static final Codec<StructureSpawnConfig> CODEC = RecordCodecBuilder.create(i -> i.group(
+                ResourceKey.codec(Registries.STRUCTURE).fieldOf("structure")
+                        .forGetter(StructureSpawnConfig::structure),
+                MobCategory.CODEC.fieldOf("category").forGetter(StructureSpawnConfig::category),
+                StructureSpawnOverride.BoundingBoxType.CODEC.optionalFieldOf(
+                                "bounding_box", StructureSpawnOverride.BoundingBoxType.PIECE)
+                        .forGetter(StructureSpawnConfig::boundingBox),
+                AdditionalMobSpawn.CODEC.listOf().fieldOf("spawns")
+                        .forGetter(StructureSpawnConfig::spawns),
+                Codec.BOOL.optionalFieldOf("replace", true)
+                        .forGetter(StructureSpawnConfig::replace)
+        ).apply(i, StructureSpawnConfig::new));
     }
 
     /** Set of registry keys to drop from matched biomes during the REMOVE phase. */
@@ -225,6 +264,7 @@ public record WorldshapeDescriptor(
         private Map<MobCategory, RemapStrategy> mobSpawnStrategyByCategory = Map.of();
         private Additions additions = Additions.EMPTY;
         private AtmosphereOverride atmosphere = AtmosphereOverride.EMPTY;
+        private List<StructureSpawnConfig> structureSpawnOverrides = List.of();
         private int priority = DEFAULT_PRIORITY;
 
         private Builder() {}
@@ -242,6 +282,7 @@ public record WorldshapeDescriptor(
         public Builder mobSpawnStrategyByCategory(Map<MobCategory, RemapStrategy> v) { this.mobSpawnStrategyByCategory = v; return this; }
         public Builder additions(Additions v) { this.additions = v; return this; }
         public Builder atmosphere(AtmosphereOverride v) { this.atmosphere = v; return this; }
+        public Builder structureSpawnOverrides(List<StructureSpawnConfig> v) { this.structureSpawnOverrides = v; return this; }
         public Builder priority(int v) { this.priority = v; return this; }
 
         public WorldshapeDescriptor build() {
@@ -257,7 +298,7 @@ public record WorldshapeDescriptor(
                     oreStrategy, structureStrategy, mobSpawnStrategy,
                     structurePredicates, defaultStructurePredicate,
                     appliesTo, exclusions, mobSpawnStrategyByCategory,
-                    additions, atmosphere, priority);
+                    additions, atmosphere, structureSpawnOverrides, priority);
         }
     }
 
@@ -305,6 +346,9 @@ public record WorldshapeDescriptor(
                     .forGetter(WorldshapeDescriptor::additions),
             AtmosphereOverride.CODEC.optionalFieldOf("atmosphere", AtmosphereOverride.EMPTY)
                     .forGetter(WorldshapeDescriptor::atmosphere),
+            StructureSpawnConfig.CODEC.listOf()
+                    .optionalFieldOf("structure_spawn_overrides", List.of())
+                    .forGetter(WorldshapeDescriptor::structureSpawnOverrides),
             Codec.INT.optionalFieldOf("priority", DEFAULT_PRIORITY)
                     .forGetter(WorldshapeDescriptor::priority)
     ).apply(i, WorldshapeDescriptor::new));
