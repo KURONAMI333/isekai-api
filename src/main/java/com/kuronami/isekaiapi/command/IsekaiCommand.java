@@ -14,17 +14,24 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
 /**
- * Registers {@code /isekai} subcommand tree. v0.1 implements skeleton commands
- * (version, reload, query dimensions). Full suite per spec §5.4 lands incrementally:
+ * Registers {@code /isekai} subcommand tree.
+ *
+ * <p>v0.1 (implemented):
  * <ul>
- *   <li>{@code /isekai dump worldgen [dim]} — v0.2</li>
- *   <li>{@code /isekai dump ore <id>} — v0.2</li>
- *   <li>{@code /isekai dump structure <id>} — v0.2</li>
- *   <li>{@code /isekai query worldshape [dim]} — v0.1 partial (dimension list only)</li>
- *   <li>{@code /isekai validate <namespace>} — v0.2</li>
- *   <li>{@code /isekai preview <descriptor_id>} — v1.1</li>
- *   <li>{@code /isekai reload} — v0.1 stub</li>
+ *   <li>{@code /isekai version}</li>
+ *   <li>{@code /isekai reload} (stub — full datapack reload lands v0.2)</li>
+ *   <li>{@code /isekai query dimensions}</li>
+ *   <li>{@code /isekai validate <namespace>} (stub — schema validator lands v0.2)</li>
  * </ul>
+ *
+ * <p>v0.2 (planned):
+ * <ul>
+ *   <li>{@code /isekai dump worldgen [dim]}</li>
+ *   <li>{@code /isekai dump ore <id>}</li>
+ *   <li>{@code /isekai dump structure <id>}</li>
+ * </ul>
+ *
+ * <p>v1.1: {@code /isekai preview <descriptor_id>}.
  */
 @EventBusSubscriber(modid = IsekaiApi.MODID)
 public final class IsekaiCommand {
@@ -41,12 +48,12 @@ public final class IsekaiCommand {
                 .requires(src -> src.hasPermission(2))
                 .then(Commands.literal("version").executes(ctx -> {
                     ctx.getSource().sendSuccess(() ->
-                            Component.literal("Isekai API v" + IsekaiApi.VERSION + " (v0.1 skeleton)"), false);
+                            Component.literal("Isekai API v" + IsekaiApi.VERSION), false);
                     return 1;
                 }))
                 .then(Commands.literal("reload").executes(ctx -> {
                     ctx.getSource().sendSuccess(() ->
-                            Component.literal("[Isekai v0.1 stub] reload requested (no-op; datapack reload pipeline lands v0.2)"), true);
+                            Component.literal("Isekai reload requested (stub; full pipeline lands v0.2)"), true);
                     IsekaiApi.LOGGER.info("Isekai reload command invoked by {}", ctx.getSource().getTextName());
                     return 1;
                 }))
@@ -67,12 +74,12 @@ public final class IsekaiCommand {
                             String ns = StringArgumentType.getString(ctx, "namespace");
                             var result = IsekaiValidator.validateNamespace(ns);
                             ctx.getSource().sendSuccess(() ->
-                                    Component.literal(String.format("Validated %d files, %d errors found (v0.1 stub)",
+                                    Component.literal(String.format("Validated %d files, %d errors found",
                                             result.filesChecked(), result.errorsFound())), false);
                             return result.isOk() ? 1 : 0;
                         })));
 
         dispatcher.register(root);
-        IsekaiApi.LOGGER.info("Isekai commands registered: /isekai version|reload|query dimensions|validate (4 of 7, v0.1)");
+        IsekaiApi.LOGGER.info("Isekai commands registered: /isekai version|reload|query dimensions|validate");
     }
 }

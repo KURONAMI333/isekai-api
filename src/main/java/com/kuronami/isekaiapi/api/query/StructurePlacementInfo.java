@@ -13,7 +13,7 @@ public record StructurePlacementInfo(
         StructurePlacement placement,
         Set<TagKey<Biome>> validBiomes
 ) {
-    public static StructurePlacementInfo of(ResourceKey<Structure> key, StructurePlacement placement, Set<TagKey<Biome>> validBiomes) {
-        return new StructurePlacementInfo(key, placement, Set.copyOf(validBiomes));
+    public StructurePlacementInfo {
+        validBiomes = Set.copyOf(validBiomes);
     }
 }
