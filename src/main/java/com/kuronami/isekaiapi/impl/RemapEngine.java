@@ -76,11 +76,8 @@ public final class RemapEngine {
         if (strategy instanceof RemapStrategy.Custom custom) {
             return custom.fn().apply(original, playable);
         }
-        if (strategy instanceof RemapStrategy.BandSplit) {
-            // BandSplit needs per-band metadata (which band this feature belongs to). The
-            // engine doesn't yet receive that — fall back to Linear so the result is at
-            // least sensible. Per-band dispatching is a v0.8 deliverable.
-            return linearScale(original, playable, worldBottom, worldTop);
+        if (strategy instanceof RemapStrategy.BandSplit bs) {
+            return bandSplit(bs, original, playable);
         }
         // Unknown / future variant — return original unchanged so downstream layers stay safe.
         return original;
@@ -107,6 +104,59 @@ public final class RemapEngine {
         // Clamp + guard against degenerate output where rounding collapses the range.
         newMin = Math.max(playable.minY(), Math.min(newMin, playable.maxY()));
         newMax = Math.max(newMin, Math.min(newMax, playable.maxY()));
+        return new VerticalRange(newMin, newMax, original.distribution());
+    }
+
+    /**
+     * Dispatch the feature's original range to the matching band, then project the feature
+     * proportionally into that band's slice of the playable range. The matching band is the
+     * one whose {@code vanillaSource} contains the feature's midpoint; ties (e.g. midpoint
+     * exactly on a boundary) resolve to the lower-Y band. If no band matches (feature
+     * outside every declared source range), fall back to {@link #linearScale}.
+     *
+     * <p>Each band's slice of the playable range starts at the cumulative sum of preceding
+     * {@code targetRatio}s and spans this band's own ratio. The feature's proportional
+     * position within its source band carries over into the same proportion within the
+     * target slice.
+     */
+    private static VerticalRange bandSplit(RemapStrategy.BandSplit bs, VerticalRange original,
+                                            VerticalRange playable) {
+        double midpoint = (original.minY() + original.maxY()) / 2.0;
+        int matchIndex = -1;
+        for (int i = 0; i < bs.bands().size(); i++) {
+            var band = bs.bands().get(i);
+            if (midpoint >= band.vanillaSource().minY() && midpoint <= band.vanillaSource().maxY()) {
+                matchIndex = i;
+                break;
+            }
+        }
+        if (matchIndex < 0) {
+            // Feature lies outside every declared band; degrade gracefully to full-range linear.
+            int playSpan = playable.maxY() - playable.minY();
+            return new VerticalRange(playable.minY(), playable.minY() + playSpan, original.distribution());
+        }
+        // Compute this band's slice [sliceMin, sliceMax] in the playable range.
+        float cumulativeBefore = 0f;
+        for (int i = 0; i < matchIndex; i++) {
+            cumulativeBefore += bs.bands().get(i).targetRatio();
+        }
+        var matched = bs.bands().get(matchIndex);
+        int playSpan = playable.maxY() - playable.minY();
+        int sliceMin = playable.minY() + Math.round(cumulativeBefore * playSpan);
+        int sliceMax = playable.minY() + Math.round((cumulativeBefore + matched.targetRatio()) * playSpan);
+        // Now scale the feature's range proportionally within this slice.
+        var source = matched.vanillaSource();
+        int sourceSpan = source.maxY() - source.minY();
+        if (sourceSpan <= 0) {
+            return new VerticalRange(sliceMin, sliceMax, original.distribution());
+        }
+        double tMin = (original.minY() - source.minY()) / (double) sourceSpan;
+        double tMax = (original.maxY() - source.minY()) / (double) sourceSpan;
+        int sliceSpan = sliceMax - sliceMin;
+        int newMin = sliceMin + (int) Math.round(tMin * sliceSpan);
+        int newMax = sliceMin + (int) Math.round(tMax * sliceSpan);
+        newMin = Math.max(sliceMin, Math.min(newMin, sliceMax));
+        newMax = Math.max(newMin, Math.min(newMax, sliceMax));
         return new VerticalRange(newMin, newMax, original.distribution());
     }
 
