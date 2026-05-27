@@ -61,7 +61,7 @@ import java.util.Set;
 public final class VanillaRuleSnapshot {
 
     public static final VanillaRuleSnapshot EMPTY =
-            new VanillaRuleSnapshot(List.of(), List.of(), Map.of(), Map.of(), Map.of(), -64, 320);
+            new VanillaRuleSnapshot(List.of(), List.of(), Map.of(), Map.of(), Map.of(), Map.of(), -64, 320);
 
     /**
      * Overworld defaults used by {@link #anchorToY} when no per-call dimension override is
@@ -82,6 +82,11 @@ public final class VanillaRuleSnapshot {
             new VerticalRange(APPROX_WORLD_BOTTOM, APPROX_WORLD_TOP, HeightDistribution.UNIFORM);
 
     private final List<PlacedFeatureInfo> ores;
+    /**
+     * Reverse tag index built at scan time. A PlacedFeature appearing in multiple tags is
+     * added once per tag. Empty when a tag isn't keyed by any scanned feature.
+     */
+    private final Map<TagKey<PlacedFeature>, List<PlacedFeatureInfo>> oresByTag;
     private final List<StructurePlacementInfo> structures;
     private final Map<MobCategory, List<MobSpawnInfo>> mobsByCategory;
     private final Map<ResourceKey<Biome>, List<MobSpawnInfo>> mobsByBiome;
@@ -100,6 +105,7 @@ public final class VanillaRuleSnapshot {
                                 Map<MobCategory, List<MobSpawnInfo>> mobsByCategory,
                                 Map<ResourceKey<Biome>, List<MobSpawnInfo>> mobsByBiome,
                                 Map<ResourceKey<PlacedFeature>, Set<GenerationStep.Decoration>> stepsByFeature,
+                                Map<TagKey<PlacedFeature>, List<PlacedFeatureInfo>> oresByTag,
                                 int worldBottom,
                                 int worldTop) {
         this.ores = List.copyOf(ores);
@@ -107,6 +113,7 @@ public final class VanillaRuleSnapshot {
         this.mobsByCategory = Map.copyOf(mobsByCategory);
         this.mobsByBiome = copyOfListMap(mobsByBiome);
         this.stepsByFeature = copyOfStepsMap(stepsByFeature);
+        this.oresByTag = copyOfListMap(oresByTag);
         this.worldBottom = worldBottom;
         this.worldTop = worldTop;
     }
@@ -134,7 +141,9 @@ public final class VanillaRuleSnapshot {
         int overworldBottom = server.overworld().getMinBuildHeight();
         int overworldTop = server.overworld().getMaxBuildHeight();
 
-        List<PlacedFeatureInfo> features = scanPlacedFeatures(server, overworldBottom, overworldTop);
+        var placedScan = scanPlacedFeatures(server, overworldBottom, overworldTop);
+        List<PlacedFeatureInfo> features = placedScan.features();
+        Map<TagKey<PlacedFeature>, List<PlacedFeatureInfo>> oresByTag = placedScan.byTag();
         List<StructurePlacementInfo> structures = scanStructures(server);
         var mobScan = scanMobSpawns(server);
         Map<MobCategory, List<MobSpawnInfo>> mobs = mobScan.byCategory();
@@ -151,25 +160,40 @@ public final class VanillaRuleSnapshot {
                 structures.size(), mobTotal, mobs.size(),
                 overworldBottom, overworldTop);
 
-        return new VanillaRuleSnapshot(features, structures, mobs, mobsBiome, stepsByFeature, overworldBottom, overworldTop);
+        IsekaiApi.LOGGER.debug("[Isekai v0.9] PlacedFeature tag index: {} distinct tags", oresByTag.size());
+
+        return new VanillaRuleSnapshot(features, structures, mobs, mobsBiome, stepsByFeature, oresByTag,
+                overworldBottom, overworldTop);
     }
 
     /** Group result for {@link #scanMobSpawns}: spawns are indexed two ways simultaneously. */
     private record MobScan(Map<MobCategory, List<MobSpawnInfo>> byCategory,
                             Map<ResourceKey<Biome>, List<MobSpawnInfo>> byBiome) {}
 
-    /** Walk PLACED_FEATURE; extract VerticalRange via the Access Transformer-exposed fields. */
-    private static List<PlacedFeatureInfo> scanPlacedFeatures(MinecraftServer server, int worldBottom, int worldTop) {
+    /** Group result for {@link #scanPlacedFeatures}: list + reverse tag index in one pass. */
+    private record PlacedScan(List<PlacedFeatureInfo> features,
+                               Map<TagKey<PlacedFeature>, List<PlacedFeatureInfo>> byTag) {}
+
+    /**
+     * Walk PLACED_FEATURE; extract VerticalRange via the Access Transformer-exposed fields,
+     * and build a reverse tag index in the same pass using {@code Holder.tags()}.
+     */
+    private static PlacedScan scanPlacedFeatures(MinecraftServer server, int worldBottom, int worldTop) {
         HolderLookup.RegistryLookup<PlacedFeature> lookup =
                 server.registryAccess().lookupOrThrow(Registries.PLACED_FEATURE);
         List<PlacedFeatureInfo> features = new ArrayList<>();
+        Map<TagKey<PlacedFeature>, List<PlacedFeatureInfo>> byTag = new HashMap<>();
         lookup.listElements().forEach(ref -> {
             ResourceKey<PlacedFeature> key = ref.unwrapKey().orElseThrow();
             PlacedFeature pf = ref.value();
             VerticalRange range = extractVerticalRange(pf, worldBottom, worldTop);
-            features.add(new PlacedFeatureInfo(key, range != null ? range : FALLBACK_RANGE, 1, Set.of()));
+            PlacedFeatureInfo info = new PlacedFeatureInfo(
+                    key, range != null ? range : FALLBACK_RANGE, 1, Set.of());
+            features.add(info);
+            ref.tags().forEach(tag ->
+                    byTag.computeIfAbsent(tag, k -> new ArrayList<>()).add(info));
         });
-        return features;
+        return new PlacedScan(features, byTag);
     }
 
     /**
@@ -372,16 +396,21 @@ public final class VanillaRuleSnapshot {
         return mobsByBiome.getOrDefault(biome, List.of());
     }
 
+    /** PlacedFeatures that were tagged with the given TagKey at scan time. */
+    public List<PlacedFeatureInfo> oresForTag(TagKey<PlacedFeature> tag) {
+        return oresByTag.getOrDefault(tag, List.of());
+    }
+
     public boolean isEmpty() {
         return ores.isEmpty() && structures.isEmpty() && mobsByCategory.isEmpty();
     }
 
-    /** v0.6 backwards-compat constructor — kept for tests / fixed snapshots that pre-date the step + biome indices. */
+    /** v0.6 backwards-compat constructor — kept for tests / fixed snapshots that pre-date the indices. */
     public VanillaRuleSnapshot(List<PlacedFeatureInfo> ores,
                                 List<StructurePlacementInfo> structures,
                                 Map<MobCategory, List<MobSpawnInfo>> mobsByCategory,
                                 int worldBottom,
                                 int worldTop) {
-        this(ores, structures, mobsByCategory, Map.of(), Map.of(), worldBottom, worldTop);
+        this(ores, structures, mobsByCategory, Map.of(), Map.of(), Map.of(), worldBottom, worldTop);
     }
 }
