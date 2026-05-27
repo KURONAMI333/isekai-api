@@ -52,6 +52,7 @@ public record WorldshapeDescriptor(
         Set<ResourceKey<Structure>> excludedStructures,
         Map<MobCategory, RemapStrategy> mobSpawnStrategyByCategory,
         List<AdditionalFeature> additionalFeatures,
+        AtmosphereOverride atmosphere,
         int priority
 ) {
     public WorldshapeDescriptor {
@@ -61,6 +62,7 @@ public record WorldshapeDescriptor(
         excludedStructures = Set.copyOf(excludedStructures);
         mobSpawnStrategyByCategory = Map.copyOf(mobSpawnStrategyByCategory);
         additionalFeatures = List.copyOf(additionalFeatures);
+        if (atmosphere == null) atmosphere = AtmosphereOverride.EMPTY;
     }
 
     /**
@@ -140,6 +142,8 @@ public record WorldshapeDescriptor(
             AdditionalFeature.CODEC.listOf()
                     .optionalFieldOf("additional_features", List.of())
                     .forGetter(WorldshapeDescriptor::additionalFeatures),
+            AtmosphereOverride.CODEC.optionalFieldOf("atmosphere", AtmosphereOverride.EMPTY)
+                    .forGetter(WorldshapeDescriptor::atmosphere),
             Codec.INT.optionalFieldOf("priority", DEFAULT_PRIORITY)
                     .forGetter(WorldshapeDescriptor::priority)
     ).apply(i, WorldshapeDescriptor::new));
