@@ -3,23 +3,18 @@ package com.kuronami.isekaiapi.api.remap;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.material.Fluid;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.function.ToIntBiFunction;
 
 /**
  * Defines "what Y level counts as the surface" for surface-relative placement modifiers
- * and predicate evaluation. Neutral primitives only.
+ * and predicate evaluation. Neutral primitives only — every variant is JSON-encodable so
+ * datapack consumers and Java consumers share a single dispatch path.
  *
  * <p>JSON form: {@code {"type": "isekai:world_surface"}} / {@code {"type": "isekai:fixed_y", "y": 64}}.
- *
- * <p>{@link Custom} is Java-only — it carries a function reference that cannot be encoded
- * to JSON, so datapack consumers must use one of the data-driven variants instead.
  */
 public sealed interface SurfaceAnchor {
 
@@ -57,24 +52,11 @@ public sealed interface SurfaceAnchor {
         @Override public MapCodec<? extends SurfaceAnchor> codec() { return MAP_CODEC; }
     }
 
-    /** Caller-supplied function (level, pos) -> surface Y. Datapack consumers cannot use this. */
-    record Custom(SurfaceLocator fn) implements SurfaceAnchor {
-        @Override public String typeId() { return "isekai:custom"; }
-        @Override public MapCodec<? extends SurfaceAnchor> codec() {
-            throw new UnsupportedOperationException(
-                    "SurfaceAnchor.Custom is Java-only and cannot be serialized to JSON");
-        }
-    }
-
-    @FunctionalInterface
-    interface SurfaceLocator extends ToIntBiFunction<LevelReader, BlockPos> {}
-
     private static Codec<SurfaceAnchor> buildDispatchCodec() {
         Map<String, MapCodec<? extends SurfaceAnchor>> registry = new LinkedHashMap<>();
         registry.put("isekai:world_surface", WorldSurface.MAP_CODEC);
         registry.put("isekai:below_fluid",   BelowFluid.MAP_CODEC);
         registry.put("isekai:fixed_y",       FixedY.MAP_CODEC);
-        // "isekai:custom" intentionally omitted — Java-only, not encodable.
         Map<String, MapCodec<? extends SurfaceAnchor>> frozen = Map.copyOf(registry);
 
         return Codec.STRING.dispatch(
@@ -85,8 +67,7 @@ public sealed interface SurfaceAnchor {
                     if (mc == null) {
                         throw new IllegalArgumentException(
                                 "Unknown SurfaceAnchor type: '" + typeId
-                                        + "'. Known types: " + frozen.keySet()
-                                        + " (note: 'isekai:custom' is Java-only and cannot be used in JSON)");
+                                        + "'. Known types: " + frozen.keySet());
                     }
                     return mc;
                 });

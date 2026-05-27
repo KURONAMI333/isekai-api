@@ -1,6 +1,7 @@
 package com.kuronami.isekaiapi;
 
 import com.kuronami.isekaiapi.biomemodifier.IsekaiBiomeModifiers;
+import com.kuronami.isekaiapi.biomemodifier.IsekaiStructureModifiers;
 import com.kuronami.isekaiapi.densityfunction.IsekaiDensityFunctions;
 import com.kuronami.isekaiapi.placementmodifier.IsekaiPlacementModifiers;
 import com.mojang.logging.LogUtils;
@@ -15,9 +16,10 @@ public final class IsekaiApi {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public IsekaiApi(IEventBus modBus) {
-        LOGGER.info("Isekai API v{} loading", VERSION);
+        LOGGER.info("[Isekai] loading v{}", VERSION);
         IsekaiDensityFunctions.register(modBus);
         IsekaiPlacementModifiers.register(modBus);
         IsekaiBiomeModifiers.register(modBus);
+        IsekaiStructureModifiers.register(modBus);
     }
 }
