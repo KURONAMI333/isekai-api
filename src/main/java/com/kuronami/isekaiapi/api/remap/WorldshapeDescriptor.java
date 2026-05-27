@@ -6,6 +6,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.GenerationStep;
@@ -49,6 +50,7 @@ public record WorldshapeDescriptor(
         Set<ResourceKey<Biome>> appliesTo,
         Set<ResourceKey<PlacedFeature>> excludedFeatures,
         Set<ResourceKey<Structure>> excludedStructures,
+        Map<MobCategory, RemapStrategy> mobSpawnStrategyByCategory,
         List<AdditionalFeature> additionalFeatures,
         int priority
 ) {
@@ -57,7 +59,16 @@ public record WorldshapeDescriptor(
         appliesTo = Set.copyOf(appliesTo);
         excludedFeatures = Set.copyOf(excludedFeatures);
         excludedStructures = Set.copyOf(excludedStructures);
+        mobSpawnStrategyByCategory = Map.copyOf(mobSpawnStrategyByCategory);
         additionalFeatures = List.copyOf(additionalFeatures);
+    }
+
+    /**
+     * Resolve the strategy for the given {@link MobCategory}. Falls through to the global
+     * {@link #mobSpawnStrategy} when no per-category override is present.
+     */
+    public RemapStrategy resolveMobSpawnStrategy(MobCategory category) {
+        return mobSpawnStrategyByCategory.getOrDefault(category, mobSpawnStrategy);
     }
 
     /**
@@ -123,6 +134,9 @@ public record WorldshapeDescriptor(
                     .xmap(list -> (Set<ResourceKey<Structure>>) new HashSet<>(list),
                           set -> List.copyOf(set))
                     .forGetter(WorldshapeDescriptor::excludedStructures),
+            Codec.unboundedMap(MobCategory.CODEC, RemapStrategy.CODEC)
+                    .optionalFieldOf("mob_spawn_strategy_by_category", Map.of())
+                    .forGetter(WorldshapeDescriptor::mobSpawnStrategyByCategory),
             AdditionalFeature.CODEC.listOf()
                     .optionalFieldOf("additional_features", List.of())
                     .forGetter(WorldshapeDescriptor::additionalFeatures),
