@@ -70,9 +70,11 @@ public record ApplyWorldshapeBiomeModifier(WorldshapeDescriptor worldshape) impl
         }
         if (phase == Phase.REMOVE) {
             removeExcludedFeatures(builder);
+            removeExcludedCarvers(builder);
             removeOriginalsThatWillBeRemapped(builder);
         } else if (phase == Phase.ADD) {
             addAdditionalFeatures(builder);
+            addAdditionalCarvers(builder);
             addRemappedOreFeatures(builder);
         } else if (phase == Phase.MODIFY) {
             applyMobSpawnStrategy(builder);
@@ -296,6 +298,61 @@ public record ApplyWorldshapeBiomeModifier(WorldshapeDescriptor worldshape) impl
             return impl.getSnapshot();
         }
         return null;
+    }
+
+    /**
+     * REMOVE phase: drop every ConfiguredWorldCarver whose key appears in
+     * {@link WorldshapeDescriptor#excludedCarvers()} from every carving step. Carvers are
+     * the cave/canyon generation pass — removing them unlocks worldshapes like 'mountain
+     * world with no carved caves' or 'surface world only'.
+     */
+    private void removeExcludedCarvers(ModifiableBiomeInfo.BiomeInfo.Builder builder) {
+        var excluded = worldshape.excludedCarvers();
+        if (excluded.isEmpty()) return;
+        var generation = builder.getGenerationSettings();
+        int removed = 0;
+        for (var step : net.minecraft.world.level.levelgen.GenerationStep.Carving.values()) {
+            var stepCarvers = generation.getCarvers(step);
+            int before = stepCarvers.size();
+            stepCarvers.removeIf(holder ->
+                    holder.unwrapKey().map(excluded::contains).orElse(false));
+            removed += before - stepCarvers.size();
+        }
+        if (removed > 0) {
+            IsekaiApi.LOGGER.debug("[Isekai] removed {} excluded carvers (descriptor dim={})",
+                    removed, worldshape.dimension().location());
+        }
+    }
+
+    /**
+     * ADD phase: resolve each {@link WorldshapeDescriptor#additionalCarvers()} entry
+     * against the CONFIGURED_CARVER registry and add it to the named carving step.
+     * Mirrors the additional_features path but for carvers.
+     */
+    private void addAdditionalCarvers(ModifiableBiomeInfo.BiomeInfo.Builder builder) {
+        var additions = worldshape.additionalCarvers();
+        if (additions.isEmpty()) return;
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null) return;
+        var lookup = server.registryAccess()
+                .lookupOrThrow(net.minecraft.core.registries.Registries.CONFIGURED_CARVER);
+        var generation = builder.getGenerationSettings();
+        int added = 0;
+        for (var ac : additions) {
+            var holder = lookup.get(ac.carver()).orElse(null);
+            if (holder == null) {
+                IsekaiApi.LOGGER.warn(
+                        "[Isekai] additional_carvers: '{}' not in CONFIGURED_CARVER registry; skipping",
+                        ac.carver().location());
+                continue;
+            }
+            generation.getCarvers(ac.step()).add(holder);
+            added++;
+        }
+        if (added > 0) {
+            IsekaiApi.LOGGER.debug("[Isekai] added {} additional carvers (descriptor dim={})",
+                    added, worldshape.dimension().location());
+        }
     }
 
     private void addAdditionalFeatures(ModifiableBiomeInfo.BiomeInfo.Builder builder) {

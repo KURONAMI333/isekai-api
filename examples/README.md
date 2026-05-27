@@ -108,11 +108,22 @@ transition}`).
   "structure_predicates":   { "<structure key>": SpatialPredicate, ... }, // optional, default {}
   "default_structure_predicate": SpatialPredicate,      // required
   "applies_to":             ["<biome key>", ...],       // optional, default [] (dimension-wide)
-  "excluded_features":      ["<feature key>", ...],     // optional, default []
-  "excluded_structures":    ["<structure key>", ...],   // optional, default []
+  "exclusions": {                                       // optional, default { features: [], structures: [], carvers: [] }
+    "features":   ["<feature key>", ...],
+    "structures": ["<structure key>", ...],
+    "carvers":    ["<configured_carver key>", ...]
+  },
   "mob_spawn_strategy_by_category": { "monster": RemapStrategy, "creature": RemapStrategy, ... }, // optional, default {} — overrides per-category, falls back to mob_spawn_strategy
-  "additional_features":    [{ "feature": "<feature key>", "step": "<decoration step>" }, ...], // optional, default []
-  "priority":               <int>                        // optional, default 100
+  "additions": {                                        // optional, default { features: [], carvers: [] }
+    "features": [{ "feature": "<feature key>", "step": "<decoration step>" }, ...],
+    "carvers":  [{ "carver": "<configured_carver key>", "step": "air|liquid" }, ...]
+  },
+  "atmosphere": {                                       // optional, default {}; every sub-field is independently optional
+    "has_precipitation": <bool>, "temperature": <float>, "downfall": <float>,
+    "sky_color": <int>, "fog_color": <int>, "water_color": <int>, "water_fog_color": <int>,
+    "foliage_color": <int>, "grass_color": <int>
+  },
+  "priority": <int>                                      // optional, default 100
 }
 ```
 
