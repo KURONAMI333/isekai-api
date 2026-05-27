@@ -4,6 +4,7 @@ import com.kuronami.isekaiapi.api.query.IsekaiQuery;
 import com.kuronami.isekaiapi.api.remap.IsekaiRemap;
 import com.kuronami.isekaiapi.impl.IsekaiQueryImpl;
 import com.kuronami.isekaiapi.impl.IsekaiRemapImpl;
+import com.kuronami.isekaiapi.impl.VanillaRuleSnapshot;
 
 /**
  * Public facade for consumers. Access points:
@@ -28,5 +29,14 @@ public final class Isekai {
 
     public static IsekaiRemap remap() {
         return REMAP;
+    }
+
+    /**
+     * Internal: invoked by the lifecycle hook to publish the freshly-scanned vanilla
+     * rule snapshot to the query cache. Not part of the public consumer API; consumers
+     * read via {@link #query()}, not via this method.
+     */
+    public static void publishSnapshot(VanillaRuleSnapshot snapshot) {
+        ((IsekaiQueryImpl) QUERY).setSnapshot(snapshot);
     }
 }

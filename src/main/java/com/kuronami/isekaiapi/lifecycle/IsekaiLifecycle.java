@@ -1,15 +1,16 @@
 package com.kuronami.isekaiapi.lifecycle;
 
 import com.kuronami.isekaiapi.IsekaiApi;
+import com.kuronami.isekaiapi.api.Isekai;
+import com.kuronami.isekaiapi.impl.VanillaRuleSnapshot;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
 
 /**
- * Server lifecycle hooks per spec §5.6. v0.1 logs the trigger points only;
- * vanilla rule scan + WorldshapeSnapshot cache build / datapack reload pipeline
- * land in v0.2.
+ * Server lifecycle hooks. v0.2 wires up the vanilla rule snapshot scanner;
+ * the datapack reload pipeline ships in v0.3 alongside the JSON schema validator.
  */
 @EventBusSubscriber(modid = IsekaiApi.MODID)
 public final class IsekaiLifecycle {
@@ -18,16 +19,18 @@ public final class IsekaiLifecycle {
 
     @SubscribeEvent
     public static void onServerAboutToStart(ServerAboutToStartEvent event) {
-        IsekaiApi.LOGGER.info("[Isekai v0.1] ServerAboutToStartEvent: vanilla rule snapshot cache build deferred to v0.2");
-        // TODO v0.2: scan PlacedFeature / Structure / MobSpawn / DensityFunction registries
-        // TODO v0.2: build immutable WorldshapeSnapshot per dimension
-        // TODO v0.2: trigger IsekaiQueryImpl to cache results
+        IsekaiApi.LOGGER.info("[Isekai] ServerAboutToStartEvent: scanning vanilla worldgen rules");
+        var snapshot = VanillaRuleSnapshot.scan(event.getServer());
+        Isekai.publishSnapshot(snapshot);
+        IsekaiApi.LOGGER.info("[Isekai] Snapshot published (empty={}); query API now backed by cache",
+                snapshot.isEmpty());
     }
 
     @SubscribeEvent
     public static void onAddReloadListener(AddReloadListenerEvent event) {
-        IsekaiApi.LOGGER.info("[Isekai v0.1] AddReloadListenerEvent: datapack reload pipeline deferred to v0.2");
-        // TODO v0.2: register a PreparableReloadListener that scans data/<ns>/isekai/ JSON
-        // TODO v0.2: re-build consumer descriptors on /reload
+        IsekaiApi.LOGGER.info("[Isekai v0.2] AddReloadListenerEvent: datapack reload pipeline deferred to v0.3");
+        // TODO v0.3: register a PreparableReloadListener that scans data/<ns>/isekai/ JSON,
+        // validates each WorldshapeDescriptor / LayeredDescriptor against the codec,
+        // and rebuilds consumer-side state without a full server restart.
     }
 }
