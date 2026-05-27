@@ -58,8 +58,21 @@ public final class VanillaRuleSnapshot {
     public static final VanillaRuleSnapshot EMPTY =
             new VanillaRuleSnapshot(List.of(), List.of(), Map.of());
 
+    /**
+     * Overworld defaults used by {@link #anchorToY} when no per-call dimension override is
+     * supplied. NeoForge 1.21.1 vanilla overworld is -64..320. Per-dimension resolution
+     * would require the {@link net.minecraft.world.level.levelgen.WorldGenerationContext}
+     * for the consumer's target level — landing in v0.7 alongside the biome modifier ADD
+     * phase, where dimension is known.
+     */
     private static final int APPROX_WORLD_BOTTOM = -64;
     private static final int APPROX_WORLD_TOP = 320;
+
+    /**
+     * Returned for placed features that lack a {@link HeightRangePlacement} modifier or use
+     * a {@link HeightProvider} subtype the AT doesn't expose yet. Identity-comparable
+     * (via {@code ==}) for cheap "did we get a real range" checks in callers.
+     */
     private static final VerticalRange FALLBACK_RANGE =
             new VerticalRange(APPROX_WORLD_BOTTOM, APPROX_WORLD_TOP, HeightDistribution.UNIFORM);
 
@@ -78,7 +91,14 @@ public final class VanillaRuleSnapshot {
     public static VanillaRuleSnapshot scan(MinecraftServer server) {
         IsekaiApi.LOGGER.info("[Isekai v0.6] VanillaRuleSnapshot.scan: walking PLACED_FEATURE + STRUCTURE + BIOME registries");
 
-        List<PlacedFeatureInfo> features = scanPlacedFeatures(server);
+        // Resolve the overworld's actual build height range — vanilla 1.21.1 ships -64..320
+        // but cubic-chunks or world height mods can change this. PlacedFeatures scanned here
+        // are typically authored against the overworld even when reused in modded dimensions
+        // (the Y range absoluteness is set at server startup, not per-level visit).
+        int overworldBottom = server.overworld().getMinBuildHeight();
+        int overworldTop = server.overworld().getMaxBuildHeight();
+
+        List<PlacedFeatureInfo> features = scanPlacedFeatures(server, overworldBottom, overworldTop);
         List<StructurePlacementInfo> structures = scanStructures(server);
         Map<MobCategory, List<MobSpawnInfo>> mobs = scanMobSpawns(server);
 
@@ -86,22 +106,24 @@ public final class VanillaRuleSnapshot {
         int mobTotal = mobs.values().stream().mapToInt(List::size).sum();
         IsekaiApi.LOGGER.info(
                 "[Isekai v0.6] Scanned {} placed features ({} with extracted VerticalRange, "
-                        + "{} with fallback) + {} structure placements + {} mob spawn entries across {} categories",
+                        + "{} with fallback) + {} structure placements + {} mob spawn entries across {} categories "
+                        + "(overworld build-height {}..{})",
                 features.size(), withRange, features.size() - withRange,
-                structures.size(), mobTotal, mobs.size());
+                structures.size(), mobTotal, mobs.size(),
+                overworldBottom, overworldTop);
 
         return new VanillaRuleSnapshot(features, structures, mobs);
     }
 
     /** Walk PLACED_FEATURE; extract VerticalRange via the Access Transformer-exposed fields. */
-    private static List<PlacedFeatureInfo> scanPlacedFeatures(MinecraftServer server) {
+    private static List<PlacedFeatureInfo> scanPlacedFeatures(MinecraftServer server, int worldBottom, int worldTop) {
         HolderLookup.RegistryLookup<PlacedFeature> lookup =
                 server.registryAccess().lookupOrThrow(Registries.PLACED_FEATURE);
         List<PlacedFeatureInfo> features = new ArrayList<>();
         lookup.listElements().forEach(ref -> {
             ResourceKey<PlacedFeature> key = ref.unwrapKey().orElseThrow();
             PlacedFeature pf = ref.value();
-            VerticalRange range = extractVerticalRange(pf);
+            VerticalRange range = extractVerticalRange(pf, worldBottom, worldTop);
             features.add(new PlacedFeatureInfo(key, range != null ? range : FALLBACK_RANGE, 1, Set.of()));
         });
         return features;
@@ -188,37 +210,37 @@ public final class VanillaRuleSnapshot {
         return byCategory;
     }
 
-    private static VerticalRange extractVerticalRange(PlacedFeature pf) {
+    private static VerticalRange extractVerticalRange(PlacedFeature pf, int worldBottom, int worldTop) {
         for (PlacementModifier mod : pf.placement()) {
             if (mod instanceof HeightRangePlacement hrp) {
-                return convertHeightProvider(hrp.height);
+                return convertHeightProvider(hrp.height, worldBottom, worldTop);
             }
         }
         return null;
     }
 
-    private static VerticalRange convertHeightProvider(HeightProvider hp) {
+    private static VerticalRange convertHeightProvider(HeightProvider hp, int worldBottom, int worldTop) {
         if (hp instanceof UniformHeight uh) {
             return new VerticalRange(
-                    anchorToY(uh.minInclusive),
-                    anchorToY(uh.maxInclusive),
+                    anchorToY(uh.minInclusive, worldBottom, worldTop),
+                    anchorToY(uh.maxInclusive, worldBottom, worldTop),
                     HeightDistribution.UNIFORM);
         }
         if (hp instanceof TrapezoidHeight th) {
             return new VerticalRange(
-                    anchorToY(th.minInclusive),
-                    anchorToY(th.maxInclusive),
+                    anchorToY(th.minInclusive, worldBottom, worldTop),
+                    anchorToY(th.maxInclusive, worldBottom, worldTop),
                     HeightDistribution.TRAPEZOID);
         }
         // ConstantHeight / BiasedToBottomHeight / VeryBiasedToBottomHeight / WeightedListHeight
-        // are not yet supported; their fields aren't in the AT. v0.5 will extend the AT.
+        // are not yet supported; their fields aren't in the AT. v0.7 will extend the AT.
         return FALLBACK_RANGE;
     }
 
-    private static int anchorToY(VerticalAnchor anchor) {
+    private static int anchorToY(VerticalAnchor anchor, int worldBottom, int worldTop) {
         if (anchor instanceof VerticalAnchor.Absolute a) return a.y();
-        if (anchor instanceof VerticalAnchor.AboveBottom ab) return APPROX_WORLD_BOTTOM + ab.offset();
-        if (anchor instanceof VerticalAnchor.BelowTop bt) return APPROX_WORLD_TOP - bt.offset();
+        if (anchor instanceof VerticalAnchor.AboveBottom ab) return worldBottom + ab.offset();
+        if (anchor instanceof VerticalAnchor.BelowTop bt) return worldTop - bt.offset();
         return 0;
     }
 
