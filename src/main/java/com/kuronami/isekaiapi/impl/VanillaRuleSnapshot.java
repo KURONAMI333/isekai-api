@@ -12,15 +12,17 @@ import java.util.Map;
 
 /**
  * Immutable cached view of vanilla + modded worldgen rules taken at
- * {@code ServerAboutToStartEvent}. Backs all {@link com.kuronami.isekaiapi.api.query.IsekaiQuery}
- * methods in O(1).
+ * {@code ServerAboutToStartEvent}. Backs all
+ * {@link com.kuronami.isekaiapi.api.query.IsekaiQuery} methods in O(1).
  *
- * <p>v0.2 status: scaffold + lifecycle wired. The actual registry-walk logic that
- * populates the lists from {@code BuiltInRegistries.PLACED_FEATURE} etc. lands in
- * v0.3 — the missing piece is the per-feature {@code VerticalRange} extraction
- * (parsing {@code HeightRangePlacement} variants out of each {@code PlacedFeature}'s
- * modifier list) which needs careful handling of all the vanilla
- * {@code HeightProvider} subtypes.
+ * <p>v0.2 status: scaffold + lifecycle wired (scan invocation, snapshot publication
+ * to {@link IsekaiQueryImpl}, AtomicReference-based cache swap). The actual registry
+ * walk that populates the lists is deferred to v0.3 — first v0.3 attempt was
+ * reverted because the API path needed verification: NeoForge 1.21.1
+ * {@code RegistryAccess.lookupOrThrow} returns {@code RegistryLookup<T>} not
+ * {@code Registry<T>}, and {@code UniformHeight} / {@code TrapezoidHeight} field
+ * access pattern (getter vs direct field) needs confirmation. Next session reattempts
+ * with confirmed API references rather than guesses.
  */
 public final class VanillaRuleSnapshot {
 
@@ -40,21 +42,16 @@ public final class VanillaRuleSnapshot {
     }
 
     /**
-     * v0.2 skeleton — returns an EMPTY snapshot but exercises the lifecycle path
-     * (event firing, log line, downstream cache assignment). Replace the empty
-     * return with a full registry walk in v0.3.
+     * v0.2 skeleton — returns {@link #EMPTY} but exercises the lifecycle path so
+     * {@code IsekaiLifecycle.onServerAboutToStart} can call this without error.
+     * v0.3 will replace this body with a real
+     * {@code BuiltInRegistries.PLACED_FEATURE} walk.
      */
     public static VanillaRuleSnapshot scan(MinecraftServer server) {
-        IsekaiApi.LOGGER.info(
-                "[Isekai v0.2 skeleton] VanillaRuleSnapshot.scan: registry walk deferred to v0.3 "
-                        + "(server={}, registries available={})",
+        IsekaiApi.LOGGER.info("[Isekai v0.2 skeleton] VanillaRuleSnapshot.scan: registry walk "
+                + "implementation deferred to v0.3 (server motd={}, registries available={})",
                 server.getMotd(),
                 server.registryAccess() != null);
-        // TODO v0.3: walk BuiltInRegistries.PLACED_FEATURE -> extract VerticalRange via
-        // analysis of each feature's HeightRangePlacement (uniform / trapezoid / triangle / etc.)
-        // TODO v0.3: walk BuiltInRegistries.STRUCTURE -> StructurePlacement metadata
-        // TODO v0.3: walk BuiltInRegistries.BIOME -> mob spawn settings per MobCategory
-        // TODO v0.3: cache modded ResourceKeys alongside vanilla
         return EMPTY;
     }
 
