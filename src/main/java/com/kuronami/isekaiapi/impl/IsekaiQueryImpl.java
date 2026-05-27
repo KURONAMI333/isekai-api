@@ -43,6 +43,15 @@ public final class IsekaiQueryImpl implements IsekaiQuery {
                 prev.isEmpty(), s.isEmpty());
     }
 
+    /**
+     * Direct read of the currently-published snapshot. Internal — exposed for
+     * {@link com.kuronami.isekaiapi.biomemodifier.ApplyWorldshapeBiomeModifier} which needs
+     * raw access to per-feature VerticalRanges + world bounds for strategy remapping.
+     */
+    public VanillaRuleSnapshot getSnapshot() {
+        return snapshot.get();
+    }
+
     @Override
     public Optional<VerticalRange> getOreVerticalRange(ResourceKey<PlacedFeature> ore) {
         return snapshot.get().ores().stream()
