@@ -9,6 +9,11 @@ import java.util.function.ToIntBiFunction;
 /**
  * Defines "what Y level counts as the surface" for surface-relative placement modifiers
  * and predicate evaluation. Neutral primitives only.
+ *
+ * <p>Note: dispatch Codec is not (yet) provided. Placement modifiers that accept a
+ * SurfaceAnchor from datapack JSON encode the anchor as a {@code type} string field
+ * locally and resolve to a {@code SurfaceAnchor} record at construction time. A proper
+ * sealed-interface dispatch codec lands in v0.2 when the JSON schema validator does.
  */
 public sealed interface SurfaceAnchor {
     /** Topmost solid block per column (vanilla heightmap WORLD_SURFACE). */
