@@ -15,8 +15,10 @@
     "applies_to": [
       "minecraft:desert"
     ],
-    "excluded_features": [
-      "minecraft:lake_lava_surface"
-    ]
+    "exclusions": {
+      "features": [
+        "minecraft:lake_lava_surface"
+      ]
+    }
   }
 }

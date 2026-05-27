@@ -12,12 +12,14 @@
     "structure_strategy": { "type": "isekai:identity" },
     "mob_spawn_strategy": { "type": "isekai:identity" },
     "default_structure_predicate": { "type": "isekai:always" },
-    "excluded_structures": [
-      "minecraft:village_plains",
-      "minecraft:village_desert",
-      "minecraft:village_savanna",
-      "minecraft:village_snowy",
-      "minecraft:village_taiga"
-    ]
+    "exclusions": {
+      "structures": [
+        "minecraft:village_plains",
+        "minecraft:village_desert",
+        "minecraft:village_savanna",
+        "minecraft:village_snowy",
+        "minecraft:village_taiga"
+      ]
+    }
   }
 }
