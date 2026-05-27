@@ -114,8 +114,18 @@ public final class IsekaiCommand {
                         .then(Commands.literal("ore")
                                 .then(Commands.argument("id", ResourceLocationArgument.id()).executes(ctx -> {
                                     ResourceLocation id = ResourceLocationArgument.getId(ctx, "id");
-                                    ctx.getSource().sendSuccess(() ->
-                                            Component.literal("[Isekai v0.1 stub] dump ore " + id + " — vanilla rule scanner lands v0.2"), false);
+                                    var match = Isekai.query().getAllOres().stream()
+                                            .filter(info -> info.key().location().equals(id))
+                                            .findFirst();
+                                    if (match.isEmpty()) {
+                                        ctx.getSource().sendFailure(Component.literal(
+                                                "No PlacedFeature found: " + id));
+                                        return 0;
+                                    }
+                                    var info = match.get();
+                                    ctx.getSource().sendSuccess(() -> Component.literal(
+                                            info.key().location() + " -> " + info.range()
+                                                    + " (count=" + info.count() + ")"), false);
                                     return 1;
                                 })))
                         .then(Commands.literal("structure")
