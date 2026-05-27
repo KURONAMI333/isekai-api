@@ -99,7 +99,7 @@ transition}`).
 - `isekai:solid_floor`    — `{ "min_clearance": <int> }`
 - `isekai:solid_ceiling`  — `{ "min_clearance": <int> }`
 - `isekai:terrain_slope`  — `{ "min_slope": <dbl>, "max_slope": <dbl> }`
-- `isekai:near_block`     — `{ "target": "<block key>", "max_distance": <int> }`
+- `isekai:near_block`     — `{ "targets": "<block key>" | ["<block key>", ...] | "#<block tag>", "max_distance": <int> }`
 - `isekai:near_biome`     — `{ "biome": "<biome key>", "max_distance": <int> }`
 - `isekai:in_fluid`       — `{ "fluid": "<fluid key>" }`
 - `isekai:always` / `isekai:never` — no payload
