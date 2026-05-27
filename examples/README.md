@@ -26,6 +26,26 @@ compose two leaf predicates (`y_in_range` + `solid_ceiling`) so structures
 only spawn in roofed chambers. `count_scale` 1.5x amplifies mob spawning.
 `priority=110` wins ties against the default-priority skyland_minimal pack.
 
+## biome_modifier_demo/
+
+A NeoForge biome modifier referencing Isekai's `isekai_api:apply_worldshape`
+type. Removes `minecraft:lake_lava_surface` from `minecraft:desert` biomes.
+
+This is the only example that produces an **observable in-game effect**;
+the other examples populate Isekai's runtime registry (queryable via
+`/isekai query worldshape`) but don't yet alter biome generation. v0.6
+biome-modifier behavior is limited to the REMOVE phase
+(`excluded_features`); ADD-phase remapping for ore/structure/mob_spawn
+strategies lands in v0.7.
+
+When this pack is loaded, look for log lines like
+`[Isekai] removed N excluded placed features (descriptor dim=...)` at
+debug level.
+
+The JSON is wrapped in `{ "type": "isekai_api:apply_worldshape",
+"worldshape": { ... } }`. Inside `worldshape`, you write the same fields
+documented below for `WorldshapeDescriptor`.
+
 ## layered_overworld/
 
 Multi-layer worldshape: a vanilla-like terrain layer at y=-64..70 plus a
