@@ -22,6 +22,7 @@ import net.minecraft.world.level.levelgen.heightproviders.HeightProvider;
 import net.minecraft.world.level.levelgen.heightproviders.TrapezoidHeight;
 import net.minecraft.world.level.levelgen.heightproviders.UniformHeight;
 import net.minecraft.world.level.levelgen.heightproviders.VeryBiasedToBottomHeight;
+import net.minecraft.world.level.levelgen.heightproviders.WeightedListHeight;
 import net.minecraft.world.level.levelgen.placement.HeightRangePlacement;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.placement.PlacementModifier;
@@ -369,9 +370,34 @@ public final class VanillaRuleSnapshot {
                     anchorToY(vbbh.maxInclusive, worldBottom, worldTop),
                     HeightDistribution.BIASED_LOW);
         }
-        // WeightedListHeight is the one remaining vanilla variant — its piece list isn't
-        // a simple range, so we fall back. It's rare in vanilla worldgen.
+        if (hp instanceof WeightedListHeight wlh) {
+            return weightedListEnvelope(wlh, worldBottom, worldTop);
+        }
         return FALLBACK_RANGE;
+    }
+
+    /**
+     * Compute the union (min-of-mins, max-of-maxes) of every nested HeightProvider in a
+     * {@link WeightedListHeight}'s distribution. Returns FALLBACK_RANGE if the distribution
+     * is empty or every nested provider falls back.
+     *
+     * <p>Distribution defaults to {@link HeightDistribution#UNIFORM} since the per-piece
+     * distributions can differ — picking any one would be misleading. Consumers wanting
+     * the exact per-piece breakdown can query each entry separately via the snapshot.
+     */
+    private static VerticalRange weightedListEnvelope(WeightedListHeight wlh, int worldBottom, int worldTop) {
+        var entries = wlh.distribution.unwrap();
+        if (entries.isEmpty()) return FALLBACK_RANGE;
+        int min = Integer.MAX_VALUE;
+        int max = Integer.MIN_VALUE;
+        for (var entry : entries) {
+            VerticalRange r = convertHeightProvider(entry.data(), worldBottom, worldTop);
+            if (r == FALLBACK_RANGE) continue;
+            if (r.minY() < min) min = r.minY();
+            if (r.maxY() > max) max = r.maxY();
+        }
+        if (min == Integer.MAX_VALUE) return FALLBACK_RANGE;
+        return new VerticalRange(min, max, HeightDistribution.UNIFORM);
     }
 
     private static int anchorToY(VerticalAnchor anchor, int worldBottom, int worldTop) {
