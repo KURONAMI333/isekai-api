@@ -102,7 +102,7 @@ transition}`).
 
 `RemapStrategy` dispatch on `"type"`:
 - `isekai:linear`, `isekai:inverted`, `isekai:identity` — no payload
-- `isekai:band_split` — `{ "ratios": [<float>, ...] }`
+- `isekai:band_split` — `{ "bands": [{ "vanilla_source": VerticalRange, "target_ratio": <float> }, ...] }`
 - `isekai:fixed_range` — `{ "min": <int>, "max": <int>, "dist": "<distribution>" }`
 - `isekai:count_scale` — `{ "factor": <double>=0 }`
 - `isekai:pipe` — `{ "chain": [RemapStrategy, ...] }` (non-empty)
