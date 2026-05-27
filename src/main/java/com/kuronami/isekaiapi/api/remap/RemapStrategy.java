@@ -53,8 +53,13 @@ public sealed interface RemapStrategy {
     /** Fully custom: (vanillaRange, playableRange) -> remapped range. Java-only. */
     record Custom(BiFunction<VerticalRange, VerticalRange, VerticalRange> fn) implements RemapStrategy {}
 
-    /** Apply chain in order, each operating on the previous result. */
+    /** Apply chain in order, each operating on the previous result. Must be non-empty. */
     record Pipe(List<RemapStrategy> chain) implements RemapStrategy {
-        public Pipe { chain = List.copyOf(chain); }
+        public Pipe {
+            chain = List.copyOf(chain);
+            if (chain.isEmpty()) {
+                throw new IllegalArgumentException("Pipe requires at least one strategy");
+            }
+        }
     }
 }

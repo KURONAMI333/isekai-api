@@ -29,17 +29,29 @@ public final class IsekaiValidator {
         return ValidationResult.ok(0);
     }
 
-    public record ValidationResult(int filesChecked, int errorsFound, List<String> messages) {
+    /**
+     * Result of a namespace validation pass. {@link #errors} is the canonical source of
+     * truth; {@link #errorsFound()} is derived from it. {@link #filesChecked} counts
+     * every JSON file that was inspected (including the ones that passed).
+     */
+    public record ValidationResult(int filesChecked, List<String> errors) {
         public ValidationResult {
-            messages = List.copyOf(messages);
+            errors = List.copyOf(errors);
+            if (filesChecked < 0) {
+                throw new IllegalArgumentException("filesChecked < 0");
+            }
         }
 
         public static ValidationResult ok(int filesChecked) {
-            return new ValidationResult(filesChecked, 0, List.of());
+            return new ValidationResult(filesChecked, List.of());
+        }
+
+        public int errorsFound() {
+            return errors.size();
         }
 
         public boolean isOk() {
-            return errorsFound == 0;
+            return errors.isEmpty();
         }
     }
 }

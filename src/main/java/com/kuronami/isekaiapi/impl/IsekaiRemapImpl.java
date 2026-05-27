@@ -22,13 +22,22 @@ public final class IsekaiRemapImpl implements IsekaiRemap {
 
     @Override
     public void declareWorldshape(WorldshapeDescriptor descriptor) {
-        var existing = singleLayer.put(descriptor.dimension(), descriptor);
-        if (existing != null) {
-            IsekaiApi.LOGGER.warn("[Isekai] Replacing single-layer descriptor for {} (priority {} -> {})",
-                    descriptor.dimension(), existing.priority(), descriptor.priority());
-        }
-        IsekaiApi.LOGGER.info("[Isekai v0.1 stub] declareWorldshape: dim={}, range={}, priority={}",
-                descriptor.dimension(), descriptor.playableRange(), descriptor.priority());
+        singleLayer.compute(descriptor.dimension(), (k, existing) -> {
+            if (existing != null && existing.priority() > descriptor.priority()) {
+                IsekaiApi.LOGGER.warn(
+                        "[Isekai] Skipping declareWorldshape for {}: existing priority {} > new priority {}",
+                        descriptor.dimension(), existing.priority(), descriptor.priority());
+                return existing;
+            }
+            if (existing != null) {
+                IsekaiApi.LOGGER.warn(
+                        "[Isekai] Replacing single-layer descriptor for {} (priority {} -> {})",
+                        descriptor.dimension(), existing.priority(), descriptor.priority());
+            }
+            IsekaiApi.LOGGER.info("[Isekai v0.1 stub] declareWorldshape: dim={}, range={}, priority={}",
+                    descriptor.dimension(), descriptor.playableRange(), descriptor.priority());
+            return descriptor;
+        });
     }
 
     @Override

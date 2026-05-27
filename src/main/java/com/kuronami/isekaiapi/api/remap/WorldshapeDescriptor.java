@@ -16,9 +16,15 @@ import java.util.Set;
  * {@link IsekaiRemap#declareWorldshape}. For multi-layer (stacked) worldshapes, use
  * {@link LayeredDescriptor} via {@link IsekaiRemap#declareLayeredWorldshape}.
  *
- * <p>{@code structurePredicates} maps each vanilla structure key to the spatial condition
- * under which it should spawn in this worldshape. Structures absent from the map fall back
- * to {@code structureStrategy}.
+ * <p>{@code structurePredicates} maps each vanilla / modded structure key to the spatial
+ * condition under which it should spawn in this worldshape. Structures absent from the
+ * map fall back to {@code defaultStructurePredicate} — this catches modded structures
+ * the consumer wasn't aware of at design time, while still letting them be placed
+ * sensibly. {@code structureStrategy} additionally controls Y-range remapping for any
+ * structure that survives the predicate filter.
+ *
+ * <p>If two consumers register a descriptor for the same dimension, the one with the
+ * higher {@link #priority} wins. Ties replace.
  */
 public record WorldshapeDescriptor(
         ResourceKey<Level> dimension,
@@ -28,6 +34,7 @@ public record WorldshapeDescriptor(
         RemapStrategy structureStrategy,
         RemapStrategy mobSpawnStrategy,
         Map<ResourceKey<Structure>, SpatialPredicate> structurePredicates,
+        SpatialPredicate defaultStructurePredicate,
         Set<ResourceKey<Biome>> appliesTo,
         Set<ResourceKey<Feature<?>>> excludedFeatures,
         int priority
