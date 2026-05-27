@@ -13,6 +13,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.MobSpawnSettings;
 import net.minecraft.world.level.levelgen.VerticalAnchor;
 import net.minecraft.world.level.levelgen.heightproviders.HeightProvider;
 import net.minecraft.world.level.levelgen.heightproviders.TrapezoidHeight;
@@ -75,18 +76,21 @@ public final class VanillaRuleSnapshot {
     }
 
     public static VanillaRuleSnapshot scan(MinecraftServer server) {
-        IsekaiApi.LOGGER.info("[Isekai v0.6] VanillaRuleSnapshot.scan: walking PLACED_FEATURE + STRUCTURE registries");
+        IsekaiApi.LOGGER.info("[Isekai v0.6] VanillaRuleSnapshot.scan: walking PLACED_FEATURE + STRUCTURE + BIOME registries");
 
         List<PlacedFeatureInfo> features = scanPlacedFeatures(server);
         List<StructurePlacementInfo> structures = scanStructures(server);
+        Map<MobCategory, List<MobSpawnInfo>> mobs = scanMobSpawns(server);
 
         long withRange = features.stream().filter(info -> info.range() != FALLBACK_RANGE).count();
+        int mobTotal = mobs.values().stream().mapToInt(List::size).sum();
         IsekaiApi.LOGGER.info(
                 "[Isekai v0.6] Scanned {} placed features ({} with extracted VerticalRange, "
-                        + "{} with fallback) + {} structure placements; mob-spawns deferred",
-                features.size(), withRange, features.size() - withRange, structures.size());
+                        + "{} with fallback) + {} structure placements + {} mob spawn entries across {} categories",
+                features.size(), withRange, features.size() - withRange,
+                structures.size(), mobTotal, mobs.size());
 
-        return new VanillaRuleSnapshot(features, structures, Map.of());
+        return new VanillaRuleSnapshot(features, structures, mobs);
     }
 
     /** Walk PLACED_FEATURE; extract VerticalRange via the Access Transformer-exposed fields. */
@@ -153,6 +157,35 @@ public final class VanillaRuleSnapshot {
         Set<TagKey<Biome>> tags = new HashSet<>();
         structure.biomes().unwrap().ifLeft(tags::add);
         return tags;
+    }
+
+    /**
+     * Walk every biome's {@link MobSpawnSettings} and group spawn entries by mob category.
+     * Each {@link MobSpawnSettings.SpawnerData} becomes one {@link MobSpawnInfo}.
+     *
+     * <p>Identical (entity, weight, min, max) tuples appearing in multiple biomes generate
+     * duplicate entries — this is intentional, since per-biome spawn density compounds the
+     * effective rate. Consumers that want unique entity types should de-dup downstream.
+     */
+    private static Map<MobCategory, List<MobSpawnInfo>> scanMobSpawns(MinecraftServer server) {
+        HolderLookup.RegistryLookup<Biome> biomeLookup =
+                server.registryAccess().lookupOrThrow(Registries.BIOME);
+
+        Map<MobCategory, List<MobSpawnInfo>> byCategory = new HashMap<>();
+        biomeLookup.listElements().forEach(ref -> {
+            Biome biome = ref.value();
+            MobSpawnSettings mobSettings = biome.getMobSettings();
+            for (MobCategory category : MobCategory.values()) {
+                var spawners = mobSettings.getMobs(category).unwrap();
+                if (spawners.isEmpty()) continue;
+                List<MobSpawnInfo> bucket = byCategory.computeIfAbsent(category, k -> new ArrayList<>());
+                for (MobSpawnSettings.SpawnerData sd : spawners) {
+                    bucket.add(new MobSpawnInfo(
+                            sd.type, category, sd.getWeight().asInt(), sd.minCount, sd.maxCount));
+                }
+            }
+        });
+        return byCategory;
     }
 
     private static VerticalRange extractVerticalRange(PlacedFeature pf) {
