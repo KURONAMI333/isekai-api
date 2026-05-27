@@ -83,6 +83,7 @@ transition}`).
   "applies_to":             ["<biome key>", ...],       // optional, default [] (dimension-wide)
   "excluded_features":      ["<feature key>", ...],     // optional, default []
   "excluded_structures":    ["<structure key>", ...],   // optional, default []
+  "mob_spawn_strategy_by_category": { "monster": RemapStrategy, "creature": RemapStrategy, ... }, // optional, default {} — overrides per-category, falls back to mob_spawn_strategy
   "additional_features":    [{ "feature": "<feature key>", "step": "<decoration step>" }, ...], // optional, default []
   "priority":               <int>                        // optional, default 100
 }
