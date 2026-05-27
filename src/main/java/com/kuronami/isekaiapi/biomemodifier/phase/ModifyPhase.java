@@ -95,8 +95,13 @@ public final class ModifyPhase {
         // creature_generation_probability lives on MobSpawnSettings, not BiomeSpecialEffects;
         // grouped here with the other atmospheric tunables since it's a per-biome scalar
         // governing how often passive-creature chunk-population runs.
-        atmos.creatureGenerationProbability().ifPresent(p ->
-                builder.getMobSpawnSettings().creatureGenerationProbability(p));
+        var spawnBuilder = builder.getMobSpawnSettings();
+        atmos.creatureGenerationProbability().ifPresent(spawnBuilder::creatureGenerationProbability);
+
+        // mob_spawn_costs: per-entity (energyBudget, charge) controlling spawn-cap balance.
+        // Higher charge = entity counts heavier against the cap.
+        atmos.mobSpawnCosts().forEach((type, cost) ->
+                spawnBuilder.addMobCharge(type, cost.charge(), cost.energyBudget()));
 
         IsekaiApi.LOGGER.debug("[Isekai] applied atmosphere override (dim={})",
                 descriptor.dimension().location());
