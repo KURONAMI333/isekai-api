@@ -151,6 +151,82 @@ public record WorldshapeDescriptor(
     public static final int DEFAULT_PRIORITY = 100;
 
     /**
+     * Convenience builder for Java consumers — avoids threading 14 positional arguments
+     * through the canonical constructor and gives optional fields sensible defaults.
+     * Required fields ({@code dimension}, {@code playableRange}, {@code surfaceAnchor},
+     * three strategies, {@code defaultStructurePredicate}) must be set before {@link #build}
+     * is called; optional fields default to {@code Set.of()} / {@code Map.of()} / EMPTY
+     * sub-records / {@link #DEFAULT_PRIORITY}.
+     *
+     * <pre>{@code
+     * WorldshapeDescriptor.builder()
+     *     .dimension(Level.OVERWORLD)
+     *     .playableRange(new VerticalRange(80, 200, HeightDistribution.UNIFORM))
+     *     .surfaceAnchor(new SurfaceAnchor.FixedY(150))
+     *     .oreStrategy(new RemapStrategy.Linear())
+     *     .structureStrategy(new RemapStrategy.Identity())
+     *     .mobSpawnStrategy(new RemapStrategy.Identity())
+     *     .defaultStructurePredicate(new SpatialPredicate.YInRange(80, 200))
+     *     .priority(110)
+     *     .build();
+     * }</pre>
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /** Fluent builder; see {@link WorldshapeDescriptor#builder()}. */
+    public static final class Builder {
+        private ResourceKey<Level> dimension;
+        private VerticalRange playableRange;
+        private SurfaceAnchor surfaceAnchor;
+        private RemapStrategy oreStrategy;
+        private RemapStrategy structureStrategy;
+        private RemapStrategy mobSpawnStrategy;
+        private SpatialPredicate defaultStructurePredicate;
+        private Map<ResourceKey<Structure>, SpatialPredicate> structurePredicates = Map.of();
+        private Set<ResourceKey<Biome>> appliesTo = Set.of();
+        private Exclusions exclusions = Exclusions.EMPTY;
+        private Map<MobCategory, RemapStrategy> mobSpawnStrategyByCategory = Map.of();
+        private Additions additions = Additions.EMPTY;
+        private AtmosphereOverride atmosphere = AtmosphereOverride.EMPTY;
+        private int priority = DEFAULT_PRIORITY;
+
+        private Builder() {}
+
+        public Builder dimension(ResourceKey<Level> v) { this.dimension = v; return this; }
+        public Builder playableRange(VerticalRange v) { this.playableRange = v; return this; }
+        public Builder surfaceAnchor(SurfaceAnchor v) { this.surfaceAnchor = v; return this; }
+        public Builder oreStrategy(RemapStrategy v) { this.oreStrategy = v; return this; }
+        public Builder structureStrategy(RemapStrategy v) { this.structureStrategy = v; return this; }
+        public Builder mobSpawnStrategy(RemapStrategy v) { this.mobSpawnStrategy = v; return this; }
+        public Builder defaultStructurePredicate(SpatialPredicate v) { this.defaultStructurePredicate = v; return this; }
+        public Builder structurePredicates(Map<ResourceKey<Structure>, SpatialPredicate> v) { this.structurePredicates = v; return this; }
+        public Builder appliesTo(Set<ResourceKey<Biome>> v) { this.appliesTo = v; return this; }
+        public Builder exclusions(Exclusions v) { this.exclusions = v; return this; }
+        public Builder mobSpawnStrategyByCategory(Map<MobCategory, RemapStrategy> v) { this.mobSpawnStrategyByCategory = v; return this; }
+        public Builder additions(Additions v) { this.additions = v; return this; }
+        public Builder atmosphere(AtmosphereOverride v) { this.atmosphere = v; return this; }
+        public Builder priority(int v) { this.priority = v; return this; }
+
+        public WorldshapeDescriptor build() {
+            if (dimension == null) throw new IllegalStateException("dimension is required");
+            if (playableRange == null) throw new IllegalStateException("playableRange is required");
+            if (surfaceAnchor == null) throw new IllegalStateException("surfaceAnchor is required");
+            if (oreStrategy == null) throw new IllegalStateException("oreStrategy is required");
+            if (structureStrategy == null) throw new IllegalStateException("structureStrategy is required");
+            if (mobSpawnStrategy == null) throw new IllegalStateException("mobSpawnStrategy is required");
+            if (defaultStructurePredicate == null) throw new IllegalStateException("defaultStructurePredicate is required");
+            return new WorldshapeDescriptor(
+                    dimension, playableRange, surfaceAnchor,
+                    oreStrategy, structureStrategy, mobSpawnStrategy,
+                    structurePredicates, defaultStructurePredicate,
+                    appliesTo, exclusions, mobSpawnStrategyByCategory,
+                    additions, atmosphere, priority);
+        }
+    }
+
+    /**
      * Full descriptor codec. Optional fields default per the builder pattern:
      * <ul>
      *   <li>{@code applies_to} omitted = empty set (descriptor applies dimension-wide)</li>
