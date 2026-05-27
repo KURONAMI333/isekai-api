@@ -1,0 +1,174 @@
+package com.kuronami.isekaiapi.lifecycle;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.kuronami.isekaiapi.IsekaiApi;
+import com.kuronami.isekaiapi.api.Isekai;
+import com.kuronami.isekaiapi.api.remap.LayeredDescriptor;
+import com.kuronami.isekaiapi.api.remap.TransitionRule;
+import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.JsonOps;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
+import net.minecraft.util.profiling.ProfilerFiller;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Loads {@code data/<ns>/isekai/worldshape/*.json} on every datapack reload and invokes
+ * {@link com.kuronami.isekaiapi.api.remap.IsekaiRemap#declareWorldshape} for each entry.
+ *
+ * <p>Reload model:
+ * <ul>
+ *   <li>On every reload, previously-JSON-declared worldshapes are removed for the
+ *       dimensions appearing in the new pack (via {@code removeWorldshape}).</li>
+ *   <li>Java-side declarations (consumers calling {@code declareWorldshape} directly)
+ *       are <b>not</b> touched — this listener only owns JSON-sourced state.</li>
+ *   <li>If a JSON file fails to decode, that single entry is skipped with an error log;
+ *       the rest still apply. This matches the {@code validation_strict_mode = false}
+ *       default; strict mode lands in v0.6 alongside the config.</li>
+ * </ul>
+ *
+ * <p>The companion {@code layered_worldshape/} directory is handled the same way; each
+ * file there is a list of {@link LayeredDescriptor} for one dimension, with an optional
+ * {@code transition} at the top level. v0.5 ships both listeners; richer cross-file
+ * validation (no overlapping yRange, no duplicate dimension entries) lands in v0.6.
+ */
+public final class IsekaiReloadListener extends SimpleJsonResourceReloadListener {
+
+    /** Directory under {@code data/<ns>/} scanned for single-layer worldshape JSON. */
+    public static final String WORLDSHAPE_DIR = "isekai/worldshape";
+
+    /** Directory under {@code data/<ns>/} scanned for multi-layer worldshape JSON. */
+    public static final String LAYERED_DIR = "isekai/layered_worldshape";
+
+    /**
+     * Per-dimension keys most recently loaded from JSON. We retain this so a subsequent
+     * reload can remove no-longer-present entries before applying the new set.
+     */
+    private final Set<net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>> lastJsonDimensions = new HashSet<>();
+
+    /** Whether this listener loads single-layer or layered descriptors. */
+    private final Mode mode;
+
+    public enum Mode { SINGLE, LAYERED }
+
+    private IsekaiReloadListener(Mode mode, String directory) {
+        super(new Gson(), directory);
+        this.mode = mode;
+    }
+
+    /** Listener for {@code data/<ns>/isekai/worldshape/*.json}. */
+    public static IsekaiReloadListener forSingleLayer() {
+        return new IsekaiReloadListener(Mode.SINGLE, WORLDSHAPE_DIR);
+    }
+
+    /** Listener for {@code data/<ns>/isekai/layered_worldshape/*.json}. */
+    public static IsekaiReloadListener forLayered() {
+        return new IsekaiReloadListener(Mode.LAYERED, LAYERED_DIR);
+    }
+
+    @Override
+    protected void apply(Map<ResourceLocation, JsonElement> entries, ResourceManager rm, ProfilerFiller profiler) {
+        IsekaiApi.LOGGER.info("[Isekai] reload: {} mode={}, {} entries",
+                mode == Mode.SINGLE ? WORLDSHAPE_DIR : LAYERED_DIR, mode, entries.size());
+
+        Set<net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>> previous = Set.copyOf(lastJsonDimensions);
+        lastJsonDimensions.clear();
+
+        if (mode == Mode.SINGLE) {
+            for (Map.Entry<ResourceLocation, JsonElement> e : entries.entrySet()) {
+                applySingle(e.getKey(), e.getValue());
+            }
+        } else {
+            for (Map.Entry<ResourceLocation, JsonElement> e : entries.entrySet()) {
+                applyLayered(e.getKey(), e.getValue());
+            }
+        }
+
+        // Remove dimensions that were in JSON before but not in the new pack.
+        for (var dim : previous) {
+            if (!lastJsonDimensions.contains(dim)) {
+                Isekai.remap().removeWorldshape(dim);
+                IsekaiApi.LOGGER.info("[Isekai] reload: removed stale JSON-sourced worldshape for {}", dim);
+            }
+        }
+    }
+
+    private void applySingle(ResourceLocation entryId, JsonElement json) {
+        DataResult<WorldshapeDescriptor> result = decode(WorldshapeDescriptor.CODEC, json, entryId);
+        result.ifSuccess(d -> {
+            try {
+                Isekai.remap().declareWorldshape(d);
+                lastJsonDimensions.add(d.dimension());
+            } catch (RuntimeException ex) {
+                IsekaiApi.LOGGER.error("[Isekai] reload: declareWorldshape failed for {}: {}",
+                        entryId, ex.getMessage());
+            }
+        });
+        result.ifError(err -> IsekaiApi.LOGGER.error("[Isekai] reload: failed to decode {}: {}",
+                entryId, err.message()));
+    }
+
+    /**
+     * Layered JSON shape:
+     * <pre>
+     * {
+     *   "dimension": "minecraft:overworld",
+     *   "layers": [ { "y_range": ..., "descriptor": ..., "transition": ... }, ... ],
+     *   "transition": { "type": "isekai:hard" }   // top-level transition between adjacent layers
+     * }
+     * </pre>
+     */
+    private void applyLayered(ResourceLocation entryId, JsonElement json) {
+        DataResult<LayeredFile> result = decode(LayeredFile.CODEC, json, entryId);
+        result.ifSuccess(f -> {
+            try {
+                Isekai.remap().declareLayeredWorldshape(f.dimension(), f.layers(), f.transition());
+                lastJsonDimensions.add(f.dimension());
+            } catch (RuntimeException ex) {
+                IsekaiApi.LOGGER.error("[Isekai] reload: declareLayeredWorldshape failed for {}: {}",
+                        entryId, ex.getMessage());
+            }
+        });
+        result.ifError(err -> IsekaiApi.LOGGER.error("[Isekai] reload: failed to decode {}: {}",
+                entryId, err.message()));
+    }
+
+    private static <T> DataResult<T> decode(Codec<T> codec, JsonElement json, ResourceLocation id) {
+        try {
+            return codec.parse(JsonOps.INSTANCE, json);
+        } catch (IllegalArgumentException e) {
+            // Codec invariant violation that wasn't wrapped in DataResult
+            return DataResult.error(() -> "invariant violation in " + id + ": " + e.getMessage());
+        }
+    }
+
+    /** Wire format for one file under {@code isekai/layered_worldshape/}. */
+    public record LayeredFile(
+            net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension,
+            List<LayeredDescriptor> layers,
+            TransitionRule transition
+    ) {
+        public LayeredFile {
+            layers = List.copyOf(layers);
+            if (layers.isEmpty()) {
+                throw new IllegalArgumentException("layered_worldshape: layers must not be empty");
+            }
+        }
+
+        public static final Codec<LayeredFile> CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.create(i -> i.group(
+                net.minecraft.resources.ResourceKey.codec(net.minecraft.core.registries.Registries.DIMENSION)
+                        .fieldOf("dimension").forGetter(LayeredFile::dimension),
+                LayeredDescriptor.CODEC.listOf().fieldOf("layers").forGetter(LayeredFile::layers),
+                TransitionRule.CODEC.optionalFieldOf("transition", new TransitionRule.Hard())
+                        .forGetter(LayeredFile::transition)
+        ).apply(i, LayeredFile::new));
+    }
+}
