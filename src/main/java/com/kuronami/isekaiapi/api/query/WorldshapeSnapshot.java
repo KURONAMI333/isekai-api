@@ -11,16 +11,10 @@ public record WorldshapeSnapshot(
         List<StructurePlacementInfo> structures,
         List<MobSpawnInfo> mobs
 ) {
-    public static WorldshapeSnapshot of(ResourceKey<Level> dimension,
-                                         List<PlacedFeatureInfo> ores,
-                                         List<StructurePlacementInfo> structures,
-                                         List<MobSpawnInfo> mobs) {
-        return new WorldshapeSnapshot(
-                dimension,
-                List.copyOf(ores),
-                List.copyOf(structures),
-                List.copyOf(mobs)
-        );
+    public WorldshapeSnapshot {
+        ores = List.copyOf(ores);
+        structures = List.copyOf(structures);
+        mobs = List.copyOf(mobs);
     }
 
     public boolean isEmpty() {

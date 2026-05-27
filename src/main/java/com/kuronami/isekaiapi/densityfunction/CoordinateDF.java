@@ -7,7 +7,13 @@ import net.minecraft.util.KeyDispatchDataCodec;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.level.levelgen.DensityFunction;
 
-/** Raw coordinate on the chosen axis. Primitive: spatial reference. */
+/**
+ * Raw coordinate on the chosen axis. Primitive: spatial reference.
+ *
+ * <p>{@link #minValue()} / {@link #maxValue()} return the full double range. In practice,
+ * compose this with {@code multiply} / {@code clamp} / {@code lerp} to bring values into
+ * the usable [-1, 1] density range before letting the result reach the noise router.
+ */
 public record CoordinateDF(Axis axis) implements DensityFunction.SimpleFunction {
     public static final MapCodec<CoordinateDF> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             Axis.CODEC.fieldOf("axis").forGetter(CoordinateDF::axis)

@@ -12,8 +12,9 @@ import com.kuronami.isekaiapi.impl.IsekaiRemapImpl;
  *   <li>{@link #remap()} — declare your worldshape transformation</li>
  * </ul>
  *
- * <p>v0.1 status: API surface frozen; implementations are no-op stubs that log and return
- * empty results. Functional implementations land with density function primitives in v0.2.
+ * <p>v0.1: API surface frozen; density function primitives are registered and usable.
+ * Query and Remap return immutable no-op stubs — the vanilla rule scanner and biome
+ * modifier generator land in v0.2.
  */
 public final class Isekai {
     private static final IsekaiQuery QUERY = new IsekaiQueryImpl();

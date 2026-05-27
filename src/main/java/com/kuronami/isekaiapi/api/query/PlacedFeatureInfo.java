@@ -1,6 +1,5 @@
 package com.kuronami.isekaiapi.api.query;
 
-import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.biome.Biome;
@@ -14,7 +13,7 @@ public record PlacedFeatureInfo(
         int count,
         Set<TagKey<Biome>> biomes
 ) {
-    public static PlacedFeatureInfo of(ResourceKey<PlacedFeature> key, VerticalRange range, int count, Set<TagKey<Biome>> biomes) {
-        return new PlacedFeatureInfo(key, range, count, Set.copyOf(biomes));
+    public PlacedFeatureInfo {
+        biomes = Set.copyOf(biomes);
     }
 }

@@ -43,7 +43,7 @@ public final class IsekaiQueryImpl implements IsekaiQuery {
     @Override public Optional<NoiseGeneratorSettings> getVanillaNoiseSettings(ResourceKey<NoiseGeneratorSettings> key) { return Optional.empty(); }
 
     @Override public WorldshapeSnapshot getSnapshot(ResourceKey<Level> dimension) {
-        return WorldshapeSnapshot.of(dimension, List.of(), List.of(), List.of());
+        return new WorldshapeSnapshot(dimension, List.of(), List.of(), List.of());
     }
     @Override public Set<ResourceKey<Level>> getDimensionsWithWorldshape() { return Set.of(); }
 }
