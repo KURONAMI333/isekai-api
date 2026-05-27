@@ -6,7 +6,10 @@ import com.kuronami.isekaiapi.api.predicate.SpatialPredicate;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
 import com.kuronami.isekaiapi.impl.SpatialPredicateEvaluator;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.levelgen.structure.Structure;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -54,8 +57,10 @@ public class StructureFindValidGenerationPointMixin {
 
         Structure structure = (Structure) (Object) this;
         BlockPos pos = result.get().position();
+        ResourceKey<Structure> structureKey = resolveStructureKey(structure);
         SpatialPredicateEvaluator.Context evalCtx = new SpatialPredicateEvaluator.Context(
-                context.chunkGenerator(), context.heightAccessor(), context.randomState());
+                context.chunkGenerator(), context.heightAccessor(), context.randomState(),
+                context.biomeSource());
 
         // Try every declared dimension; if any of them rejects this structure here,
         // short-circuit. (In practice consumers declare one descriptor per dimension; this
@@ -64,12 +69,12 @@ public class StructureFindValidGenerationPointMixin {
         for (var dimKey : declaredDims) {
             var descriptor = Isekai.remap().getActiveDescriptor(dimKey).orElse(null);
             if (descriptor == null) continue;
-            SpatialPredicate predicate = predicateFor(descriptor, structure);
+            SpatialPredicate predicate = predicateFor(descriptor, structureKey);
             if (predicate == null) continue;
             if (!SpatialPredicateEvaluator.evaluate(predicate, pos, evalCtx)) {
                 IsekaiApi.LOGGER.debug(
                         "[Isekai] structure {} rejected by predicate at {} (descriptor dim={})",
-                        structure, pos, dimKey.location());
+                        structureKey != null ? structureKey.location() : structure, pos, dimKey.location());
                 cir.setReturnValue(Optional.empty());
                 return;
             }
@@ -77,16 +82,31 @@ public class StructureFindValidGenerationPointMixin {
     }
 
     /**
-     * Look up the predicate for this Structure: per-structure entry first, then the
-     * descriptor's default. Returns {@code null} when the descriptor doesn't declare any
-     * predicate path (silent allow).
+     * Look up the predicate for this Structure: per-structure entry first
+     * ({@link WorldshapeDescriptor#structurePredicates()}), then fall back to the
+     * descriptor's {@link WorldshapeDescriptor#defaultStructurePredicate()}.
+     * Returns {@code null} when neither path applies (silent allow).
      */
-    private SpatialPredicate predicateFor(WorldshapeDescriptor descriptor, Structure structure) {
-        // We don't have a direct ResourceKey<Structure> from the Structure instance; the
-        // Mixin context can't trivially recover it without a registry lookup. For v1.0,
-        // fall back to the default predicate — per-structure overrides land in v1.1 once
-        // we plumb the registry-key lookup. The default is consulted, which covers the
-        // common 'all structures in this world must satisfy X' use case.
+    private SpatialPredicate predicateFor(WorldshapeDescriptor descriptor,
+                                           ResourceKey<Structure> structureKey) {
+        if (structureKey != null) {
+            SpatialPredicate perStructure = descriptor.structurePredicates().get(structureKey);
+            if (perStructure != null) return perStructure;
+        }
         return descriptor.defaultStructurePredicate();
+    }
+
+    /**
+     * Recover the {@link ResourceKey} for a Structure instance via the live registry.
+     * Returns {@code null} when no server is available (e.g. datagen) or when the
+     * structure isn't in any registry (impossible in practice but defensive).
+     */
+    private static ResourceKey<Structure> resolveStructureKey(Structure structure) {
+        var server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null) return null;
+        return server.registryAccess()
+                .registryOrThrow(Registries.STRUCTURE)
+                .getResourceKey(structure)
+                .orElse(null);
     }
 }
