@@ -225,22 +225,23 @@ public record ApplyWorldshapeBiomeModifier(WorldshapeDescriptor worldshape) impl
 
     /**
      * MODIFY phase: scale every mob spawn entry's weight by the effective count factor of
-     * {@link WorldshapeDescriptor#mobSpawnStrategy()}. Identity / non-CountScale strategies
-     * leave weights unchanged. Each SpawnerData is rebuilt with the scaled weight via the
-     * mutable backing list returned by {@code MobSpawnSettingsBuilder.getSpawner(category)}.
+     * the per-category strategy resolved from
+     * {@link WorldshapeDescriptor#resolveMobSpawnStrategy(net.minecraft.world.entity.MobCategory)}.
+     * Identity / non-CountScale strategies leave weights unchanged. Each SpawnerData is
+     * rebuilt with the scaled weight via the mutable backing list returned by
+     * {@code MobSpawnSettingsBuilder.getSpawner(category)}.
      *
-     * <p>Note: this scales ALL mob categories uniformly. Per-category factors would need
-     * the descriptor to carry a {@code Map<MobCategory, RemapStrategy>} instead of a
-     * single strategy — a v0.9 deliverable if consumer demand surfaces.
+     * <p>Resolution order: per-category override from
+     * {@link WorldshapeDescriptor#mobSpawnStrategyByCategory()} if present, else the
+     * global {@link WorldshapeDescriptor#mobSpawnStrategy()}. Categories never present
+     * in either path keep vanilla weights.
      */
     private void applyMobSpawnStrategy(ModifiableBiomeInfo.BiomeInfo.Builder builder) {
-        double factor = RemapEngine.effectiveCountFactor(worldshape.mobSpawnStrategy());
-        if (Math.abs(factor - 1.0) < 1e-6) {
-            return;
-        }
         var spawnBuilder = builder.getMobSpawnSettings();
         int rebuilt = 0;
         for (var category : net.minecraft.world.entity.MobCategory.values()) {
+            double factor = RemapEngine.effectiveCountFactor(worldshape.resolveMobSpawnStrategy(category));
+            if (Math.abs(factor - 1.0) < 1e-6) continue;
             var list = spawnBuilder.getSpawner(category);
             for (int i = 0; i < list.size(); i++) {
                 var sd = list.get(i);
@@ -254,8 +255,9 @@ public record ApplyWorldshapeBiomeModifier(WorldshapeDescriptor worldshape) impl
         }
         if (rebuilt > 0) {
             IsekaiApi.LOGGER.debug(
-                    "[Isekai] scaled {} mob spawn weights by factor {} (descriptor dim={})",
-                    rebuilt, factor, worldshape.dimension().location());
+                    "[Isekai] scaled {} mob spawn weights (descriptor dim={}, per-category overrides={})",
+                    rebuilt, worldshape.dimension().location(),
+                    worldshape.mobSpawnStrategyByCategory().keySet());
         }
     }
 
