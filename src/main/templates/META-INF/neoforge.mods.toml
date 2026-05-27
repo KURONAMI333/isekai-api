@@ -26,3 +26,7 @@ ${mod_description}
     versionRange="${minecraft_version_range}"
     ordering="NONE"
     side="BOTH"
+
+# Mixin config — enforces structure_predicates at vanilla placement time.
+[[mixins]]
+config="isekai.mixins.json"
