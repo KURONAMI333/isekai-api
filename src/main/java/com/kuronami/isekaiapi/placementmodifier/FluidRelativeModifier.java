@@ -21,8 +21,9 @@ import java.util.stream.Stream;
  * contiguous water body. Useful for Deep Sea / Island World style consumers
  * that want kelp/coral/etc. anchored to fluid boundaries rather than terrain.
  *
- * <p>v0.1: fluid is hardcoded to water (Fluids.WATER); v0.2 adds the
- * arbitrary-fluid + arbitrary-anchor variants via a richer codec.
+ * <p>Fluid is currently hardcoded to {@link Fluids#WATER}; arbitrary-fluid support is a
+ * future enhancement (would require extending the codec with a {@code Fluid} key).
+ * The anchor (FLUID_TOP / FLUID_BOTTOM) is already configurable via the codec.
  */
 public class FluidRelativeModifier extends PlacementModifier {
     public static final MapCodec<FluidRelativeModifier> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
