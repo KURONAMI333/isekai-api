@@ -109,6 +109,26 @@ public final class IsekaiCommand {
                                     ctx.getSource().sendSuccess(() -> Component.literal(sb.toString()), false);
                                     return 1;
                                 }))))
+                .then(Commands.literal("stats").executes(ctx -> {
+                    var ores = Isekai.query().getAllOres();
+                    var structures = Isekai.query().getAllStructures();
+                    int totalMobs = 0;
+                    for (var category : net.minecraft.world.entity.MobCategory.values()) {
+                        totalMobs += Isekai.query().getMobsByCategory(category).size();
+                    }
+                    var dimsDeclared = Isekai.remap().getDeclaredDimensions().size();
+                    int totalMobsFinal = totalMobs;
+                    ctx.getSource().sendSuccess(() -> Component.literal("Isekai snapshot stats:"), false);
+                    ctx.getSource().sendSuccess(() -> Component.literal(
+                            "  PlacedFeatures: " + ores.size()), false);
+                    ctx.getSource().sendSuccess(() -> Component.literal(
+                            "  Structure placements: " + structures.size()), false);
+                    ctx.getSource().sendSuccess(() -> Component.literal(
+                            "  Mob spawn entries: " + totalMobsFinal), false);
+                    ctx.getSource().sendSuccess(() -> Component.literal(
+                            "  Declared worldshape dimensions: " + dimsDeclared), false);
+                    return 1;
+                }))
                 .then(Commands.literal("preview")
                         .then(Commands.literal("range")
                                 .then(Commands.argument("id", ResourceLocationArgument.id()).executes(ctx -> {
