@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "package": "com.kuronami.isekaiapi.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8.5",
+  "refmap": "isekai.refmap.json",
+  "mixins": [
+    "StructureFindValidGenerationPointMixin"
+  ],
+  "client": [],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
