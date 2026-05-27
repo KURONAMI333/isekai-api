@@ -9,8 +9,6 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 
 /**
  * Maps a vanilla {@link VerticalRange} into the consumer's playable range.
@@ -18,9 +16,9 @@ import java.util.function.Function;
  *
  * <p>JSON form: {@code {"type": "isekai:linear"}} / {@code {"type": "isekai:count_scale", "factor": 0.5}}.
  *
- * <p>{@link NonLinear} and {@link Custom} are Java-only — they carry function references
- * that cannot be encoded to JSON. Datapack consumers must use {@link BandSplit} or
- * {@link Pipe} for non-linear behavior.
+ * <p>Every variant is JSON-encodable. Non-linear mappings are expressed via
+ * {@link BandSplit} (per-band proportional mapping) or {@link Pipe} (compositional
+ * chains); both cover the use cases that historically required raw function references.
  */
 public sealed interface RemapStrategy {
 
@@ -134,27 +132,6 @@ public sealed interface RemapStrategy {
         @Override public MapCodec<? extends RemapStrategy> codec() { return MAP_CODEC; }
     }
 
-    /**
-     * Caller-supplied non-linear mapping: input {@code t in [0,1]} -> output {@code t' in [0,1]}.
-     * Datapack consumers cannot use this variant; use {@link BandSplit} or {@link Pipe} instead.
-     */
-    record NonLinear(Function<Float, Float> mapping) implements RemapStrategy {
-        @Override public String typeId() { return "isekai:non_linear"; }
-        @Override public MapCodec<? extends RemapStrategy> codec() {
-            throw new UnsupportedOperationException(
-                    "RemapStrategy.NonLinear is Java-only and cannot be serialized to JSON");
-        }
-    }
-
-    /** Fully custom: (vanillaRange, playableRange) -> remapped range. Java-only. */
-    record Custom(BiFunction<VerticalRange, VerticalRange, VerticalRange> fn) implements RemapStrategy {
-        @Override public String typeId() { return "isekai:custom"; }
-        @Override public MapCodec<? extends RemapStrategy> codec() {
-            throw new UnsupportedOperationException(
-                    "RemapStrategy.Custom is Java-only and cannot be serialized to JSON");
-        }
-    }
-
     /** Apply chain in order, each operating on the previous result. Must be non-empty. */
     record Pipe(List<RemapStrategy> chain) implements RemapStrategy {
         public Pipe {
@@ -180,7 +157,6 @@ public sealed interface RemapStrategy {
         registry.put("isekai:count_scale", CountScale.MAP_CODEC);
         registry.put("isekai:identity",    Identity.MAP_CODEC);
         registry.put("isekai:pipe",        Pipe.MAP_CODEC);
-        // "isekai:non_linear" and "isekai:custom" intentionally omitted — Java-only.
         Map<String, MapCodec<? extends RemapStrategy>> frozen = Map.copyOf(registry);
 
         return Codec.STRING.dispatch(
@@ -191,8 +167,7 @@ public sealed interface RemapStrategy {
                     if (mc == null) {
                         throw new IllegalArgumentException(
                                 "Unknown RemapStrategy type: '" + typeId
-                                        + "'. Known types: " + frozen.keySet()
-                                        + " (note: 'isekai:non_linear' and 'isekai:custom' are Java-only)");
+                                        + "'. Known types: " + frozen.keySet());
                     }
                     return mc;
                 });

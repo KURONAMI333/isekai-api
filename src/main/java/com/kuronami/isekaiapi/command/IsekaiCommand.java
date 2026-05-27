@@ -60,13 +60,13 @@ public final class IsekaiCommand {
                     var server = ctx.getSource().getServer();
                     ctx.getSource().sendSuccess(() ->
                             Component.literal("Isekai reload: triggering datapack reload (this re-runs every reload listener, not just Isekai's)"), true);
-                    IsekaiApi.LOGGER.info("Isekai reload command invoked by {}", ctx.getSource().getTextName());
+                    IsekaiApi.LOGGER.info("[Isekai] reload command invoked by {}", ctx.getSource().getTextName());
                     // Reload all currently-selected datapacks. This runs every PreparableReloadListener,
                     // including the two IsekaiReloadListener instances. The work happens off-thread; the
                     // command returns immediately.
                     server.reloadResources(server.getPackRepository().getSelectedIds())
                             .exceptionally(ex -> {
-                                IsekaiApi.LOGGER.error("Isekai reload failed", ex);
+                                IsekaiApi.LOGGER.error("[Isekai] reload failed", ex);
                                 ctx.getSource().sendFailure(Component.literal("Reload failed: " + ex.getMessage()));
                                 return null;
                             });
@@ -217,7 +217,7 @@ public final class IsekaiCommand {
                                                 + structures.size() + " structure placements to " + dumpFile), false);
                                 return 1;
                             } catch (IOException e) {
-                                IsekaiApi.LOGGER.error("dump worldgen failed", e);
+                                IsekaiApi.LOGGER.error("[Isekai] dump worldgen failed", e);
                                 ctx.getSource().sendFailure(Component.literal("dump worldgen failed: " + e.getMessage()));
                                 return 0;
                             }
@@ -262,6 +262,6 @@ public final class IsekaiCommand {
                                 }))));
 
         dispatcher.register(root);
-        IsekaiApi.LOGGER.info("Isekai commands registered: /isekai version|reload|query|validate|dump|preview range");
+        IsekaiApi.LOGGER.info("[Isekai] commands registered: /isekai version|reload|stats|query|validate|dump|preview");
     }
 }

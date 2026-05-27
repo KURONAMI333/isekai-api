@@ -148,13 +148,6 @@ public record WorldshapeDescriptor(
         return mobSpawnStrategyByCategory.getOrDefault(category, mobSpawnStrategy);
     }
 
-    // Convenience accessors so consumers don't always have to write d.exclusions().features()
-    public Set<ResourceKey<PlacedFeature>> excludedFeatures() { return exclusions.features(); }
-    public Set<ResourceKey<Structure>> excludedStructures() { return exclusions.structures(); }
-    public Set<ResourceKey<ConfiguredWorldCarver<?>>> excludedCarvers() { return exclusions.carvers(); }
-    public List<AdditionalFeature> additionalFeatures() { return additions.features(); }
-    public List<AdditionalCarver> additionalCarvers() { return additions.carvers(); }
-
     public static final int DEFAULT_PRIORITY = 100;
 
     /**

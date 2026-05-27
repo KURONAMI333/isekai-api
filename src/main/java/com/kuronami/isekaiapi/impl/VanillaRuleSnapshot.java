@@ -187,16 +187,16 @@ public final class VanillaRuleSnapshot {
         long withRange = features.stream().filter(info -> info.range() != FALLBACK_RANGE).count();
         int mobTotal = mobs.values().stream().mapToInt(List::size).sum();
         IsekaiApi.LOGGER.info(
-                "[Isekai v0.8] Scanned {} placed features ({} with extracted VerticalRange, "
+                "[Isekai] Scanned {} placed features ({} with extracted VerticalRange, "
                         + "{} with fallback, {} step-indexed) + {} structure placements + {} mob spawn entries across {} categories "
                         + "(overworld build-height {}..{})",
                 features.size(), withRange, features.size() - withRange, stepsByFeature.size(),
                 structures.size(), mobTotal, mobs.size(),
                 overworldBottom, overworldTop);
 
-        IsekaiApi.LOGGER.debug("[Isekai v0.10] tag indices: {} placed-feature tags, {} structure tags",
+        IsekaiApi.LOGGER.debug("[Isekai] tag indices: {} placed-feature tags, {} structure tags",
                 oresByTag.size(), structuresByTag.size());
-        IsekaiApi.LOGGER.debug("[Isekai v0.12] per-dim ranges: {} dimensions indexed", perDimRanges.size());
+        IsekaiApi.LOGGER.debug("[Isekai] per-dim ranges: {} dimensions indexed", perDimRanges.size());
 
         return new VanillaRuleSnapshot(features, structures, mobs, mobsBiome, stepsByFeature, oresByTag,
                 structuresByTag, perDimRanges, overworldBottom, overworldTop);

@@ -1,6 +1,17 @@
 # Isekai API — example datapacks
 
-Each subdirectory is a self-contained datapack. To try one:
+Two categories, both as self-contained datapacks:
+
+- **`runtime_effects/`** — packs that go in `data/<ns>/neoforge/biome_modifier/` or
+  `data/<ns>/neoforge/structure_modifier/` and produce visible in-game changes via
+  NeoForge's modifier pipeline.
+- **`declaration_only/`** — packs that go in `data/<ns>/isekai/worldshape/` or
+  `data/<ns>/isekai/layered_worldshape/`. They populate Isekai's runtime registry
+  (queryable via `/isekai query worldshape`) but do not, by themselves, alter chunk
+  generation. Wrap the same descriptor in an `apply_worldshape` biome modifier to make
+  it take effect.
+
+To try one:
 
 1. Copy the directory into your world's `datapacks/` folder.
 2. Run `/reload` (or restart the server).
@@ -66,23 +77,6 @@ The JSON is wrapped in `{ "type": "isekai_api:apply_worldshape",
 "worldshape": { ... } }`. Inside `worldshape`, you write the same fields
 documented below for `WorldshapeDescriptor`.
 
-### Where observable effects come from
-
-Datapacks under `neoforge/biome_modifier/` or `neoforge/structure_modifier/`
-hit chunk generation directly. Examples in this category produce visible
-in-game changes:
-
-- `biome_modifier_demo/` — REMOVE phase (drops listed PlacedFeatures)
-- `peaceful_plains/` — MODIFY phase (scales mob spawn weights)
-- `no_villages/` — Structure modifier (clears the structure's biome filter)
-
-Datapacks under `isekai/worldshape/` or `isekai/layered_worldshape/`
-populate Isekai's runtime registry only — queryable via
-`/isekai query worldshape` and `/isekai stats`, but no chunk-gen effect
-unless you also wrap the same worldshape in an `apply_worldshape`
-biome modifier. Examples in this category:
-
-- `skyland_minimal/`, `underground_only/`, `layered_overworld/`
 
 ## layered_overworld/
 

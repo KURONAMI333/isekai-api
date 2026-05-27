@@ -70,12 +70,6 @@ public final class RemapEngine {
             }
             return acc;
         }
-        if (strategy instanceof RemapStrategy.NonLinear nl) {
-            return nonLinearScale(nl, original, playable, worldBottom, worldTop);
-        }
-        if (strategy instanceof RemapStrategy.Custom custom) {
-            return custom.fn().apply(original, playable);
-        }
         if (strategy instanceof RemapStrategy.BandSplit bs) {
             return bandSplit(bs, original, playable);
         }
@@ -158,39 +152,6 @@ public final class RemapEngine {
         newMin = Math.max(sliceMin, Math.min(newMin, sliceMax));
         newMax = Math.max(newMin, Math.min(newMax, sliceMax));
         return new VerticalRange(newMin, newMax, original.distribution());
-    }
-
-    /**
-     * Apply a NonLinear's {@code Function<Float, Float>} mapping at both endpoints of the
-     * original range (interpreted as proportions of {@code [worldBottom, worldTop]}) and
-     * project the mapped fractions into the playable range.
-     */
-    private static VerticalRange nonLinearScale(RemapStrategy.NonLinear nl,
-                                                 VerticalRange original, VerticalRange playable,
-                                                 int worldBottom, int worldTop) {
-        int worldSpan = worldTop - worldBottom;
-        if (worldSpan <= 0) return playable;
-        float tMin = (original.minY() - worldBottom) / (float) worldSpan;
-        float tMax = (original.maxY() - worldBottom) / (float) worldSpan;
-        float mappedMin = nl.mapping().apply(Math.max(0f, Math.min(1f, tMin)));
-        float mappedMax = nl.mapping().apply(Math.max(0f, Math.min(1f, tMax)));
-        if (mappedMin > mappedMax) {
-            float tmp = mappedMin; mappedMin = mappedMax; mappedMax = tmp;
-        }
-        int playSpan = playable.maxY() - playable.minY();
-        int newMin = playable.minY() + Math.round(mappedMin * playSpan);
-        int newMax = playable.minY() + Math.round(mappedMax * playSpan);
-        return new VerticalRange(newMin, newMax, original.distribution());
-    }
-
-    /**
-     * Convenience for tests / commands: apply with a fixed source envelope.
-     * Equivalent to {@code apply(strategy, original, playable, -64, 320)}.
-     */
-    public static VerticalRange applyVanillaOverworld(RemapStrategy strategy,
-                                                       VerticalRange original,
-                                                       VerticalRange playable) {
-        return apply(strategy, original, playable, -64, 320);
     }
 
     /**
