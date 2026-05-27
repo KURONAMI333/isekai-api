@@ -59,9 +59,19 @@ public final class IsekaiCommand {
                     return 1;
                 }))
                 .then(Commands.literal("reload").executes(ctx -> {
+                    var server = ctx.getSource().getServer();
                     ctx.getSource().sendSuccess(() ->
-                            Component.literal("Isekai reload requested (stub; full pipeline lands v0.2)"), true);
+                            Component.literal("Isekai reload: triggering datapack reload (this re-runs every reload listener, not just Isekai's)"), true);
                     IsekaiApi.LOGGER.info("Isekai reload command invoked by {}", ctx.getSource().getTextName());
+                    // Reload all currently-selected datapacks. This runs every PreparableReloadListener,
+                    // including the two IsekaiReloadListener instances. The work happens off-thread; the
+                    // command returns immediately.
+                    server.reloadResources(server.getPackRepository().getSelectedIds())
+                            .exceptionally(ex -> {
+                                IsekaiApi.LOGGER.error("Isekai reload failed", ex);
+                                ctx.getSource().sendFailure(Component.literal("Reload failed: " + ex.getMessage()));
+                                return null;
+                            });
                     return 1;
                 }))
                 .then(Commands.literal("query")

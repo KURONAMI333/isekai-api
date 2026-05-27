@@ -28,9 +28,10 @@ public final class IsekaiLifecycle {
 
     @SubscribeEvent
     public static void onAddReloadListener(AddReloadListenerEvent event) {
-        IsekaiApi.LOGGER.info("[Isekai v0.2] AddReloadListenerEvent: datapack reload pipeline deferred to v0.3");
-        // TODO v0.3: register a PreparableReloadListener that scans data/<ns>/isekai/ JSON,
-        // validates each WorldshapeDescriptor / LayeredDescriptor against the codec,
-        // and rebuilds consumer-side state without a full server restart.
+        // Register one listener per JSON directory so each runs on its own worker batch.
+        event.addListener(IsekaiReloadListener.forSingleLayer());
+        event.addListener(IsekaiReloadListener.forLayered());
+        IsekaiApi.LOGGER.info("[Isekai] reload listeners registered: {} + {}",
+                IsekaiReloadListener.WORLDSHAPE_DIR, IsekaiReloadListener.LAYERED_DIR);
     }
 }
