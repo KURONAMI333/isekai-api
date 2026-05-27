@@ -59,7 +59,7 @@ import java.util.Set;
 public final class VanillaRuleSnapshot {
 
     public static final VanillaRuleSnapshot EMPTY =
-            new VanillaRuleSnapshot(List.of(), List.of(), Map.of());
+            new VanillaRuleSnapshot(List.of(), List.of(), Map.of(), -64, 320);
 
     /**
      * Overworld defaults used by {@link #anchorToY} when no per-call dimension override is
@@ -82,13 +82,19 @@ public final class VanillaRuleSnapshot {
     private final List<PlacedFeatureInfo> ores;
     private final List<StructurePlacementInfo> structures;
     private final Map<MobCategory, List<MobSpawnInfo>> mobsByCategory;
+    private final int worldBottom;
+    private final int worldTop;
 
     public VanillaRuleSnapshot(List<PlacedFeatureInfo> ores,
                                 List<StructurePlacementInfo> structures,
-                                Map<MobCategory, List<MobSpawnInfo>> mobsByCategory) {
+                                Map<MobCategory, List<MobSpawnInfo>> mobsByCategory,
+                                int worldBottom,
+                                int worldTop) {
         this.ores = List.copyOf(ores);
         this.structures = List.copyOf(structures);
         this.mobsByCategory = Map.copyOf(mobsByCategory);
+        this.worldBottom = worldBottom;
+        this.worldTop = worldTop;
     }
 
     public static VanillaRuleSnapshot scan(MinecraftServer server) {
@@ -115,7 +121,7 @@ public final class VanillaRuleSnapshot {
                 structures.size(), mobTotal, mobs.size(),
                 overworldBottom, overworldTop);
 
-        return new VanillaRuleSnapshot(features, structures, mobs);
+        return new VanillaRuleSnapshot(features, structures, mobs, overworldBottom, overworldTop);
     }
 
     /** Walk PLACED_FEATURE; extract VerticalRange via the Access Transformer-exposed fields. */
@@ -266,6 +272,12 @@ public final class VanillaRuleSnapshot {
 
     public List<PlacedFeatureInfo> ores() { return ores; }
     public List<StructurePlacementInfo> structures() { return structures; }
+
+    /** Overworld build height bottom captured at scan time. v0.7 strategy remap source range. */
+    public int worldBottom() { return worldBottom; }
+
+    /** Overworld build height top captured at scan time. */
+    public int worldTop() { return worldTop; }
 
     public List<MobSpawnInfo> mobsForCategory(MobCategory category) {
         return mobsByCategory.getOrDefault(category, List.of());
