@@ -1,10 +1,12 @@
 package com.kuronami.isekaiapi.impl;
 
-import com.kuronami.isekaiapi.api.query.HeightDistribution;
 import com.kuronami.isekaiapi.api.query.VerticalRange;
 import net.minecraft.world.level.levelgen.VerticalAnchor;
+import net.minecraft.world.level.levelgen.heightproviders.BiasedToBottomHeight;
+import net.minecraft.world.level.levelgen.heightproviders.HeightProvider;
 import net.minecraft.world.level.levelgen.heightproviders.TrapezoidHeight;
 import net.minecraft.world.level.levelgen.heightproviders.UniformHeight;
+import net.minecraft.world.level.levelgen.heightproviders.VeryBiasedToBottomHeight;
 import net.minecraft.world.level.levelgen.placement.HeightRangePlacement;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.placement.PlacementModifier;
@@ -18,17 +20,18 @@ import java.util.List;
  * modifier (count, biome filters, fluid filters, etc.) and the underlying configured
  * feature reference.
  *
- * <p>Used by the v0.7+ biome modifier ADD phase: the modifier removes a feature in REMOVE
- * phase and re-adds the rebuilt variant in ADD phase, giving the consumer's
- * {@link com.kuronami.isekaiapi.api.remap.RemapStrategy} effect over actual chunk
- * generation. The rebuilt feature is wrapped in {@code Holder.direct(...)} since it
- * doesn't live in the registry.
+ * <p>Distribution preservation: the rebuilder inspects the original {@link HeightProvider}
+ * type and constructs the same type with the new anchors. {@link BiasedToBottomHeight} and
+ * {@link VeryBiasedToBottomHeight} additionally preserve their {@code inner} (bias
+ * intensity) field via Access Transformer. Distributions that map cleanly:
  *
- * <p>Distribution preservation: a {@link HeightDistribution#TRAPEZOID} original keeps the
- * trapezoid shape; everything else becomes a uniform {@link HeightRangePlacement}. The
- * BIASED_LOW variants don't have a corresponding standalone HeightProvider constructor in
- * vanilla, so they round-trip as uniform (their density bias is lost). This is acceptable
- * for v0.7 — the playable range is correct, only the distribution within it is uniform.
+ * <ul>
+ *   <li>UniformHeight -> UniformHeight</li>
+ *   <li>TrapezoidHeight -> TrapezoidHeight</li>
+ *   <li>BiasedToBottomHeight -> BiasedToBottomHeight (inner preserved)</li>
+ *   <li>VeryBiasedToBottomHeight -> VeryBiasedToBottomHeight (inner preserved)</li>
+ *   <li>Other / unknown -> UniformHeight (safe fallback)</li>
+ * </ul>
  */
 public final class PlacedFeatureRebuilder {
 
@@ -44,28 +47,37 @@ public final class PlacedFeatureRebuilder {
         boolean swapped = false;
         List<PlacementModifier> newMods = new ArrayList<>(oldMods.size());
         for (PlacementModifier mod : oldMods) {
-            if (!swapped && mod instanceof HeightRangePlacement) {
-                newMods.add(buildHRP(newRange));
+            if (!swapped && mod instanceof HeightRangePlacement hrp) {
+                newMods.add(rebuildHRP(hrp.height, newRange));
                 swapped = true;
             } else {
                 newMods.add(mod);
             }
         }
-        if (!swapped) {
-            // The feature uses some other vertical placement (CountPlacement-only, surface
-            // relative, etc.); we can't meaningfully remap its Y range. Caller should keep
-            // the original instead.
-            return null;
-        }
+        if (!swapped) return null;
         return new PlacedFeature(original.feature(), List.copyOf(newMods));
     }
 
-    private static HeightRangePlacement buildHRP(VerticalRange range) {
-        VerticalAnchor min = VerticalAnchor.absolute(range.minY());
-        VerticalAnchor max = VerticalAnchor.absolute(range.maxY());
-        if (range.distribution() == HeightDistribution.TRAPEZOID) {
+    /**
+     * Rebuild a HeightRangePlacement preserving the original {@link HeightProvider}'s type
+     * (and {@code inner} bias intensity for the BIASED variants). Falls back to uniform
+     * when the original is a type we don't know how to clone.
+     */
+    private static HeightRangePlacement rebuildHRP(HeightProvider original, VerticalRange newRange) {
+        VerticalAnchor min = VerticalAnchor.absolute(newRange.minY());
+        VerticalAnchor max = VerticalAnchor.absolute(newRange.maxY());
+        if (original instanceof TrapezoidHeight) {
             return HeightRangePlacement.of(TrapezoidHeight.of(min, max));
         }
+        if (original instanceof BiasedToBottomHeight orig) {
+            return HeightRangePlacement.of(BiasedToBottomHeight.of(min, max, orig.inner));
+        }
+        if (original instanceof VeryBiasedToBottomHeight orig) {
+            return HeightRangePlacement.of(VeryBiasedToBottomHeight.of(min, max, orig.inner));
+        }
+        // UniformHeight, ConstantHeight (degenerate range), WeightedListHeight, or unknown:
+        // collapse to uniform for safety. UniformHeight is the most permissive sample
+        // distribution and stays well-defined when min == max.
         return HeightRangePlacement.of(UniformHeight.of(min, max));
     }
 }

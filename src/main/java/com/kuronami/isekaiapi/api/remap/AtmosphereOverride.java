@@ -33,12 +33,14 @@ public record AtmosphereOverride(
         Optional<Integer> waterColor,
         Optional<Integer> waterFogColor,
         Optional<Integer> foliageColor,
-        Optional<Integer> grassColor
+        Optional<Integer> grassColor,
+        Optional<Float> creatureGenerationProbability
 ) {
     public static final AtmosphereOverride EMPTY = new AtmosphereOverride(
             Optional.empty(), Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(),
-            Optional.empty(), Optional.empty(), Optional.empty());
+            Optional.empty(), Optional.empty(), Optional.empty(),
+            Optional.empty());
 
     public static final Codec<AtmosphereOverride> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.BOOL.optionalFieldOf("has_precipitation").forGetter(AtmosphereOverride::hasPrecipitation),
@@ -49,7 +51,9 @@ public record AtmosphereOverride(
             Codec.INT.optionalFieldOf("water_color").forGetter(AtmosphereOverride::waterColor),
             Codec.INT.optionalFieldOf("water_fog_color").forGetter(AtmosphereOverride::waterFogColor),
             Codec.INT.optionalFieldOf("foliage_color").forGetter(AtmosphereOverride::foliageColor),
-            Codec.INT.optionalFieldOf("grass_color").forGetter(AtmosphereOverride::grassColor)
+            Codec.INT.optionalFieldOf("grass_color").forGetter(AtmosphereOverride::grassColor),
+            Codec.floatRange(0f, 1f).optionalFieldOf("creature_generation_probability")
+                    .forGetter(AtmosphereOverride::creatureGenerationProbability)
     ).apply(i, AtmosphereOverride::new));
 
     /** {@code true} when every field is empty — biome's atmosphere stays untouched. */
@@ -57,6 +61,7 @@ public record AtmosphereOverride(
         return hasPrecipitation.isEmpty() && temperature.isEmpty() && downfall.isEmpty()
                 && skyColor.isEmpty() && fogColor.isEmpty()
                 && waterColor.isEmpty() && waterFogColor.isEmpty()
-                && foliageColor.isEmpty() && grassColor.isEmpty();
+                && foliageColor.isEmpty() && grassColor.isEmpty()
+                && creatureGenerationProbability.isEmpty();
     }
 }
