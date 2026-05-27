@@ -61,7 +61,7 @@ import java.util.Set;
 public final class VanillaRuleSnapshot {
 
     public static final VanillaRuleSnapshot EMPTY =
-            new VanillaRuleSnapshot(List.of(), List.of(), Map.of(), Map.of(), Map.of(), Map.of(), -64, 320);
+            new VanillaRuleSnapshot(List.of(), List.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), -64, 320);
 
     /**
      * Overworld defaults used by {@link #anchorToY} when no per-call dimension override is
@@ -88,6 +88,8 @@ public final class VanillaRuleSnapshot {
      */
     private final Map<TagKey<PlacedFeature>, List<PlacedFeatureInfo>> oresByTag;
     private final List<StructurePlacementInfo> structures;
+    /** Reverse tag index for Structure registry, mirroring {@link #oresByTag}. */
+    private final Map<TagKey<Structure>, List<StructurePlacementInfo>> structuresByTag;
     private final Map<MobCategory, List<MobSpawnInfo>> mobsByCategory;
     private final Map<ResourceKey<Biome>, List<MobSpawnInfo>> mobsByBiome;
     /**
@@ -106,6 +108,7 @@ public final class VanillaRuleSnapshot {
                                 Map<ResourceKey<Biome>, List<MobSpawnInfo>> mobsByBiome,
                                 Map<ResourceKey<PlacedFeature>, Set<GenerationStep.Decoration>> stepsByFeature,
                                 Map<TagKey<PlacedFeature>, List<PlacedFeatureInfo>> oresByTag,
+                                Map<TagKey<Structure>, List<StructurePlacementInfo>> structuresByTag,
                                 int worldBottom,
                                 int worldTop) {
         this.ores = List.copyOf(ores);
@@ -114,6 +117,7 @@ public final class VanillaRuleSnapshot {
         this.mobsByBiome = copyOfListMap(mobsByBiome);
         this.stepsByFeature = copyOfStepsMap(stepsByFeature);
         this.oresByTag = copyOfListMap(oresByTag);
+        this.structuresByTag = copyOfListMap(structuresByTag);
         this.worldBottom = worldBottom;
         this.worldTop = worldTop;
     }
@@ -144,7 +148,9 @@ public final class VanillaRuleSnapshot {
         var placedScan = scanPlacedFeatures(server, overworldBottom, overworldTop);
         List<PlacedFeatureInfo> features = placedScan.features();
         Map<TagKey<PlacedFeature>, List<PlacedFeatureInfo>> oresByTag = placedScan.byTag();
-        List<StructurePlacementInfo> structures = scanStructures(server);
+        var structScan = scanStructures(server);
+        List<StructurePlacementInfo> structures = structScan.infos();
+        Map<TagKey<Structure>, List<StructurePlacementInfo>> structuresByTag = structScan.byTag();
         var mobScan = scanMobSpawns(server);
         Map<MobCategory, List<MobSpawnInfo>> mobs = mobScan.byCategory();
         Map<ResourceKey<Biome>, List<MobSpawnInfo>> mobsBiome = mobScan.byBiome();
@@ -160,10 +166,11 @@ public final class VanillaRuleSnapshot {
                 structures.size(), mobTotal, mobs.size(),
                 overworldBottom, overworldTop);
 
-        IsekaiApi.LOGGER.debug("[Isekai v0.9] PlacedFeature tag index: {} distinct tags", oresByTag.size());
+        IsekaiApi.LOGGER.debug("[Isekai v0.10] tag indices: {} placed-feature tags, {} structure tags",
+                oresByTag.size(), structuresByTag.size());
 
         return new VanillaRuleSnapshot(features, structures, mobs, mobsBiome, stepsByFeature, oresByTag,
-                overworldBottom, overworldTop);
+                structuresByTag, overworldBottom, overworldTop);
     }
 
     /** Group result for {@link #scanMobSpawns}: spawns are indexed two ways simultaneously. */
@@ -196,13 +203,20 @@ public final class VanillaRuleSnapshot {
         return new PlacedScan(features, byTag);
     }
 
+    /** Group result for {@link #scanStructures}: list + reverse tag index in one pass. */
+    private record StructureScan(List<StructurePlacementInfo> infos,
+                                  Map<TagKey<Structure>, List<StructurePlacementInfo>> byTag) {}
+
     /**
      * Walk STRUCTURE_SET to build a Structure -> StructurePlacement reverse map, then walk
      * STRUCTURE to emit one {@link StructurePlacementInfo} per (structure, set) pairing.
      * Structures not in any set are skipped (they would never generate). Structures in
      * multiple sets emit one entry per set, so callers see every placement variant.
+     *
+     * <p>Also builds a parallel {@code Map<TagKey<Structure>, List<StructurePlacementInfo>>}
+     * via {@code Holder.tags()} so {@code IsekaiQuery.getStructuresByTag} returns in O(1).
      */
-    private static List<StructurePlacementInfo> scanStructures(MinecraftServer server) {
+    private static StructureScan scanStructures(MinecraftServer server) {
         var registryAccess = server.registryAccess();
         HolderLookup.RegistryLookup<StructureSet> setLookup =
                 registryAccess.lookupOrThrow(Registries.STRUCTURE_SET);
@@ -221,6 +235,7 @@ public final class VanillaRuleSnapshot {
         });
 
         List<StructurePlacementInfo> infos = new ArrayList<>();
+        Map<TagKey<Structure>, List<StructurePlacementInfo>> byTag = new HashMap<>();
         structureLookup.listElements().forEach(ref -> {
             ResourceKey<Structure> key = ref.unwrapKey().orElseThrow();
             Structure structure = ref.value();
@@ -231,10 +246,13 @@ public final class VanillaRuleSnapshot {
             }
             Set<TagKey<Biome>> biomeTags = extractBiomeTags(structure);
             for (StructurePlacement placement : placements) {
-                infos.add(new StructurePlacementInfo(key, placement, biomeTags));
+                StructurePlacementInfo info = new StructurePlacementInfo(key, placement, biomeTags);
+                infos.add(info);
+                ref.tags().forEach(tag ->
+                        byTag.computeIfAbsent(tag, k -> new ArrayList<>()).add(info));
             }
         });
-        return infos;
+        return new StructureScan(infos, byTag);
     }
 
     /**
@@ -401,6 +419,11 @@ public final class VanillaRuleSnapshot {
         return oresByTag.getOrDefault(tag, List.of());
     }
 
+    /** Structure placements that were tagged with the given TagKey at scan time. */
+    public List<StructurePlacementInfo> structuresForTag(TagKey<Structure> tag) {
+        return structuresByTag.getOrDefault(tag, List.of());
+    }
+
     public boolean isEmpty() {
         return ores.isEmpty() && structures.isEmpty() && mobsByCategory.isEmpty();
     }
@@ -411,6 +434,6 @@ public final class VanillaRuleSnapshot {
                                 Map<MobCategory, List<MobSpawnInfo>> mobsByCategory,
                                 int worldBottom,
                                 int worldTop) {
-        this(ores, structures, mobsByCategory, Map.of(), Map.of(), Map.of(), worldBottom, worldTop);
+        this(ores, structures, mobsByCategory, Map.of(), Map.of(), Map.of(), Map.of(), worldBottom, worldTop);
     }
 }

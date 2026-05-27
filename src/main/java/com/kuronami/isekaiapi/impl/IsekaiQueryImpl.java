@@ -77,6 +77,11 @@ public final class IsekaiQueryImpl implements IsekaiQuery {
     @Override public List<StructurePlacementInfo> getAllStructures() { return snapshot.get().structures(); }
 
     @Override
+    public List<StructurePlacementInfo> getStructuresByTag(TagKey<Structure> tag) {
+        return snapshot.get().structuresForTag(tag);
+    }
+
+    @Override
     public List<MobSpawnInfo> getMobSpawnsForBiome(ResourceKey<Biome> biome) {
         return snapshot.get().mobsForBiome(biome);
     }
