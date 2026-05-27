@@ -8,11 +8,13 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.structure.Structure;
 
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -46,12 +48,30 @@ public record WorldshapeDescriptor(
         SpatialPredicate defaultStructurePredicate,
         Set<ResourceKey<Biome>> appliesTo,
         Set<ResourceKey<PlacedFeature>> excludedFeatures,
+        List<AdditionalFeature> additionalFeatures,
         int priority
 ) {
     public WorldshapeDescriptor {
         structurePredicates = Map.copyOf(structurePredicates);
         appliesTo = Set.copyOf(appliesTo);
         excludedFeatures = Set.copyOf(excludedFeatures);
+        additionalFeatures = List.copyOf(additionalFeatures);
+    }
+
+    /**
+     * A {@link PlacedFeature} the consumer wants injected into the matched biomes at the
+     * given {@link GenerationStep.Decoration} step. v0.7 minimum: the biome modifier ADD
+     * phase iterates this list and calls
+     * {@code BiomeGenerationSettingsBuilder.addFeature(step, holder)} for each entry that
+     * resolves to a real registry entry.
+     */
+    public record AdditionalFeature(ResourceKey<PlacedFeature> feature, GenerationStep.Decoration step) {
+        public static final Codec<AdditionalFeature> CODEC = RecordCodecBuilder.create(i -> i.group(
+                ResourceKey.codec(Registries.PLACED_FEATURE).fieldOf("feature")
+                        .forGetter(AdditionalFeature::feature),
+                GenerationStep.Decoration.CODEC.fieldOf("step")
+                        .forGetter(AdditionalFeature::step)
+        ).apply(i, AdditionalFeature::new));
     }
 
     public static final int DEFAULT_PRIORITY = 100;
@@ -92,10 +112,13 @@ public record WorldshapeDescriptor(
                           set -> java.util.List.copyOf(set))
                     .forGetter(WorldshapeDescriptor::appliesTo),
             ResourceKey.codec(Registries.PLACED_FEATURE).listOf()
-                    .optionalFieldOf("excluded_features", java.util.List.of())
+                    .optionalFieldOf("excluded_features", List.of())
                     .xmap(list -> (Set<ResourceKey<PlacedFeature>>) new HashSet<>(list),
-                          set -> java.util.List.copyOf(set))
+                          set -> List.copyOf(set))
                     .forGetter(WorldshapeDescriptor::excludedFeatures),
+            AdditionalFeature.CODEC.listOf()
+                    .optionalFieldOf("additional_features", List.of())
+                    .forGetter(WorldshapeDescriptor::additionalFeatures),
             Codec.INT.optionalFieldOf("priority", DEFAULT_PRIORITY)
                     .forGetter(WorldshapeDescriptor::priority)
     ).apply(i, WorldshapeDescriptor::new));
