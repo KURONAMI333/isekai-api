@@ -66,7 +66,7 @@ public final class IsekaiCommand {
                 }))
                 .then(Commands.literal("query")
                         .then(Commands.literal("dimensions").executes(ctx -> {
-                            var dims = Isekai.query().getDimensionsWithWorldshape();
+                            var dims = Isekai.remap().getDeclaredDimensions();
                             if (dims.isEmpty()) {
                                 ctx.getSource().sendSuccess(() ->
                                         Component.literal("No WorldshapeDescriptor registered yet"), false);
@@ -75,7 +75,30 @@ public final class IsekaiCommand {
                                         Component.literal("Dimensions with worldshape: " + dims), false);
                             }
                             return 1;
-                        })))
+                        }))
+                        .then(Commands.literal("worldshape")
+                                .then(Commands.argument("dim", ResourceLocationArgument.id()).executes(ctx -> {
+                                    ResourceLocation dimId = ResourceLocationArgument.getId(ctx, "dim");
+                                    var dimKey = net.minecraft.resources.ResourceKey.create(
+                                            net.minecraft.core.registries.Registries.DIMENSION, dimId);
+                                    var single = Isekai.remap().getActiveDescriptor(dimKey);
+                                    var layers = Isekai.remap().getActiveLayers(dimKey);
+                                    if (single.isEmpty() && layers.isEmpty()) {
+                                        ctx.getSource().sendSuccess(() ->
+                                                Component.literal("No worldshape declared for " + dimId), false);
+                                        return 0;
+                                    }
+                                    StringBuilder sb = new StringBuilder("Worldshape for ").append(dimId).append(": ");
+                                    single.ifPresent(d -> sb.append("single-layer range=")
+                                            .append(d.playableRange())
+                                            .append(", priority=").append(d.priority()));
+                                    if (!layers.isEmpty()) {
+                                        if (single.isPresent()) sb.append(" + ");
+                                        sb.append(layers.size()).append("-layer stack");
+                                    }
+                                    ctx.getSource().sendSuccess(() -> Component.literal(sb.toString()), false);
+                                    return 1;
+                                }))))
                 .then(Commands.literal("validate")
                         .then(Commands.argument("namespace", StringArgumentType.word()).executes(ctx -> {
                             String ns = StringArgumentType.getString(ctx, "namespace");
