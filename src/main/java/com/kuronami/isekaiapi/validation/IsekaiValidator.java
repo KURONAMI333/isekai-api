@@ -61,7 +61,9 @@ public final class IsekaiValidator {
 
         filesChecked += validateDir(
                 rm, namespace, LAYERED_DIR, errors,
-                (id, json) -> decodeAndCheck(id, json, LayeredDescriptor.CODEC, d -> {}, errors));
+                (id, json) -> decodeAndCheck(id, json,
+                        com.kuronami.isekaiapi.lifecycle.IsekaiReloadListener.LayeredFile.CODEC,
+                        IsekaiValidator::crossCheckLayered, errors));
 
         IsekaiApi.LOGGER.info(
                 "[Isekai] validateNamespace({}) -> {} files checked, {} errors",
@@ -129,6 +131,61 @@ public final class IsekaiValidator {
         }
         if (d.priority() < 0) {
             throw new IllegalArgumentException("priority < 0: " + d.priority());
+        }
+        crossCheckStrategy("ore_strategy", d.oreStrategy());
+        crossCheckStrategy("structure_strategy", d.structureStrategy());
+        crossCheckStrategy("mob_spawn_strategy", d.mobSpawnStrategy());
+    }
+
+    /** Cross-field checks for a {@code LayeredFile}: non-overlapping y_ranges, monotone. */
+    private static void crossCheckLayered(com.kuronami.isekaiapi.lifecycle.IsekaiReloadListener.LayeredFile f) {
+        var layers = f.layers();
+        // Sort a defensive copy by minY so the overlap check is O(n).
+        var sorted = new java.util.ArrayList<>(layers);
+        sorted.sort(java.util.Comparator.comparingInt(l -> l.yRange().minY()));
+        for (int i = 0; i < sorted.size(); i++) {
+            var current = sorted.get(i).yRange();
+            if (current.minY() >= current.maxY()) {
+                throw new IllegalArgumentException(
+                        "layer[" + i + "] yRange invalid: min_y >= max_y (" + current + ")");
+            }
+            // Each per-layer descriptor goes through the same scalar checks.
+            crossCheckWorldshape(sorted.get(i).descriptor());
+            if (i == 0) continue;
+            var prev = sorted.get(i - 1).yRange();
+            if (current.minY() < prev.maxY()) {
+                throw new IllegalArgumentException(
+                        "layer[" + i + "] y_range (" + current.minY() + ".." + current.maxY()
+                                + ") overlaps previous (" + prev.minY() + ".." + prev.maxY() + ")");
+            }
+        }
+    }
+
+    /**
+     * Cross-field checks for a {@link com.kuronami.isekaiapi.api.remap.RemapStrategy} tree.
+     * Currently enforces {@code BandSplit.ratios} sums to ~1.0 (tolerance 0.01) and recurses
+     * into {@code Pipe} chains. Other variants have nothing to validate beyond what the
+     * record canonical constructor already enforces.
+     */
+    private static void crossCheckStrategy(String fieldLabel,
+                                           com.kuronami.isekaiapi.api.remap.RemapStrategy s) {
+        if (s instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.BandSplit bs) {
+            double sum = 0.0;
+            for (float r : bs.ratios()) {
+                if (r < 0) {
+                    throw new IllegalArgumentException(
+                            fieldLabel + ".BandSplit.ratios contains negative: " + r);
+                }
+                sum += r;
+            }
+            if (Math.abs(sum - 1.0) > 0.01) {
+                throw new IllegalArgumentException(
+                        fieldLabel + ".BandSplit.ratios sum=" + sum + " (must be 1.0 ± 0.01)");
+            }
+        } else if (s instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.Pipe p) {
+            for (var child : p.chain()) {
+                crossCheckStrategy(fieldLabel + ".pipe", child);
+            }
         }
     }
 
