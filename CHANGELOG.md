@@ -34,20 +34,27 @@ First public release. Universal worldgen library for NeoForge 1.21.1.
 - ADD phase: injects `additions.features`, `additions.carvers`, and
   strategy-remapped ore PlacedFeatures (step-preserving — rebuilt features
   land in their original decoration step).
-- MODIFY phase: scales mob spawn weights per category, applies
-  `atmosphere` overrides (climate + visual).
+- MODIFY phase:
+  - mob spawn entry add (`additions.mob_spawns`) and remove
+    (`exclusions.mob_spawns`)
+  - per-category weight scaling via `mob_spawn_strategy` and
+    `mob_spawn_strategy_by_category`
+  - `atmosphere` overrides: sky/fog/water/foliage/grass colors,
+    temperature, downfall, has_precipitation, creature_generation_probability
 
 ### Structure modifier (`isekai_api:apply_worldshape_structures`)
 - REMOVE phase: clears matched structures' biome filter to make them
   unspawnable.
 
 ### Mixins
-- `Structure.findValidGenerationPoint` — enforces
-  `SpatialPredicate.{Always,Never,YInRange,SolidFloor,SolidCeiling,
-  InFluid,NearBlock,NearBiome,TerrainSlope,And,Or,Not}` at structure
-  placement time. Per-structure predicates honored.
-- `RandomSpreadStructurePlacement.spacing` / `.separation` — dynamically
-  scales by the active `structure_strategy` CountScale factor.
+- `Structure.findValidGenerationPoint` — enforces all 12
+  `SpatialPredicate` variants at structure placement time.
+  Per-structure predicates from `structure_predicates` honored;
+  default falls back to `defaultStructurePredicate`.
+- `RandomSpreadStructurePlacement.spacing` / `.separation` — per-dimension
+  scaling by the descriptor's `structure_strategy` CountScale factor.
+  Uses a ThreadLocal<ChunkGeneratorStructureState> set/cleared by
+  `isPlacementChunk` to resolve the calling dim via BiomeSource match.
 
 ### Commands (operator-only)
 - `/isekai version`, `stats`, `reload`
@@ -70,12 +77,15 @@ First public release. Universal worldgen library for NeoForge 1.21.1.
 - `declaration_only/layered_overworld` — two-layer + blend transition
 
 ### Known limitations
-- `structure_strategy` factor applies uniformly across declared
-  dimensions. Per-dim variation needs a thread-local chunk-gen context
-  that vanilla doesn't expose; deferred to a later release.
 - `structure_strategy` non-CountScale variants (Linear / Inverted /
-  FixedRange / BandSplit) silently no-op on spacing — they have no
-  semantic meaning for structure placement frequency. The validator
-  warns when these appear.
-- Surface rules, sea level, BiomeSource — explicitly out of scope.
-  Consumers handle via vanilla `noise_settings` JSON or TerraBlender.
+  FixedRange / BandSplit) have no semantic meaning for structure
+  placement frequency; the validator rejects them rather than letting
+  the descriptor silently no-op.
+- Per-structure `StructureSpawnOverride` configuration (e.g., "no
+  creepers in pillager outposts") not exposed via descriptor. Consumers
+  can use vanilla's `neoforge:remove_spawns` biome modifier as a
+  workaround for now.
+- `MobSpawnSettings.MobSpawnCost` (per-entity energy budget / charge)
+  not exposed. Advanced spawn-cap tuning.
+- Surface rules, sea level, BiomeSource — explicitly out of scope
+  (these are vanilla `noise_settings` JSON or TerraBlender territory).
