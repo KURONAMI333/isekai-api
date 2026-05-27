@@ -15,14 +15,23 @@ import java.util.Map;
  * {@code ServerAboutToStartEvent}. Backs all
  * {@link com.kuronami.isekaiapi.api.query.IsekaiQuery} methods in O(1).
  *
- * <p>v0.2 status: scaffold + lifecycle wired (scan invocation, snapshot publication
- * to {@link IsekaiQueryImpl}, AtomicReference-based cache swap). The actual registry
- * walk that populates the lists is deferred to v0.3 — first v0.3 attempt was
- * reverted because the API path needed verification: NeoForge 1.21.1
- * {@code RegistryAccess.lookupOrThrow} returns {@code RegistryLookup<T>} not
- * {@code Registry<T>}, and {@code UniformHeight} / {@code TrapezoidHeight} field
- * access pattern (getter vs direct field) needs confirmation. Next session reattempts
- * with confirmed API references rather than guesses.
+ * <p>v0.2 status: scaffold + lifecycle wired. Actual registry-walk implementation
+ * deferred to v0.3. Two v0.3 attempts have failed and been reverted; the next attempt
+ * needs API verification via the NeoForge-extracted Mojang source (under
+ * {@code .gradle/caches} after a successful build) rather than community-mod
+ * reference searches, because mapping differences (Parchment vs Mojang vs Yarn)
+ * cause false positives in {@code gh search code} results.
+ *
+ * <p>Confirmed-incorrect guesses so far (both via build error):
+ * <ul>
+ *   <li>v0.3 attempt 1: assumed {@code RegistryAccess.lookupOrThrow} returns
+ *       {@code Registry<T>}. It returns {@code HolderLookup.RegistryLookup<T>}.</li>
+ *   <li>v0.3 attempt 2: assumed {@code HeightRangePlacement.height()} is the accessor.
+ *       That method does not exist in NeoForge 1.21.1's Mojang-mapping; the field is
+ *       likely either a direct {@code height} field reference or a different getter
+ *       name (e.g. {@code getHeight()}). Resolution requires reading the actual
+ *       extracted source from {@code .gradle/caches/.../neoforge/.../sources/}.</li>
+ * </ul>
  */
 public final class VanillaRuleSnapshot {
 
