@@ -1,0 +1,7 @@
+*.bat   eol=crlf
+*.gradle      text eol=lf
+*.properties  text eol=lf
+*.java        text eol=lf
+*.json        text eol=lf
+*.toml        text eol=lf
+*.md          text eol=lf
