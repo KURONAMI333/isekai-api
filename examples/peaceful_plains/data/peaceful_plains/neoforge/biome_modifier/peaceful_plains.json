@@ -1,0 +1,23 @@
+{
+  "type": "isekai_api:apply_worldshape",
+  "worldshape": {
+    "dimension": "minecraft:overworld",
+    "playable_range": {
+      "min_y": -64,
+      "max_y": 320,
+      "distribution": "uniform"
+    },
+    "surface_anchor": { "type": "isekai:world_surface" },
+    "ore_strategy":       { "type": "isekai:identity" },
+    "structure_strategy": { "type": "isekai:identity" },
+    "mob_spawn_strategy": { "type": "isekai:identity" },
+    "mob_spawn_strategy_by_category": {
+      "creature": { "type": "isekai:count_scale", "factor": 1.5 },
+      "monster":  { "type": "isekai:count_scale", "factor": 0.25 }
+    },
+    "default_structure_predicate": { "type": "isekai:always" },
+    "applies_to": [
+      "minecraft:plains"
+    ]
+  }
+}
