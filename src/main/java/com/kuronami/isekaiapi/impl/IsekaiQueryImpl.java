@@ -7,6 +7,7 @@ import com.kuronami.isekaiapi.api.query.PlacedFeatureInfo;
 import com.kuronami.isekaiapi.api.query.StructurePlacementInfo;
 import com.kuronami.isekaiapi.api.query.VerticalRange;
 import com.kuronami.isekaiapi.api.query.WorldshapeSnapshot;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.MobCategory;
@@ -16,6 +17,7 @@ import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.structure.Structure;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import java.util.List;
 import java.util.Optional;
@@ -91,8 +93,21 @@ public final class IsekaiQueryImpl implements IsekaiQuery {
         return snapshot.get().mobsForCategory(category);
     }
 
-    @Override public Optional<DensityFunction> getVanillaDensityFunction(ResourceKey<DensityFunction> key) { return Optional.empty(); }
-    @Override public Optional<NoiseGeneratorSettings> getVanillaNoiseSettings(ResourceKey<NoiseGeneratorSettings> key) { return Optional.empty(); }
+    @Override
+    public Optional<DensityFunction> getVanillaDensityFunction(ResourceKey<DensityFunction> key) {
+        var server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null) return Optional.empty();
+        return server.registryAccess().lookupOrThrow(Registries.DENSITY_FUNCTION)
+                .get(key).map(net.minecraft.core.Holder::value);
+    }
+
+    @Override
+    public Optional<NoiseGeneratorSettings> getVanillaNoiseSettings(ResourceKey<NoiseGeneratorSettings> key) {
+        var server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null) return Optional.empty();
+        return server.registryAccess().lookupOrThrow(Registries.NOISE_SETTINGS)
+                .get(key).map(net.minecraft.core.Holder::value);
+    }
 
     @Override
     public WorldshapeSnapshot getSnapshot(ResourceKey<Level> dimension) {
