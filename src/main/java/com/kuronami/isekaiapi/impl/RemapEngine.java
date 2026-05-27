@@ -142,4 +142,32 @@ public final class RemapEngine {
                                                        VerticalRange playable) {
         return apply(strategy, original, playable, -64, 320);
     }
+
+    /**
+     * Walk a strategy tree and return the product of every {@link RemapStrategy.CountScale}
+     * factor inside it (with {@code Pipe} chains folding multiplicatively). Other variants
+     * contribute {@code 1.0}. Used by the biome modifier MODIFY phase to scale mob spawn
+     * weights without separately re-implementing strategy traversal there.
+     *
+     * <p>Examples:
+     * <ul>
+     *   <li>{@code Identity} -> 1.0</li>
+     *   <li>{@code CountScale(0.5)} -> 0.5</li>
+     *   <li>{@code Pipe(Linear, CountScale(2.0))} -> 2.0 (Linear contributes 1.0)</li>
+     *   <li>{@code Pipe(CountScale(2.0), CountScale(1.5))} -> 3.0</li>
+     * </ul>
+     */
+    public static double effectiveCountFactor(RemapStrategy strategy) {
+        if (strategy instanceof RemapStrategy.CountScale cs) {
+            return cs.factor();
+        }
+        if (strategy instanceof RemapStrategy.Pipe pipe) {
+            double product = 1.0;
+            for (RemapStrategy child : pipe.chain()) {
+                product *= effectiveCountFactor(child);
+            }
+            return product;
+        }
+        return 1.0;
+    }
 }
