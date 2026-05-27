@@ -14,6 +14,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.MobSpawnSettings;
+import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.VerticalAnchor;
 import net.minecraft.world.level.levelgen.heightproviders.BiasedToBottomHeight;
 import net.minecraft.world.level.levelgen.heightproviders.ConstantHeight;
@@ -29,6 +30,7 @@ import net.minecraft.world.level.levelgen.structure.StructureSet;
 import net.minecraft.world.level.levelgen.structure.placement.StructurePlacement;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -59,7 +61,7 @@ import java.util.Set;
 public final class VanillaRuleSnapshot {
 
     public static final VanillaRuleSnapshot EMPTY =
-            new VanillaRuleSnapshot(List.of(), List.of(), Map.of(), -64, 320);
+            new VanillaRuleSnapshot(List.of(), List.of(), Map.of(), Map.of(), -64, 320);
 
     /**
      * Overworld defaults used by {@link #anchorToY} when no per-call dimension override is
@@ -82,23 +84,39 @@ public final class VanillaRuleSnapshot {
     private final List<PlacedFeatureInfo> ores;
     private final List<StructurePlacementInfo> structures;
     private final Map<MobCategory, List<MobSpawnInfo>> mobsByCategory;
+    /**
+     * Reverse index: which decoration step(s) each PlacedFeature appears in across all
+     * biomes. A feature can sit in multiple steps (rare but possible); the set captures
+     * every step it was seen in. Used by the v0.8 strategy remap to inject the rebuilt
+     * variant into the same step the original lived in.
+     */
+    private final Map<ResourceKey<PlacedFeature>, Set<GenerationStep.Decoration>> stepsByFeature;
     private final int worldBottom;
     private final int worldTop;
 
     public VanillaRuleSnapshot(List<PlacedFeatureInfo> ores,
                                 List<StructurePlacementInfo> structures,
                                 Map<MobCategory, List<MobSpawnInfo>> mobsByCategory,
+                                Map<ResourceKey<PlacedFeature>, Set<GenerationStep.Decoration>> stepsByFeature,
                                 int worldBottom,
                                 int worldTop) {
         this.ores = List.copyOf(ores);
         this.structures = List.copyOf(structures);
         this.mobsByCategory = Map.copyOf(mobsByCategory);
+        this.stepsByFeature = copyOfStepsMap(stepsByFeature);
         this.worldBottom = worldBottom;
         this.worldTop = worldTop;
     }
 
+    private static Map<ResourceKey<PlacedFeature>, Set<GenerationStep.Decoration>> copyOfStepsMap(
+            Map<ResourceKey<PlacedFeature>, Set<GenerationStep.Decoration>> src) {
+        Map<ResourceKey<PlacedFeature>, Set<GenerationStep.Decoration>> copy = new HashMap<>(src.size());
+        src.forEach((k, v) -> copy.put(k, Set.copyOf(v)));
+        return Map.copyOf(copy);
+    }
+
     public static VanillaRuleSnapshot scan(MinecraftServer server) {
-        IsekaiApi.LOGGER.info("[Isekai v0.6] VanillaRuleSnapshot.scan: walking PLACED_FEATURE + STRUCTURE + BIOME registries");
+        IsekaiApi.LOGGER.info("[Isekai v0.8] VanillaRuleSnapshot.scan: walking PLACED_FEATURE + STRUCTURE + BIOME registries");
 
         // Resolve the overworld's actual build height range — vanilla 1.21.1 ships -64..320
         // but cubic-chunks or world height mods can change this. PlacedFeatures scanned here
@@ -110,18 +128,19 @@ public final class VanillaRuleSnapshot {
         List<PlacedFeatureInfo> features = scanPlacedFeatures(server, overworldBottom, overworldTop);
         List<StructurePlacementInfo> structures = scanStructures(server);
         Map<MobCategory, List<MobSpawnInfo>> mobs = scanMobSpawns(server);
+        Map<ResourceKey<PlacedFeature>, Set<GenerationStep.Decoration>> stepsByFeature = scanFeatureSteps(server);
 
         long withRange = features.stream().filter(info -> info.range() != FALLBACK_RANGE).count();
         int mobTotal = mobs.values().stream().mapToInt(List::size).sum();
         IsekaiApi.LOGGER.info(
-                "[Isekai v0.6] Scanned {} placed features ({} with extracted VerticalRange, "
-                        + "{} with fallback) + {} structure placements + {} mob spawn entries across {} categories "
+                "[Isekai v0.8] Scanned {} placed features ({} with extracted VerticalRange, "
+                        + "{} with fallback, {} step-indexed) + {} structure placements + {} mob spawn entries across {} categories "
                         + "(overworld build-height {}..{})",
-                features.size(), withRange, features.size() - withRange,
+                features.size(), withRange, features.size() - withRange, stepsByFeature.size(),
                 structures.size(), mobTotal, mobs.size(),
                 overworldBottom, overworldTop);
 
-        return new VanillaRuleSnapshot(features, structures, mobs, overworldBottom, overworldTop);
+        return new VanillaRuleSnapshot(features, structures, mobs, stepsByFeature, overworldBottom, overworldTop);
     }
 
     /** Walk PLACED_FEATURE; extract VerticalRange via the Access Transformer-exposed fields. */
@@ -188,6 +207,36 @@ public final class VanillaRuleSnapshot {
         Set<TagKey<Biome>> tags = new HashSet<>();
         structure.biomes().unwrap().ifLeft(tags::add);
         return tags;
+    }
+
+    /**
+     * Walk every biome's <em>original</em> generation settings and record which decoration
+     * step(s) each PlacedFeature key appears in. Uses {@code modifiableBiomeInfo()
+     * .getOriginalBiomeInfo()} so the lookup reflects pre-modifier state — biome modifiers
+     * (including Isekai's own) haven't been applied at ServerAboutToStart time, so this is
+     * the canonical "what step did the datapack put this feature in" mapping.
+     *
+     * <p>{@code BiomeGenerationSettings.features()} returns a list indexed by
+     * {@link GenerationStep.Decoration#ordinal()}; we iterate the {@code values()} array in
+     * parallel to recover the enum constant.
+     */
+    private static Map<ResourceKey<PlacedFeature>, Set<GenerationStep.Decoration>> scanFeatureSteps(MinecraftServer server) {
+        HolderLookup.RegistryLookup<Biome> biomeLookup =
+                server.registryAccess().lookupOrThrow(Registries.BIOME);
+        Map<ResourceKey<PlacedFeature>, Set<GenerationStep.Decoration>> index = new HashMap<>();
+        GenerationStep.Decoration[] steps = GenerationStep.Decoration.values();
+        biomeLookup.listElements().forEach(ref -> {
+            var generation = ref.value().modifiableBiomeInfo().getOriginalBiomeInfo().generationSettings();
+            var perStep = generation.features();
+            for (int i = 0; i < perStep.size() && i < steps.length; i++) {
+                GenerationStep.Decoration step = steps[i];
+                for (var holder : perStep.get(i)) {
+                    holder.unwrapKey().ifPresent(key ->
+                            index.computeIfAbsent(key, k -> EnumSet.noneOf(GenerationStep.Decoration.class)).add(step));
+                }
+            }
+        });
+        return index;
     }
 
     /**
@@ -279,11 +328,35 @@ public final class VanillaRuleSnapshot {
     /** Overworld build height top captured at scan time. */
     public int worldTop() { return worldTop; }
 
+    /**
+     * Decoration step(s) the given PlacedFeature was originally indexed under across the
+     * scanned biomes. Empty set means the feature wasn't referenced by any biome at scan
+     * time — e.g. a feature defined in JSON but unused, or one that was only added by a
+     * later biome modifier.
+     */
+    public Set<GenerationStep.Decoration> stepsFor(ResourceKey<PlacedFeature> key) {
+        return stepsByFeature.getOrDefault(key, Set.of());
+    }
+
+    /** {@code true} if this info's range is the sentinel returned when extraction failed. */
+    public boolean isFallback(PlacedFeatureInfo info) {
+        return info.range() == FALLBACK_RANGE;
+    }
+
     public List<MobSpawnInfo> mobsForCategory(MobCategory category) {
         return mobsByCategory.getOrDefault(category, List.of());
     }
 
     public boolean isEmpty() {
         return ores.isEmpty() && structures.isEmpty() && mobsByCategory.isEmpty();
+    }
+
+    /** v0.6 backwards-compat constructor — kept for tests / fixed snapshots that pre-date the step index. */
+    public VanillaRuleSnapshot(List<PlacedFeatureInfo> ores,
+                                List<StructurePlacementInfo> structures,
+                                Map<MobCategory, List<MobSpawnInfo>> mobsByCategory,
+                                int worldBottom,
+                                int worldTop) {
+        this(ores, structures, mobsByCategory, Map.of(), worldBottom, worldTop);
     }
 }
