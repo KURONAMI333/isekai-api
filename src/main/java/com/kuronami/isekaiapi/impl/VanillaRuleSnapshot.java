@@ -15,9 +15,12 @@ import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.MobSpawnSettings;
 import net.minecraft.world.level.levelgen.VerticalAnchor;
+import net.minecraft.world.level.levelgen.heightproviders.BiasedToBottomHeight;
+import net.minecraft.world.level.levelgen.heightproviders.ConstantHeight;
 import net.minecraft.world.level.levelgen.heightproviders.HeightProvider;
 import net.minecraft.world.level.levelgen.heightproviders.TrapezoidHeight;
 import net.minecraft.world.level.levelgen.heightproviders.UniformHeight;
+import net.minecraft.world.level.levelgen.heightproviders.VeryBiasedToBottomHeight;
 import net.minecraft.world.level.levelgen.placement.HeightRangePlacement;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.placement.PlacementModifier;
@@ -37,21 +40,21 @@ import java.util.Set;
  * {@code ServerAboutToStartEvent}. Backs all
  * {@link com.kuronami.isekaiapi.api.query.IsekaiQuery} methods in O(1).
  *
- * <p>v0.4: walks {@code PLACED_FEATURE} registry and extracts actual
- * {@link VerticalRange} from each feature's {@link HeightRangePlacement} via the
- * Access Transformer in {@code src/main/resources/META-INF/accesstransformer.cfg}
- * (which exposes the otherwise-private {@code height}, {@code minInclusive},
- * {@code maxInclusive} fields). Features without a {@link HeightRangePlacement}
- * modifier still get a {@link PlacedFeatureInfo} entry with a fallback range so
- * the full key list remains queryable.
+ * <p>Walks three registries at scan time:
+ * <ul>
+ *   <li>PLACED_FEATURE — extracts {@link VerticalRange} from each feature's
+ *       {@link HeightRangePlacement} via the Access Transformer in
+ *       {@code src/main/resources/META-INF/accesstransformer.cfg}. Supports
+ *       UniformHeight, TrapezoidHeight, ConstantHeight, BiasedToBottomHeight,
+ *       and VeryBiasedToBottomHeight. WeightedListHeight isn't a simple range,
+ *       so it falls back. Features without HeightRangePlacement also fall back.</li>
+ *   <li>STRUCTURE_SET → STRUCTURE — emits one {@link StructurePlacementInfo}
+ *       per (structure, set) pairing; biome filter via {@code Either.left} tag.</li>
+ *   <li>BIOME — collects every {@link MobSpawnSettings.SpawnerData} per MobCategory.</li>
+ * </ul>
  *
- * <p>{@link VerticalAnchor} resolution uses overworld defaults (-64..320) since
- * {@code WorldGenerationContext} isn't available at scan time. Features anchored
- * via {@link VerticalAnchor.AboveBottom} / {@link VerticalAnchor.BelowTop} in
- * non-overworld dimensions report overworld-relative values; per-dimension scan
- * lands in v0.5.
- *
- * <p>Structures and mob-spawn walks are still pending (v0.5).
+ * <p>{@link VerticalAnchor} resolution reads the overworld's actual build height at
+ * scan time (vanilla 1.21.1 = -64..320). True per-dimension snapshots land in v0.7+.
  */
 public final class VanillaRuleSnapshot {
 
@@ -232,8 +235,25 @@ public final class VanillaRuleSnapshot {
                     anchorToY(th.maxInclusive, worldBottom, worldTop),
                     HeightDistribution.TRAPEZOID);
         }
-        // ConstantHeight / BiasedToBottomHeight / VeryBiasedToBottomHeight / WeightedListHeight
-        // are not yet supported; their fields aren't in the AT. v0.7 will extend the AT.
+        if (hp instanceof ConstantHeight ch) {
+            // ConstantHeight is a single Y — represent as a degenerate range [y, y].
+            int y = anchorToY(ch.value, worldBottom, worldTop);
+            return new VerticalRange(y, y, HeightDistribution.UNIFORM);
+        }
+        if (hp instanceof BiasedToBottomHeight bbh) {
+            return new VerticalRange(
+                    anchorToY(bbh.minInclusive, worldBottom, worldTop),
+                    anchorToY(bbh.maxInclusive, worldBottom, worldTop),
+                    HeightDistribution.BIASED_LOW);
+        }
+        if (hp instanceof VeryBiasedToBottomHeight vbbh) {
+            return new VerticalRange(
+                    anchorToY(vbbh.minInclusive, worldBottom, worldTop),
+                    anchorToY(vbbh.maxInclusive, worldBottom, worldTop),
+                    HeightDistribution.BIASED_LOW);
+        }
+        // WeightedListHeight is the one remaining vanilla variant — its piece list isn't
+        // a simple range, so we fall back. It's rare in vanilla worldgen.
         return FALLBACK_RANGE;
     }
 
