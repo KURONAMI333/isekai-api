@@ -102,10 +102,15 @@ public final class IsekaiCommand {
                 .then(Commands.literal("validate")
                         .then(Commands.argument("namespace", StringArgumentType.word()).executes(ctx -> {
                             String ns = StringArgumentType.getString(ctx, "namespace");
-                            var result = IsekaiValidator.validateNamespace(ns);
+                            var rm = ctx.getSource().getServer().getResourceManager();
+                            var result = IsekaiValidator.validateNamespace(ns, rm);
                             ctx.getSource().sendSuccess(() ->
                                     Component.literal(String.format("Validated %d files, %d errors found",
                                             result.filesChecked(), result.errorsFound())), false);
+                            // Report each error so the operator can see what to fix.
+                            for (String err : result.errors()) {
+                                ctx.getSource().sendFailure(Component.literal("  " + err));
+                            }
                             return result.isOk() ? 1 : 0;
                         })))
                 .then(Commands.literal("dump")
