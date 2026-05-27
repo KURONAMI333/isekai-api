@@ -41,4 +41,13 @@ public final class Isekai {
     public static void publishSnapshot(VanillaRuleSnapshot snapshot) {
         ((IsekaiQueryImpl) QUERY).setSnapshot(snapshot);
     }
+
+    /**
+     * Internal: read the current snapshot for impl-class consumers (biome / structure
+     * modifiers, evaluators). Not part of the public consumer API; external callers
+     * should go through {@link #query()}.
+     */
+    public static VanillaRuleSnapshot currentSnapshot() {
+        return ((IsekaiQueryImpl) QUERY).getSnapshot();
+    }
 }

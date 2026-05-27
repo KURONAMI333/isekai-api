@@ -25,7 +25,6 @@ import java.util.stream.Stream;
  *   <li>{@link SurfaceAnchor.WorldSurface} — vanilla {@code WORLD_SURFACE_WG} heightmap</li>
  *   <li>{@link SurfaceAnchor.FixedY} — fixed Y level (degenerates to absolute)</li>
  *   <li>{@link SurfaceAnchor.BelowFluid} — top of contiguous fluid body in column</li>
- *   <li>{@link SurfaceAnchor.Custom} — Java-only, cannot be used from JSON</li>
  * </ul>
  *
  * <p>JSON form:
@@ -85,9 +84,6 @@ public class SurfaceRelativeModifier extends PlacementModifier {
                 }
             }
             return null;  // no matching fluid in column
-        }
-        if (anchor instanceof SurfaceAnchor.Custom custom) {
-            return custom.fn().applyAsInt(ctx.getLevel(), pos);
         }
         return null;
     }
