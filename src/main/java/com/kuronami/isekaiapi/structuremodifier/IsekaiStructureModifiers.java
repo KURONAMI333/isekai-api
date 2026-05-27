@@ -1,4 +1,4 @@
-package com.kuronami.isekaiapi.biomemodifier;
+package com.kuronami.isekaiapi.structuremodifier;
 
 import com.kuronami.isekaiapi.IsekaiApi;
 import com.mojang.serialization.MapCodec;
@@ -25,7 +25,7 @@ import net.neoforged.neoforge.registries.NeoForgeRegistries;
  *       {@link ApplyWorldshapeStructureModifier} for behavior.</li>
  * </ul>
  *
- * <p>Biome-side serializers live in {@link IsekaiBiomeModifiers}.
+ * <p>Biome-side serializers live in {@link com.kuronami.isekaiapi.biomemodifier.IsekaiBiomeModifiers}.
  */
 public final class IsekaiStructureModifiers {
 
