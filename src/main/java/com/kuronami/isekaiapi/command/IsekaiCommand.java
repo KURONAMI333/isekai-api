@@ -109,6 +109,49 @@ public final class IsekaiCommand {
                                     ctx.getSource().sendSuccess(() -> Component.literal(sb.toString()), false);
                                     return 1;
                                 }))))
+                .then(Commands.literal("preview")
+                        .then(Commands.literal("range")
+                                .then(Commands.argument("id", ResourceLocationArgument.id()).executes(ctx -> {
+                                    ResourceLocation id = ResourceLocationArgument.getId(ctx, "id");
+                                    var key = net.minecraft.resources.ResourceKey.create(
+                                            net.minecraft.core.registries.Registries.PLACED_FEATURE, id);
+                                    var global = Isekai.query().getOreVerticalRange(key);
+                                    if (global.isEmpty()) {
+                                        ctx.getSource().sendFailure(Component.literal("No range for: " + id));
+                                        return 0;
+                                    }
+                                    ctx.getSource().sendSuccess(() -> Component.literal(
+                                            id + " (overworld-resolved): " + global.get()), false);
+                                    // Also show every dim where the resolved range differs.
+                                    var server = ctx.getSource().getServer();
+                                    for (var level : server.getAllLevels()) {
+                                        var dim = level.dimension();
+                                        var perDim = Isekai.query().getOreVerticalRangeInDimension(key, dim);
+                                        if (perDim.isPresent() && !perDim.get().equals(global.get())) {
+                                            ctx.getSource().sendSuccess(() -> Component.literal(
+                                                    "  " + dim.location() + ": " + perDim.get()), false);
+                                        }
+                                    }
+                                    return 1;
+                                }))
+                                .then(Commands.argument("dim", ResourceLocationArgument.id())
+                                        .executes(ctx -> {
+                                            ResourceLocation id = ResourceLocationArgument.getId(ctx, "id");
+                                            ResourceLocation dimId = ResourceLocationArgument.getId(ctx, "dim");
+                                            var key = net.minecraft.resources.ResourceKey.create(
+                                                    net.minecraft.core.registries.Registries.PLACED_FEATURE, id);
+                                            var dimKey = net.minecraft.resources.ResourceKey.create(
+                                                    net.minecraft.core.registries.Registries.DIMENSION, dimId);
+                                            var range = Isekai.query().getOreVerticalRangeInDimension(key, dimKey);
+                                            if (range.isEmpty()) {
+                                                ctx.getSource().sendFailure(Component.literal(
+                                                        "No range for " + id + " in " + dimId));
+                                                return 0;
+                                            }
+                                            ctx.getSource().sendSuccess(() -> Component.literal(
+                                                    id + " in " + dimId + ": " + range.get()), false);
+                                            return 1;
+                                        }))))
                 .then(Commands.literal("validate")
                         .then(Commands.argument("namespace", StringArgumentType.word()).executes(ctx -> {
                             String ns = StringArgumentType.getString(ctx, "namespace");
@@ -201,6 +244,6 @@ public final class IsekaiCommand {
                                 }))));
 
         dispatcher.register(root);
-        IsekaiApi.LOGGER.info("Isekai commands registered: /isekai version|reload|query dimensions|validate|dump worldgen|dump ore|dump structure");
+        IsekaiApi.LOGGER.info("Isekai commands registered: /isekai version|reload|query|validate|dump|preview range");
     }
 }
