@@ -1,7 +1,7 @@
 package com.kuronami.isekaiapi.lifecycle;
 
 import com.kuronami.isekaiapi.IsekaiApi;
-import com.kuronami.isekaiapi.api.Isekai;
+import com.kuronami.isekaiapi.impl.IsekaiInternal;
 import com.kuronami.isekaiapi.impl.VanillaRuleSnapshot;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -53,7 +53,7 @@ public final class SnapshotRefreshListener implements PreparableReloadListener {
         }
         IsekaiApi.LOGGER.info("[Isekai] datapack reload: rebuilding VanillaRuleSnapshot");
         var snapshot = VanillaRuleSnapshot.scan(server);
-        Isekai.publishSnapshot(snapshot);
+        IsekaiInternal.publishSnapshot(snapshot);
         IsekaiApi.LOGGER.info("[Isekai] snapshot rebuilt (empty={})", snapshot.isEmpty());
     }
 }

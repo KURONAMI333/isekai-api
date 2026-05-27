@@ -1,10 +1,10 @@
 package com.kuronami.isekaiapi.biomemodifier.phase;
 
 import com.kuronami.isekaiapi.IsekaiApi;
-import com.kuronami.isekaiapi.api.Isekai;
 import com.kuronami.isekaiapi.api.query.PlacedFeatureInfo;
 import com.kuronami.isekaiapi.api.remap.RemapStrategy;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
+import com.kuronami.isekaiapi.impl.IsekaiInternal;
 import com.kuronami.isekaiapi.impl.VanillaRuleSnapshot;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.levelgen.GenerationStep;
@@ -90,7 +90,7 @@ public final class RemovePhase {
     }
 
     private static Set<ResourceKey<PlacedFeature>> collectRemapTargets() {
-        VanillaRuleSnapshot snapshot = Isekai.currentSnapshot();
+        VanillaRuleSnapshot snapshot = IsekaiInternal.currentSnapshot();
         if (snapshot == null) return Set.of();
         Set<ResourceKey<PlacedFeature>> set = new HashSet<>();
         for (PlacedFeatureInfo info : snapshot.ores()) {
