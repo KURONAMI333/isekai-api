@@ -12,6 +12,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.MobSpawnSettings;
 import net.minecraft.world.level.levelgen.GenerationStep;
@@ -62,7 +63,7 @@ import java.util.Set;
 public final class VanillaRuleSnapshot {
 
     public static final VanillaRuleSnapshot EMPTY =
-            new VanillaRuleSnapshot(List.of(), List.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), -64, 320);
+            new VanillaRuleSnapshot(List.of(), List.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), -64, 320);
 
     /**
      * Overworld defaults used by {@link #anchorToY} when no per-call dimension override is
@@ -100,6 +101,13 @@ public final class VanillaRuleSnapshot {
      * variant into the same step the original lived in.
      */
     private final Map<ResourceKey<PlacedFeature>, Set<GenerationStep.Decoration>> stepsByFeature;
+    /**
+     * Per-dimension VerticalRange overrides for features that use relative VerticalAnchors
+     * (AboveBottom / BelowTop). Outer key = dimension, inner key = feature. Features with
+     * pure absolute anchors are absent from the inner maps (their {@link #ores} entry is
+     * already correct everywhere). Used by {@link com.kuronami.isekaiapi.api.query.IsekaiQuery#getOreVerticalRangeInDimension}.
+     */
+    private final Map<ResourceKey<Level>, Map<ResourceKey<PlacedFeature>, VerticalRange>> perDimRanges;
     private final int worldBottom;
     private final int worldTop;
 
@@ -110,6 +118,7 @@ public final class VanillaRuleSnapshot {
                                 Map<ResourceKey<PlacedFeature>, Set<GenerationStep.Decoration>> stepsByFeature,
                                 Map<TagKey<PlacedFeature>, List<PlacedFeatureInfo>> oresByTag,
                                 Map<TagKey<Structure>, List<StructurePlacementInfo>> structuresByTag,
+                                Map<ResourceKey<Level>, Map<ResourceKey<PlacedFeature>, VerticalRange>> perDimRanges,
                                 int worldBottom,
                                 int worldTop) {
         this.ores = List.copyOf(ores);
@@ -119,8 +128,15 @@ public final class VanillaRuleSnapshot {
         this.stepsByFeature = copyOfStepsMap(stepsByFeature);
         this.oresByTag = copyOfListMap(oresByTag);
         this.structuresByTag = copyOfListMap(structuresByTag);
+        this.perDimRanges = copyOfNestedMap(perDimRanges);
         this.worldBottom = worldBottom;
         this.worldTop = worldTop;
+    }
+
+    private static <K1, K2, V> Map<K1, Map<K2, V>> copyOfNestedMap(Map<K1, Map<K2, V>> src) {
+        Map<K1, Map<K2, V>> copy = new HashMap<>(src.size());
+        src.forEach((k, v) -> copy.put(k, Map.copyOf(v)));
+        return Map.copyOf(copy);
     }
 
     private static <K, V> Map<K, List<V>> copyOfListMap(Map<K, List<V>> src) {
@@ -149,6 +165,8 @@ public final class VanillaRuleSnapshot {
         var placedScan = scanPlacedFeatures(server, overworldBottom, overworldTop);
         List<PlacedFeatureInfo> features = placedScan.features();
         Map<TagKey<PlacedFeature>, List<PlacedFeatureInfo>> oresByTag = placedScan.byTag();
+        Map<ResourceKey<Level>, Map<ResourceKey<PlacedFeature>, VerticalRange>> perDimRanges =
+                scanPerDimensionRanges(server, overworldBottom, overworldTop);
         var structScan = scanStructures(server);
         List<StructurePlacementInfo> structures = structScan.infos();
         Map<TagKey<Structure>, List<StructurePlacementInfo>> structuresByTag = structScan.byTag();
@@ -169,9 +187,61 @@ public final class VanillaRuleSnapshot {
 
         IsekaiApi.LOGGER.debug("[Isekai v0.10] tag indices: {} placed-feature tags, {} structure tags",
                 oresByTag.size(), structuresByTag.size());
+        IsekaiApi.LOGGER.debug("[Isekai v0.12] per-dim ranges: {} dimensions indexed", perDimRanges.size());
 
         return new VanillaRuleSnapshot(features, structures, mobs, mobsBiome, stepsByFeature, oresByTag,
-                structuresByTag, overworldBottom, overworldTop);
+                structuresByTag, perDimRanges, overworldBottom, overworldTop);
+    }
+
+    /**
+     * Walk every loaded ServerLevel; for each, re-resolve every PlacedFeature's
+     * HeightProvider against that level's actual build height. Stores only entries
+     * that differ from the overworld-default range (memory optimisation — features
+     * with absolute anchors return identical Y in every dimension).
+     *
+     * <p>Vanilla 1.21.1 dimensions and their bottoms:
+     * <ul>
+     *   <li>Overworld: -64</li>
+     *   <li>Nether: 0</li>
+     *   <li>End: 0</li>
+     * </ul>
+     * Modded dimensions append on top. A feature using
+     * {@code UniformHeight.of(AboveBottom(20), AboveBottom(80))} thus resolves to
+     * Y=-44..16 in overworld, Y=20..80 in nether/end.
+     */
+    private static Map<ResourceKey<Level>, Map<ResourceKey<PlacedFeature>, VerticalRange>> scanPerDimensionRanges(
+            MinecraftServer server, int overworldBottom, int overworldTop) {
+        HolderLookup.RegistryLookup<PlacedFeature> lookup =
+                server.registryAccess().lookupOrThrow(Registries.PLACED_FEATURE);
+        // Cache HeightProvider per feature once so we don't re-walk placement modifiers per dim.
+        Map<ResourceKey<PlacedFeature>, HeightProvider> hpByKey = new HashMap<>();
+        lookup.listElements().forEach(ref -> {
+            ResourceKey<PlacedFeature> key = ref.unwrapKey().orElseThrow();
+            HeightProvider hp = extractHeightProvider(ref.value());
+            if (hp != null) hpByKey.put(key, hp);
+        });
+
+        Map<ResourceKey<Level>, Map<ResourceKey<PlacedFeature>, VerticalRange>> out = new HashMap<>();
+        for (var level : server.getAllLevels()) {
+            int bottom = level.getMinBuildHeight();
+            int top = level.getMaxBuildHeight();
+            if (bottom == overworldBottom && top == overworldTop) {
+                // Same bounds as overworld — every resolution is identical to the global list.
+                // No need to store an override map for this dim.
+                continue;
+            }
+            Map<ResourceKey<PlacedFeature>, VerticalRange> dimMap = new HashMap<>();
+            for (var e : hpByKey.entrySet()) {
+                VerticalRange r = convertHeightProvider(e.getValue(), bottom, top);
+                if (r != null && r != FALLBACK_RANGE) {
+                    dimMap.put(e.getKey(), r);
+                }
+            }
+            if (!dimMap.isEmpty()) {
+                out.put(level.dimension(), dimMap);
+            }
+        }
+        return out;
     }
 
     /** Group result for {@link #scanMobSpawns}: spawns are indexed two ways simultaneously. */
@@ -332,9 +402,15 @@ public final class VanillaRuleSnapshot {
     }
 
     private static VerticalRange extractVerticalRange(PlacedFeature pf, int worldBottom, int worldTop) {
+        HeightProvider hp = extractHeightProvider(pf);
+        return hp == null ? null : convertHeightProvider(hp, worldBottom, worldTop);
+    }
+
+    /** Pull the {@link HeightProvider} out of a PlacedFeature's HeightRangePlacement, or null. */
+    private static HeightProvider extractHeightProvider(PlacedFeature pf) {
         for (PlacementModifier mod : pf.placement()) {
             if (mod instanceof HeightRangePlacement hrp) {
-                return convertHeightProvider(hrp.height, worldBottom, worldTop);
+                return hrp.height;
             }
         }
         return null;
@@ -450,6 +526,21 @@ public final class VanillaRuleSnapshot {
         return structuresByTag.getOrDefault(tag, List.of());
     }
 
+    /**
+     * VerticalRange for the given feature resolved against the given dimension's build
+     * height. Returns {@code Optional.empty()} when the dimension wasn't loaded at scan
+     * time, the feature wasn't scanned, or the feature has no HRP to resolve.
+     *
+     * <p>If a dimension shares overworld build bounds, no per-dim entry is stored — caller
+     * should fall back to the global ore list (which is already overworld-resolved).
+     */
+    public java.util.Optional<VerticalRange> oreRangeInDimension(
+            ResourceKey<PlacedFeature> feature, ResourceKey<Level> dimension) {
+        Map<ResourceKey<PlacedFeature>, VerticalRange> dimMap = perDimRanges.get(dimension);
+        if (dimMap == null) return java.util.Optional.empty();
+        return java.util.Optional.ofNullable(dimMap.get(feature));
+    }
+
     public boolean isEmpty() {
         return ores.isEmpty() && structures.isEmpty() && mobsByCategory.isEmpty();
     }
@@ -460,6 +551,6 @@ public final class VanillaRuleSnapshot {
                                 Map<MobCategory, List<MobSpawnInfo>> mobsByCategory,
                                 int worldBottom,
                                 int worldTop) {
-        this(ores, structures, mobsByCategory, Map.of(), Map.of(), Map.of(), Map.of(), worldBottom, worldTop);
+        this(ores, structures, mobsByCategory, Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), worldBottom, worldTop);
     }
 }
