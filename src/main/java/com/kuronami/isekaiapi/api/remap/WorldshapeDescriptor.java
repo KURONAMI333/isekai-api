@@ -4,8 +4,10 @@ import com.kuronami.isekaiapi.api.predicate.SpatialPredicate;
 import com.kuronami.isekaiapi.api.query.VerticalRange;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
@@ -68,15 +70,17 @@ public record WorldshapeDescriptor(
     public record Exclusions(
             Set<ResourceKey<PlacedFeature>> features,
             Set<ResourceKey<Structure>> structures,
-            Set<ResourceKey<ConfiguredWorldCarver<?>>> carvers
+            Set<ResourceKey<ConfiguredWorldCarver<?>>> carvers,
+            Set<EntityType<?>> mobSpawns
     ) {
         public Exclusions {
             features = Set.copyOf(features);
             structures = Set.copyOf(structures);
             carvers = Set.copyOf(carvers);
+            mobSpawns = Set.copyOf(mobSpawns);
         }
 
-        public static final Exclusions EMPTY = new Exclusions(Set.of(), Set.of(), Set.of());
+        public static final Exclusions EMPTY = new Exclusions(Set.of(), Set.of(), Set.of(), Set.of());
 
         public static final Codec<Exclusions> CODEC = RecordCodecBuilder.create(i -> i.group(
                 ResourceKey.codec(Registries.PLACED_FEATURE).listOf()
@@ -93,28 +97,59 @@ public record WorldshapeDescriptor(
                         .optionalFieldOf("carvers", List.of())
                         .xmap(list -> (Set<ResourceKey<ConfiguredWorldCarver<?>>>) new HashSet<>(list),
                               set -> List.copyOf(set))
-                        .forGetter(Exclusions::carvers)
+                        .forGetter(Exclusions::carvers),
+                BuiltInRegistries.ENTITY_TYPE.byNameCodec().listOf()
+                        .optionalFieldOf("mob_spawns", List.of())
+                        .xmap(list -> (Set<EntityType<?>>) new HashSet<>(list),
+                              set -> List.copyOf(set))
+                        .forGetter(Exclusions::mobSpawns)
         ).apply(i, Exclusions::new));
     }
 
-    /** Lists of consumer-injected entries to add during the ADD phase. */
+    /** Lists of consumer-injected entries to add during the ADD / MODIFY phases. */
     public record Additions(
             List<AdditionalFeature> features,
-            List<AdditionalCarver> carvers
+            List<AdditionalCarver> carvers,
+            List<AdditionalMobSpawn> mobSpawns
     ) {
         public Additions {
             features = List.copyOf(features);
             carvers = List.copyOf(carvers);
+            mobSpawns = List.copyOf(mobSpawns);
         }
 
-        public static final Additions EMPTY = new Additions(List.of(), List.of());
+        public static final Additions EMPTY = new Additions(List.of(), List.of(), List.of());
 
         public static final Codec<Additions> CODEC = RecordCodecBuilder.create(i -> i.group(
                 AdditionalFeature.CODEC.listOf().optionalFieldOf("features", List.of())
                         .forGetter(Additions::features),
                 AdditionalCarver.CODEC.listOf().optionalFieldOf("carvers", List.of())
-                        .forGetter(Additions::carvers)
+                        .forGetter(Additions::carvers),
+                AdditionalMobSpawn.CODEC.listOf().optionalFieldOf("mob_spawns", List.of())
+                        .forGetter(Additions::mobSpawns)
         ).apply(i, Additions::new));
+    }
+
+    /**
+     * An extra mob spawn entry to add to matched biomes during the MODIFY phase. Mirrors
+     * vanilla {@code MobSpawnSettings.SpawnerData}: a (type, weight, minCount, maxCount)
+     * tuple plus the MobCategory bucket it lives in.
+     */
+    public record AdditionalMobSpawn(MobCategory category, EntityType<?> type,
+                                      int weight, int minCount, int maxCount) {
+        public AdditionalMobSpawn {
+            if (weight < 1) throw new IllegalArgumentException("weight must be >= 1: " + weight);
+            if (minCount < 1) throw new IllegalArgumentException("minCount must be >= 1: " + minCount);
+            if (maxCount < minCount) throw new IllegalArgumentException(
+                    "maxCount (" + maxCount + ") < minCount (" + minCount + ")");
+        }
+        public static final Codec<AdditionalMobSpawn> CODEC = RecordCodecBuilder.create(i -> i.group(
+                MobCategory.CODEC.fieldOf("category").forGetter(AdditionalMobSpawn::category),
+                BuiltInRegistries.ENTITY_TYPE.byNameCodec().fieldOf("type").forGetter(AdditionalMobSpawn::type),
+                Codec.intRange(1, Integer.MAX_VALUE).fieldOf("weight").forGetter(AdditionalMobSpawn::weight),
+                Codec.intRange(1, Integer.MAX_VALUE).fieldOf("min_count").forGetter(AdditionalMobSpawn::minCount),
+                Codec.intRange(1, Integer.MAX_VALUE).fieldOf("max_count").forGetter(AdditionalMobSpawn::maxCount)
+        ).apply(i, AdditionalMobSpawn::new));
     }
 
     /** A ConfiguredWorldCarver the consumer wants injected at the named carving step. */
