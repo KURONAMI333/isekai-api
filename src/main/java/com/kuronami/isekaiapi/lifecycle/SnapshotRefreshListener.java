@@ -10,6 +10,7 @@ import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * Rebuilds the {@link VanillaRuleSnapshot} on every datapack reload. Without this, the
@@ -28,6 +29,7 @@ import java.util.concurrent.Executor;
  * ~80 structures, ~70 biomes — well under a second on typical hardware. Heavier on
  * mod-loaded packs but still bounded by registry walks.
  */
+@ApiStatus.Internal
 public final class SnapshotRefreshListener implements PreparableReloadListener {
 
     @Override

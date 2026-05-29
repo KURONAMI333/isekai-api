@@ -7,6 +7,7 @@ import net.neoforged.neoforge.common.world.StructureModifier;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.NeoForgeRegistries;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * Registers Isekai's {@link StructureModifier} serializers. Datapack consumers reference
@@ -27,6 +28,7 @@ import net.neoforged.neoforge.registries.NeoForgeRegistries;
  *
  * <p>Biome-side serializers live in {@link com.kuronami.isekaiapi.biomemodifier.IsekaiBiomeModifiers}.
  */
+@ApiStatus.Internal
 public final class IsekaiStructureModifiers {
 
     public static final DeferredRegister<MapCodec<? extends StructureModifier>> SERIALIZERS =
@@ -35,10 +37,13 @@ public final class IsekaiStructureModifiers {
     public static final DeferredHolder<MapCodec<? extends StructureModifier>, MapCodec<ApplyWorldshapeStructureModifier>> APPLY_WORLDSHAPE_STRUCTURES =
             SERIALIZERS.register("apply_worldshape_structures", () -> ApplyWorldshapeStructureModifier.MAP_CODEC);
 
+    public static final DeferredHolder<MapCodec<? extends StructureModifier>, MapCodec<ApplyWorldshapeStructuresRefStructureModifier>> APPLY_WORLDSHAPE_STRUCTURES_REF =
+            SERIALIZERS.register("apply_worldshape_structures_ref", () -> ApplyWorldshapeStructuresRefStructureModifier.MAP_CODEC);
+
     private IsekaiStructureModifiers() {}
 
     public static void register(IEventBus modBus) {
         SERIALIZERS.register(modBus);
-        IsekaiApi.LOGGER.info("[Isekai] structure modifier serializers registered: apply_worldshape_structures");
+        IsekaiApi.LOGGER.info("[Isekai] structure modifier serializers registered: apply_worldshape_structures, apply_worldshape_structures_ref");
     }
 }

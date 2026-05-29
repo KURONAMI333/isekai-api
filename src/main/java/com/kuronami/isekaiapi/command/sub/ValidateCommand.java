@@ -6,8 +6,10 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.ApiStatus;
 
 /** {@code /isekai validate <namespace>} — codec + cross-field validation. */
+@ApiStatus.Internal
 public final class ValidateCommand {
 
     private ValidateCommand() {}

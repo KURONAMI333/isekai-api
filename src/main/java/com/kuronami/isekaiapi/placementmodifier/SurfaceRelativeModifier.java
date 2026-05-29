@@ -14,6 +14,7 @@ import net.minecraft.world.level.levelgen.placement.PlacementModifier;
 import net.minecraft.world.level.levelgen.placement.PlacementModifierType;
 
 import java.util.stream.Stream;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * Places features at {@code resolveAnchor(pos) + offset(rand)}. Drop-in replacement for
@@ -36,6 +37,7 @@ import java.util.stream.Stream;
  * }
  * }</pre>
  */
+@ApiStatus.Internal
 public class SurfaceRelativeModifier extends PlacementModifier {
     public static final MapCodec<SurfaceRelativeModifier> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             SurfaceAnchor.CODEC.fieldOf("anchor").forGetter(m -> m.anchor),

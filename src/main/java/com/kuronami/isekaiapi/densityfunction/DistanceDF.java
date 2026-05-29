@@ -6,8 +6,10 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.util.KeyDispatchDataCodec;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.level.levelgen.DensityFunction;
+import org.jetbrains.annotations.ApiStatus;
 
 /** Euclidean distance from point (refX, refY, refZ). {@link Mode} selects 2D (xz) or full 3D. */
+@ApiStatus.Internal
 public record DistanceDF(double refX, double refY, double refZ, Mode mode) implements DensityFunction.SimpleFunction {
     public static final MapCodec<DistanceDF> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             Codec.DOUBLE.fieldOf("ref_x").forGetter(DistanceDF::refX),
@@ -15,7 +17,7 @@ public record DistanceDF(double refX, double refY, double refZ, Mode mode) imple
             Codec.DOUBLE.fieldOf("ref_z").forGetter(DistanceDF::refZ),
             Mode.CODEC.fieldOf("mode").forGetter(DistanceDF::mode)
     ).apply(i, DistanceDF::new));
-    public static final KeyDispatchDataCodec<DistanceDF> KEY_CODEC = new KeyDispatchDataCodec<>(CODEC);
+    static final KeyDispatchDataCodec<DistanceDF> KEY_CODEC = new KeyDispatchDataCodec<>(CODEC);
 
     @Override public double compute(FunctionContext ctx) {
         double dx = ctx.blockX() - refX, dz = ctx.blockZ() - refZ;

@@ -9,6 +9,8 @@ version="${mod_version}"
 displayName="${mod_name}"
 authors="${mod_authors}"
 displayURL="https://github.com/KURONAMI333/isekai-api"
+logoFile="isekai_api.png"
+logoBlur=false
 description='''
 ${mod_description}
 '''

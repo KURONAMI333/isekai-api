@@ -2,8 +2,7 @@ package com.kuronami.isekaiapi.api;
 
 import com.kuronami.isekaiapi.api.query.IsekaiQuery;
 import com.kuronami.isekaiapi.api.remap.IsekaiRemap;
-import com.kuronami.isekaiapi.impl.IsekaiQueryImpl;
-import com.kuronami.isekaiapi.impl.IsekaiRemapImpl;
+import com.kuronami.isekaiapi.impl.IsekaiInternal;
 
 /**
  * Public facade for consumers. Two access points:
@@ -24,16 +23,14 @@ import com.kuronami.isekaiapi.impl.IsekaiRemapImpl;
  * minimal: query + remap.
  */
 public final class Isekai {
-    private static final IsekaiQuery QUERY = new IsekaiQueryImpl();
-    private static final IsekaiRemap REMAP = new IsekaiRemapImpl();
 
     private Isekai() {}
 
     public static IsekaiQuery query() {
-        return QUERY;
+        return IsekaiInternal.query();
     }
 
     public static IsekaiRemap remap() {
-        return REMAP;
+        return IsekaiInternal.remap();
     }
 }

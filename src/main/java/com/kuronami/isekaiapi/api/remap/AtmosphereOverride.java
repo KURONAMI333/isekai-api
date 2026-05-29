@@ -53,8 +53,10 @@ public record AtmosphereOverride(
 
     public static final Codec<AtmosphereOverride> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.BOOL.optionalFieldOf("has_precipitation").forGetter(AtmosphereOverride::hasPrecipitation),
+            // Vanilla biome temperature is unbounded (snow biomes negative, nether ≥2 to suppress rain).
             Codec.FLOAT.optionalFieldOf("temperature").forGetter(AtmosphereOverride::temperature),
-            Codec.FLOAT.optionalFieldOf("downfall").forGetter(AtmosphereOverride::downfall),
+            // Downfall is normalised to [0,1] by vanilla (0 = none, 1 = max); clamped at decode time.
+            Codec.floatRange(0f, 1f).optionalFieldOf("downfall").forGetter(AtmosphereOverride::downfall),
             Codec.INT.optionalFieldOf("sky_color").forGetter(AtmosphereOverride::skyColor),
             Codec.INT.optionalFieldOf("fog_color").forGetter(AtmosphereOverride::fogColor),
             Codec.INT.optionalFieldOf("water_color").forGetter(AtmosphereOverride::waterColor),
