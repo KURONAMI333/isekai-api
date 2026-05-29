@@ -4,10 +4,12 @@ import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.api.Isekai;
 import com.kuronami.isekaiapi.api.predicate.SpatialPredicate;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
+import com.kuronami.isekaiapi.impl.DimensionResolver;
 import com.kuronami.isekaiapi.impl.SpatialPredicateEvaluator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.spongepowered.asm.mixin.Mixin;
@@ -35,8 +37,12 @@ import java.util.Optional;
  * <p>Inject point: {@code @At("RETURN")} with {@code cancellable = true}, so the
  * returned Optional can be replaced with empty when the predicate fails.
  *
- * <p>Note: only fires when a {@code WorldshapeDescriptor} is declared for the dimension
- * the structure would spawn in. Dimensions without declarations skip the entire check.
+ * <p>Scope: the predicate applied is the one for the dimension the structure is actually
+ * generating in (resolved from the generation context's biome source via
+ * {@link com.kuronami.isekaiapi.impl.DimensionResolver}). Dimensions without a declared
+ * descriptor — and structures whose dimension can't be resolved — skip the check entirely,
+ * so a restrictive predicate in one worldshape never suppresses structures in another
+ * dimension that happens to reuse the same biomes.
  */
 @Mixin(Structure.class)
 public class StructureFindValidGenerationPointMixin {
@@ -47,37 +53,31 @@ public class StructureFindValidGenerationPointMixin {
         Optional<Structure.GenerationStub> result = cir.getReturnValue();
         if (result == null || result.isEmpty()) return;  // vanilla already said no, leave it
 
-        // Resolve the dimension from the context's chunkGenerator path. We don't have a
-        // direct dimension key, but we can correlate against declared descriptors.
-        // For v1.0: iterate every declared dimension; the first one whose biome filter
-        // matches AND has a predicate for this structure wins. Lightweight in practice
-        // because most worlds have at most 1-3 declared dimensions.
-        var declaredDims = Isekai.remap().getDeclaredDimensions();
-        if (declaredDims.isEmpty()) return;
+        // Apply ONLY the descriptor for the dimension this structure is actually generating
+        // in — resolved from the generation context's biome source. Applying every declared
+        // dimension's predicate (as an earlier version did) suppressed structures in dim B
+        // whenever dim A declared a restrictive predicate, since biomes are reused across
+        // dimensions. If the dimension can't be resolved or has no descriptor, leave vanilla
+        // untouched.
+        ResourceKey<Level> dimKey = DimensionResolver.resolveByBiomeSource(context.biomeSource());
+        if (dimKey == null) return;
+        WorldshapeDescriptor descriptor = Isekai.remap().getActiveDescriptor(dimKey).orElse(null);
+        if (descriptor == null) return;
 
         Structure structure = (Structure) (Object) this;
-        BlockPos pos = result.get().position();
         ResourceKey<Structure> structureKey = resolveStructureKey(structure);
+        SpatialPredicate predicate = predicateFor(descriptor, structureKey);
+        if (predicate == null) return;
+
+        BlockPos pos = result.get().position();
         SpatialPredicateEvaluator.Context evalCtx = new SpatialPredicateEvaluator.Context(
                 context.chunkGenerator(), context.heightAccessor(), context.randomState(),
                 context.biomeSource());
-
-        // Try every declared dimension; if any of them rejects this structure here,
-        // short-circuit. (In practice consumers declare one descriptor per dimension; this
-        // is the conservative behavior — if you've said 'no canyons in my world', no
-        // canyons spawn even if the biome reuses across dimensions.)
-        for (var dimKey : declaredDims) {
-            var descriptor = Isekai.remap().getActiveDescriptor(dimKey).orElse(null);
-            if (descriptor == null) continue;
-            SpatialPredicate predicate = predicateFor(descriptor, structureKey);
-            if (predicate == null) continue;
-            if (!SpatialPredicateEvaluator.evaluate(predicate, pos, evalCtx)) {
-                IsekaiApi.LOGGER.debug(
-                        "[Isekai] structure {} rejected by predicate at {} (descriptor dim={})",
-                        structureKey != null ? structureKey.location() : structure, pos, dimKey.location());
-                cir.setReturnValue(Optional.empty());
-                return;
-            }
+        if (!SpatialPredicateEvaluator.evaluate(predicate, pos, evalCtx)) {
+            IsekaiApi.LOGGER.debug(
+                    "[Isekai] structure {} rejected by predicate at {} (dim={})",
+                    structureKey != null ? structureKey.location() : structure, pos, dimKey.location());
+            cir.setReturnValue(Optional.empty());
         }
     }
 

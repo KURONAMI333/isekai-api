@@ -14,6 +14,7 @@ import net.minecraft.commands.Commands;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * Registers the {@code /isekai} subcommand tree. Each subcommand is implemented in its
@@ -32,6 +33,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * <p>All subcommands require permission level 2 (operators).
  */
 @EventBusSubscriber(modid = IsekaiApi.MODID)
+@ApiStatus.Internal
 public final class IsekaiCommand {
 
     private IsekaiCommand() {}

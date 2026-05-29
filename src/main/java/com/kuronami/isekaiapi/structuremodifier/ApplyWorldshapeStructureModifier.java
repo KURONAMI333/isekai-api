@@ -11,6 +11,7 @@ import net.minecraft.world.level.biome.MobSpawnSettings;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.neoforged.neoforge.common.world.ModifiableStructureInfo;
 import net.neoforged.neoforge.common.world.StructureModifier;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * A {@link StructureModifier} that applies an Isekai {@link WorldshapeDescriptor}'s
@@ -36,6 +37,7 @@ import net.neoforged.neoforge.common.world.StructureModifier;
  * }
  * }</pre>
  */
+@ApiStatus.Internal
 public record ApplyWorldshapeStructureModifier(WorldshapeDescriptor worldshape) implements StructureModifier {
 
     public static final MapCodec<ApplyWorldshapeStructureModifier> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
