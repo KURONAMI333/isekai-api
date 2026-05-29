@@ -1,52 +1,37 @@
 # Isekai API — Modrinth / CurseForge publish description
 
-> Paste-ready project description. The first 1–2 lines are the card summary (SEO-critical).
-> Categories: **library** (primary) + **worldgen** (secondary).
-> Tags/loaders: **neoforge**, **server-side** (worldgen runs server-side; safe on clients too).
-> Game versions: **1.21.1**.
+> First line is the card summary (SEO-critical). Capability-first, community-welcoming, no consumer comparisons.
+> Categories: **library** (primary) + **worldgen** (secondary). Loaders: **neoforge**. Game versions: **1.21.1**.
 
 ---
 
-**A neutral primitive language for Minecraft worldgen — compose any worldshape from datapack.**
-Floating islands, hanging continents, hollow shells, vertical biome layers, brand-new dimensions — all from JSON, no Java required. Coexists with Terralith, TerraBlender, YUNG's, and Journeymap.
+**Summary (card):**
+Build any world from datapack — a toolbox of neutral worldgen primitives for shape, biomes, dimensions, and re-placing existing content. No Java required.
 
-## What it is
+---
 
-Isekai API is to worldgen what `div`/`span` are to web pages: a small set of **neutral, composable primitives** rather than a bundle of pre-made worlds. You combine them to express *any* worldshape you can imagine. Isekai ships no biomes, no structures, no "themes" of its own — it gives modders and datapack authors the building blocks.
+**Isekai API is a toolbox for the *shape and rules* of a Minecraft world — not a world, but the machine that makes worlds.** Like `div`/`span` for web pages, it's a small set of neutral, composable primitives you combine to build *any* world you can imagine, straight from datapack JSON. It ships no biomes, structures, or themes of its own.
 
-## Features
+## What you can control
 
-- **20 density-function primitives** — 16 math/geometry building blocks (`add`, `clamp`, `distance`, `scale_coord`, `mask_y_range`, …) + 4 worldshape composers (`squeeze`, `y_envelope`, `blended_noise`, `band_density`). Express floating islands, inverted terrain, hollow worlds, capped mountains.
-- **Rule-based biome placement** (`isekai_api:rule`) — put biomes anywhere by spatial rules: vertical layers (`y_below 20 → deep_dark`), concentric rings (`within_distance 1000 → desert`), regions. No TerraBlender climate-tuning required.
-- **Per-biome surface & fill blocks** — re-skin any biome's top block or stone fill from JSON (`worldshape_surface_top` / `worldshape_default_block`).
-- **Declarative worldshape descriptors** — one JSON file declares Y range, structure-placement predicates, feature gating, biome exclusions, atmosphere (sky/fog/water colors), ore & mob remapping. Apply via a 4-line biome/structure modifier.
-- **New dimensions, pure datapack** — combine the primitives with vanilla `dimension/` + `dimension_type/` JSON to ship an entire new dimension with zero Java.
-- **Java API** — `Isekai.query()` to read vanilla/modded worldgen rules, `Isekai.remap()` to declare worldshapes programmatically.
-- **Server-start validation** — typo'd registry keys (`minecraft:ocean_monument` → the real `minecraft:monument`) and broken references are reported at boot, before they silently no-op.
+*Every axis of world generation, as composable primitives:*
 
-## Compatibility
+- **Terrain shape** — 16 math/geometry density primitives + 4 worldshape composers (`squeeze`, `y_envelope`, `blended_noise`, `band_density`). Floating islands, hanging or inverted continents, hollow shells, capped mountains, mirrored/tiled space — any 3D form on any Y band.
+- **Biome placement** — the `isekai_api:rule` biome source places biomes by pure spatial rules: vertical layers, concentric rings, regions, and `and`/`or`/`not` combos (`y_below 20 -> deep_dark`). No climate-noise tuning.
+- **Surface & fill** — re-skin any biome's top block or stone fill from JSON.
+- **New dimensions** — combine the above with vanilla dimension JSON to ship a whole new dimension. Zero Java, zero vanilla edits.
+- **Atmosphere** — per-world sky, fog, and water colors.
+- **Placement control** — decide exactly where features/structures go: relative to surface or fluid, by block context, Y range, slope, proximity to a block or biome, and logical combos.
+- **Re-place existing content** — take any vanilla *or modded* ore, structure, mob, or feature and redistribute it into your world's new shape. A rare ore vanilla buries deep can be remapped to the underside of your floating islands. Strategies: linear, inverted, fixed-range, count-scaling, band-split, pipelines — plus exclude/add.
+- **Boot-time validation** — broken or mistyped registry references are caught at server start, before they silently no-op.
+- **Java API** — `Isekai.query()` reads vanilla/modded worldgen rules; `Isekai.remap()` declares worldshapes in code.
 
-Tested in-game on NeoForge 1.21.1, all loaded simultaneously without crash:
+## Built to be built on
 
-| Mod | Support | Notes |
-|---|---|---|
-| TerraBlender | compatible | biome framework; coexists |
-| Terralith | compatible* | *both overhaul the overworld — only one can own `overworld.json` (last loaded wins). Isekai **new-dimension** worlds coexist fully with Terralith. |
-| William Wythers' Overhauled Overworld | compatible* | same overworld-override caveat as Terralith |
-| Nullscape | compatible | End overhaul — fully independent dimension, coexists |
-| YUNG's Better X (Ocean Monuments, etc.) | compatible | structure mixins coexist with Isekai's |
-| Lithostitched | compatible | worldgen merge library; different niche |
-| Journeymap / map mods | compatible | renders Isekai terrain & dimensions normally |
+Isekai isn't tied to any one world or author. **However you want to use it, you're welcome** — datapack worldshapes, full Java mods, modpack glue, quick experiments, total conversions. MIT licensed: free to use, fork, and bundle in modpacks.
 
-**Rule of thumb:** an Isekai **new-dimension** mod coexists with everything. An Isekai **overworld-override** mod is mutually exclusive with other overworld-overhaul mods (true of all overworld overhauls, not specific to Isekai) — but never crashes; the last-loaded datapack simply wins.
+- **Datapack authors:** the [Datapack Reference](https://github.com/KURONAMI333/isekai-api/blob/main/docs/DATAPACK_REFERENCE.md) lists every key with its JSON shape; copy a runnable skeleton from [`examples/`](https://github.com/KURONAMI333/isekai-api/tree/main/examples) (`sky_archipelago`, `flipped`, `moon_world`).
+- **Java modders:** add `isekai_api` as a `compileOnly` dependency and use the `Isekai` facade. Everything outside the `api` package is internal, so the public surface stays small and stable.
+- **Questions, ideas, bugs:** [open an issue](https://github.com/KURONAMI333/isekai-api/issues). Built a world with Isekai? Share it — I'd love to see what people make.
 
-## Getting started
-
-- **Datapack authors:** see the [Datapack Reference](https://github.com/KURONAMI333/isekai-api/blob/main/docs/DATAPACK_REFERENCE.md) (every key + JSON shape) and copy a skeleton from [`examples/`](https://github.com/KURONAMI333/isekai-api/tree/main/examples).
-- **Java modders:** add `isekai_api` as a `compileOnly` dependency and use the `Isekai` facade. Everything outside the `api` package is `@ApiStatus.Internal`.
-
-## License & links
-
-MIT. Source, docs, and issue tracker: https://github.com/KURONAMI333/isekai-api
-
-*Unrelated to the "Isekai Adventure" modpack.*
+MIT · [Source & docs](https://github.com/KURONAMI333/isekai-api). *Unrelated to the "Isekai Adventure" modpack.*
