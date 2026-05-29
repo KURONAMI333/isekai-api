@@ -3,6 +3,7 @@ package com.kuronami.isekaiapi.command.sub;
 import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.api.Isekai;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.ResourceLocationArgument;
@@ -12,6 +13,7 @@ import net.minecraft.world.level.storage.LevelResource;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * {@code /isekai dump}:
@@ -21,6 +23,7 @@ import java.nio.file.Path;
  *   <li>{@code structure <id>} — single-structure query</li>
  * </ul>
  */
+@ApiStatus.Internal
 public final class DumpCommand {
 
     private DumpCommand() {}
@@ -36,19 +39,19 @@ public final class DumpCommand {
                                 .executes(DumpCommand::dumpStructure)));
     }
 
-    private static int dumpWorldgen(com.mojang.brigadier.context.CommandContext<CommandSourceStack> ctx) {
+    private static int dumpWorldgen(CommandContext<CommandSourceStack> ctx) {
         var server = ctx.getSource().getServer();
-        var ores = Isekai.query().getAllOres();
+        var features = Isekai.query().getAllPlacedFeatures();
         var structures = Isekai.query().getAllStructures();
         Path dumpDir = server.getWorldPath(LevelResource.ROOT).resolve("isekai_dump");
         Path dumpFile = dumpDir.resolve("worldgen.txt");
 
         StringBuilder sb = new StringBuilder();
         sb.append("=== Isekai API worldgen dump (v").append(IsekaiApi.VERSION).append(") ===\n");
-        sb.append("PlacedFeatures: ").append(ores.size()).append("\n");
+        sb.append("PlacedFeatures: ").append(features.size()).append("\n");
         sb.append("Structure placements: ").append(structures.size()).append("\n\n");
         sb.append("-- PlacedFeatures --\n");
-        for (var info : ores) {
+        for (var info : features) {
             sb.append(info.key().location()).append(" -> ").append(info.range()).append("\n");
         }
         sb.append("\n-- Structure placements --\n");
@@ -64,7 +67,7 @@ public final class DumpCommand {
             Files.createDirectories(dumpDir);
             Files.writeString(dumpFile, sb.toString());
             ctx.getSource().sendSuccess(() -> Component.literal(
-                    "Dumped " + ores.size() + " features + "
+                    "Dumped " + features.size() + " features + "
                             + structures.size() + " structure placements to " + dumpFile), false);
             return 1;
         } catch (IOException e) {
@@ -74,9 +77,9 @@ public final class DumpCommand {
         }
     }
 
-    private static int dumpOre(com.mojang.brigadier.context.CommandContext<CommandSourceStack> ctx) {
+    private static int dumpOre(CommandContext<CommandSourceStack> ctx) {
         var id = ResourceLocationArgument.getId(ctx, "id");
-        var match = Isekai.query().getAllOres().stream()
+        var match = Isekai.query().getAllPlacedFeatures().stream()
                 .filter(info -> info.key().location().equals(id))
                 .findFirst();
         if (match.isEmpty()) {
@@ -89,7 +92,7 @@ public final class DumpCommand {
         return 1;
     }
 
-    private static int dumpStructure(com.mojang.brigadier.context.CommandContext<CommandSourceStack> ctx) {
+    private static int dumpStructure(CommandContext<CommandSourceStack> ctx) {
         var id = ResourceLocationArgument.getId(ctx, "id");
         var matches = Isekai.query().getAllStructures().stream()
                 .filter(info -> info.key().location().equals(id))

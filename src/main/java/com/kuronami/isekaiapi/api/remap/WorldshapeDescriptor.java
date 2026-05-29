@@ -17,7 +17,7 @@ import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureSpawnOverride;
 
-import java.util.HashSet;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +37,14 @@ import java.util.Set;
  *
  * <p>{@code exclusions} and {@code additions} bundle the per-content-kind sets/lists
  * (features, structures, carvers) so the descriptor stays under the 16-field limit of
- * {@code RecordCodecBuilder} while keeping the public API self-documenting.
+ * {@code RecordCodecBuilder} while keeping the public API self-documenting. {@code
+ * contentOverrides} further bundles {@code featurePredicates}, {@code
+ * structureSpawnOverrides}, and {@code blockOverrides} for the same reason — the parent
+ * record exposes those three via convenience accessors so call sites keep a flat API.
+ *
+ * <p>{@code appliesTo} (a {@link BiomeSelection}) accepts either a list of biome keys or
+ * an object with explicit {@code keys} / {@code tags} fields. Tags collapse 35-biome
+ * enumerations to a single line.
  *
  * <p>If two consumers register a descriptor for the same dimension, the one with the
  * higher {@link #priority} wins. Ties replace.
@@ -51,22 +58,36 @@ public record WorldshapeDescriptor(
         RemapStrategy mobSpawnStrategy,
         Map<ResourceKey<Structure>, SpatialPredicate> structurePredicates,
         SpatialPredicate defaultStructurePredicate,
-        Set<ResourceKey<Biome>> appliesTo,
+        BiomeSelection appliesTo,
         Exclusions exclusions,
         Map<MobCategory, RemapStrategy> mobSpawnStrategyByCategory,
         Additions additions,
         AtmosphereOverride atmosphere,
-        List<StructureSpawnConfig> structureSpawnOverrides,
+        ContentOverrides contentOverrides,
         int priority
 ) {
     public WorldshapeDescriptor {
         structurePredicates = Map.copyOf(structurePredicates);
-        appliesTo = Set.copyOf(appliesTo);
+        if (appliesTo == null) appliesTo = BiomeSelection.EMPTY;
         mobSpawnStrategyByCategory = Map.copyOf(mobSpawnStrategyByCategory);
         if (exclusions == null) exclusions = Exclusions.EMPTY;
         if (additions == null) additions = Additions.EMPTY;
         if (atmosphere == null) atmosphere = AtmosphereOverride.EMPTY;
-        structureSpawnOverrides = List.copyOf(structureSpawnOverrides);
+        if (contentOverrides == null) contentOverrides = ContentOverrides.EMPTY;
+    }
+
+    // --- Convenience accessors so call sites keep a flat API ---
+    /** Shortcut for {@code contentOverrides().featurePredicates()}. */
+    public Map<ResourceKey<PlacedFeature>, SpatialPredicate> featurePredicates() {
+        return contentOverrides.featurePredicates();
+    }
+    /** Shortcut for {@code contentOverrides().structureSpawnOverrides()}. */
+    public List<StructureSpawnConfig> structureSpawnOverrides() {
+        return contentOverrides.structureSpawnOverrides();
+    }
+    /** Shortcut for {@code contentOverrides().blockOverrides()}. */
+    public BlockOverrides blockOverrides() {
+        return contentOverrides.blockOverrides();
     }
 
     /**
@@ -122,26 +143,10 @@ public record WorldshapeDescriptor(
         public static final Exclusions EMPTY = new Exclusions(Set.of(), Set.of(), Set.of(), Set.of());
 
         public static final Codec<Exclusions> CODEC = RecordCodecBuilder.create(i -> i.group(
-                ResourceKey.codec(Registries.PLACED_FEATURE).listOf()
-                        .optionalFieldOf("features", List.of())
-                        .xmap(list -> (Set<ResourceKey<PlacedFeature>>) new HashSet<>(list),
-                              set -> List.copyOf(set))
-                        .forGetter(Exclusions::features),
-                ResourceKey.codec(Registries.STRUCTURE).listOf()
-                        .optionalFieldOf("structures", List.of())
-                        .xmap(list -> (Set<ResourceKey<Structure>>) new HashSet<>(list),
-                              set -> List.copyOf(set))
-                        .forGetter(Exclusions::structures),
-                ResourceKey.codec(Registries.CONFIGURED_CARVER).listOf()
-                        .optionalFieldOf("carvers", List.of())
-                        .xmap(list -> (Set<ResourceKey<ConfiguredWorldCarver<?>>>) new HashSet<>(list),
-                              set -> List.copyOf(set))
-                        .forGetter(Exclusions::carvers),
-                BuiltInRegistries.ENTITY_TYPE.byNameCodec().listOf()
-                        .optionalFieldOf("mob_spawns", List.of())
-                        .xmap(list -> (Set<EntityType<?>>) new HashSet<>(list),
-                              set -> List.copyOf(set))
-                        .forGetter(Exclusions::mobSpawns)
+                resourceKeySetCodec(Registries.PLACED_FEATURE, "features").forGetter(Exclusions::features),
+                resourceKeySetCodec(Registries.STRUCTURE, "structures").forGetter(Exclusions::structures),
+                resourceKeySetCodec(Registries.CONFIGURED_CARVER, "carvers").forGetter(Exclusions::carvers),
+                entityTypeSetCodec("mob_spawns").forGetter(Exclusions::mobSpawns)
         ).apply(i, Exclusions::new));
     }
 
@@ -259,12 +264,12 @@ public record WorldshapeDescriptor(
         private RemapStrategy mobSpawnStrategy;
         private SpatialPredicate defaultStructurePredicate;
         private Map<ResourceKey<Structure>, SpatialPredicate> structurePredicates = Map.of();
-        private Set<ResourceKey<Biome>> appliesTo = Set.of();
+        private BiomeSelection appliesTo = BiomeSelection.EMPTY;
         private Exclusions exclusions = Exclusions.EMPTY;
         private Map<MobCategory, RemapStrategy> mobSpawnStrategyByCategory = Map.of();
         private Additions additions = Additions.EMPTY;
         private AtmosphereOverride atmosphere = AtmosphereOverride.EMPTY;
-        private List<StructureSpawnConfig> structureSpawnOverrides = List.of();
+        private ContentOverrides contentOverrides = ContentOverrides.EMPTY;
         private int priority = DEFAULT_PRIORITY;
 
         private Builder() {}
@@ -277,12 +282,14 @@ public record WorldshapeDescriptor(
         public Builder mobSpawnStrategy(RemapStrategy v) { this.mobSpawnStrategy = v; return this; }
         public Builder defaultStructurePredicate(SpatialPredicate v) { this.defaultStructurePredicate = v; return this; }
         public Builder structurePredicates(Map<ResourceKey<Structure>, SpatialPredicate> v) { this.structurePredicates = v; return this; }
-        public Builder appliesTo(Set<ResourceKey<Biome>> v) { this.appliesTo = v; return this; }
+        public Builder appliesTo(BiomeSelection v) { this.appliesTo = v; return this; }
+        /** Convenience: wrap a key set as a {@link BiomeSelection} with no tags. */
+        public Builder appliesTo(Set<ResourceKey<Biome>> keys) { this.appliesTo = BiomeSelection.ofKeys(keys); return this; }
         public Builder exclusions(Exclusions v) { this.exclusions = v; return this; }
         public Builder mobSpawnStrategyByCategory(Map<MobCategory, RemapStrategy> v) { this.mobSpawnStrategyByCategory = v; return this; }
         public Builder additions(Additions v) { this.additions = v; return this; }
         public Builder atmosphere(AtmosphereOverride v) { this.atmosphere = v; return this; }
-        public Builder structureSpawnOverrides(List<StructureSpawnConfig> v) { this.structureSpawnOverrides = v; return this; }
+        public Builder contentOverrides(ContentOverrides v) { this.contentOverrides = v; return this; }
         public Builder priority(int v) { this.priority = v; return this; }
 
         public WorldshapeDescriptor build() {
@@ -298,14 +305,16 @@ public record WorldshapeDescriptor(
                     oreStrategy, structureStrategy, mobSpawnStrategy,
                     structurePredicates, defaultStructurePredicate,
                     appliesTo, exclusions, mobSpawnStrategyByCategory,
-                    additions, atmosphere, structureSpawnOverrides, priority);
+                    additions, atmosphere, contentOverrides, priority);
         }
     }
 
     /**
      * Full descriptor codec. Optional fields default per the builder pattern:
      * <ul>
-     *   <li>{@code applies_to} omitted = empty set (descriptor applies dimension-wide)</li>
+     *   <li>{@code applies_to} omitted = empty set (descriptor matches no biome — explicit opt-in
+     *       required since {@code BiomeModifier} has no dimension scope; "empty = all" would
+     *       silently apply across every dimension that reuses the matching biomes)</li>
      *   <li>{@code exclusions} omitted = {@link Exclusions#EMPTY}</li>
      *   <li>{@code additions} omitted = {@link Additions#EMPTY}</li>
      *   <li>{@code atmosphere} omitted = {@link AtmosphereOverride#EMPTY}</li>
@@ -332,10 +341,7 @@ public record WorldshapeDescriptor(
                     .forGetter(d -> new LinkedHashMap<>(d.structurePredicates())),
             SpatialPredicate.CODEC.fieldOf("default_structure_predicate")
                     .forGetter(WorldshapeDescriptor::defaultStructurePredicate),
-            ResourceKey.codec(Registries.BIOME).listOf()
-                    .optionalFieldOf("applies_to", List.of())
-                    .xmap(list -> (Set<ResourceKey<Biome>>) new HashSet<>(list),
-                          set -> List.copyOf(set))
+            BiomeSelection.CODEC.optionalFieldOf("applies_to", BiomeSelection.EMPTY)
                     .forGetter(WorldshapeDescriptor::appliesTo),
             Exclusions.CODEC.optionalFieldOf("exclusions", Exclusions.EMPTY)
                     .forGetter(WorldshapeDescriptor::exclusions),
@@ -346,10 +352,39 @@ public record WorldshapeDescriptor(
                     .forGetter(WorldshapeDescriptor::additions),
             AtmosphereOverride.CODEC.optionalFieldOf("atmosphere", AtmosphereOverride.EMPTY)
                     .forGetter(WorldshapeDescriptor::atmosphere),
-            StructureSpawnConfig.CODEC.listOf()
-                    .optionalFieldOf("structure_spawn_overrides", List.of())
-                    .forGetter(WorldshapeDescriptor::structureSpawnOverrides),
+            ContentOverrides.CODEC.optionalFieldOf("content_overrides", ContentOverrides.EMPTY)
+                    .forGetter(WorldshapeDescriptor::contentOverrides),
             Codec.INT.optionalFieldOf("priority", DEFAULT_PRIORITY)
                     .forGetter(WorldshapeDescriptor::priority)
     ).apply(i, WorldshapeDescriptor::new));
+
+    /**
+     * Optional {@code Set<ResourceKey<T>>} field codec — decodes a JSON list of registry
+     * IDs into a {@link Set}, encodes back as a deterministically-sorted list so JSON
+     * round-trips are byte-stable. Defaults to {@link Set#of() empty} when the field is
+     * omitted.
+     */
+    private static <T> com.mojang.serialization.MapCodec<Set<ResourceKey<T>>> resourceKeySetCodec(
+            ResourceKey<? extends net.minecraft.core.Registry<T>> registry, String fieldName) {
+        return ResourceKey.codec(registry).listOf()
+                .optionalFieldOf(fieldName, List.of())
+                .xmap(Set::copyOf,
+                      set -> set.stream()
+                              .sorted(Comparator.comparing(k -> k.location().toString()))
+                              .toList());
+    }
+
+    /**
+     * Optional {@code Set<EntityType<?>>} field codec mirroring
+     * {@link #resourceKeySetCodec} but keyed by entity-type name rather than
+     * {@link ResourceKey}.
+     */
+    private static com.mojang.serialization.MapCodec<Set<EntityType<?>>> entityTypeSetCodec(String fieldName) {
+        return BuiltInRegistries.ENTITY_TYPE.byNameCodec().listOf()
+                .optionalFieldOf(fieldName, List.of())
+                .xmap(Set::copyOf,
+                      set -> set.stream()
+                              .sorted(Comparator.comparing(t -> EntityType.getKey(t).toString()))
+                              .toList());
+    }
 }
