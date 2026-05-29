@@ -21,10 +21,10 @@ import java.util.Set;
  */
 public interface IsekaiQuery {
 
-    // ores
-    Optional<VerticalRange> getOreVerticalRange(ResourceKey<PlacedFeature> ore);
-    List<PlacedFeatureInfo> getAllOres();
-    List<PlacedFeatureInfo> getOresByTag(TagKey<PlacedFeature> tag);
+    // placed features (every PlacedFeature in the registry — ores, trees, lakes, etc.)
+    Optional<VerticalRange> getPlacedFeatureVerticalRange(ResourceKey<PlacedFeature> feature);
+    List<PlacedFeatureInfo> getAllPlacedFeatures();
+    List<PlacedFeatureInfo> getPlacedFeaturesByTag(TagKey<PlacedFeature> tag);
 
     /**
      * Per-dimension VerticalRange resolution. Features with {@code VerticalAnchor.AboveBottom}
@@ -33,8 +33,8 @@ public interface IsekaiQuery {
      * dimension. Returns {@code Optional.empty()} if the feature wasn't scanned or the
      * dimension wasn't loaded at scan time.
      */
-    Optional<VerticalRange> getOreVerticalRangeInDimension(ResourceKey<PlacedFeature> ore,
-                                                            ResourceKey<Level> dimension);
+    Optional<VerticalRange> getPlacedFeatureVerticalRangeInDimension(ResourceKey<PlacedFeature> feature,
+                                                                      ResourceKey<Level> dimension);
 
     // structures
     Optional<StructurePlacementInfo> getStructurePlacement(ResourceKey<Structure> structure);

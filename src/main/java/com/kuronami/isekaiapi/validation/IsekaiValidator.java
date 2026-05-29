@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * Datapack JSON validator for {@code data/<namespace>/isekai/} descriptors.
@@ -35,9 +36,10 @@ import java.util.Map;
  *       empty Pipe) → caught as {@link IllegalArgumentException}</li>
  * </ul>
  *
- * <p>v0.5 surface; richer cross-field checks (BandSplit ratio sum, layered yRange
- * non-overlap, dimension/biome existence) land in v0.6 alongside the reload pipeline.
+ * <p>Cross-field validation includes BandSplit ratio sums, layered yRange non-overlap,
+ * and structure_strategy meaningfulness — all performed after per-file codec decode.
  */
+@ApiStatus.Internal
 public final class IsekaiValidator {
 
     private static final String WORLDSHAPE_DIR = "isekai/worldshape";
@@ -132,6 +134,18 @@ public final class IsekaiValidator {
         if (d.priority() < 0) {
             throw new IllegalArgumentException("priority < 0: " + d.priority());
         }
+        // Empty applies_to means BiomeMatcher rejects every biome (intentional, prevents
+        // cross-dimension leakage). That's fine for a structure-exclusion-only worldshape,
+        // but if the descriptor carries biome-side content (atmosphere, feature/carver
+        // exclusions, additions, ore/mob remap, content overrides) that content is silently
+        // wasted — almost always a typo'd "keys"/"tags" field. Flag that specific case.
+        if (d.appliesTo().isEmpty() && hasBiomeSideContent(d)) {
+            throw new IllegalArgumentException(
+                    "applies_to is empty but the worldshape configures biome-side content "
+                    + "(atmosphere / exclusions / additions / ore or mob strategy / content_overrides). "
+                    + "That content will apply to NO biome. Did you typo the 'keys'/'tags' field, "
+                    + "or intend a tag like '#minecraft:is_overworld'?");
+        }
         crossCheckStrategy("ore_strategy", d.oreStrategy());
         crossCheckStrategy("structure_strategy", d.structureStrategy());
         crossCheckStrategy("mob_spawn_strategy", d.mobSpawnStrategy());
@@ -146,24 +160,47 @@ public final class IsekaiValidator {
     }
 
     /**
-     * Walk a structure_strategy tree and reject any variant other than Identity,
-     * CountScale, or Pipe-of-meaningful. Linear / Inverted / FixedRange / BandSplit are
-     * legal in the codec but have no effect on structure placement; rather than letting
-     * a consumer wonder why their structure_strategy 'didn't do anything', surface this
-     * as a validation error.
+     * True when the descriptor configures anything that is applied per-matched-biome (i.e.
+     * needs a non-empty {@code applies_to} to have any effect). Structure-only concerns
+     * (structure_predicates, exclusions.structures, structure_spawn_overrides) are excluded
+     * because they apply via the structure modifier independent of biome matching.
+     */
+    private static boolean hasBiomeSideContent(WorldshapeDescriptor d) {
+        boolean atmosphere = !d.atmosphere().isNoOp();
+        boolean exclusions = !d.exclusions().features().isEmpty()
+                || !d.exclusions().carvers().isEmpty()
+                || !d.exclusions().mobSpawns().isEmpty();
+        boolean additions = !d.additions().features().isEmpty()
+                || !d.additions().carvers().isEmpty()
+                || !d.additions().mobSpawns().isEmpty();
+        boolean oreRemap = !(d.oreStrategy() instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.Identity);
+        boolean mobRemap = !(d.mobSpawnStrategy() instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.Identity)
+                || !d.mobSpawnStrategyByCategory().isEmpty();
+        boolean contentOverrides = !d.featurePredicates().isEmpty() || !d.blockOverrides().isEmpty();
+        return atmosphere || exclusions || additions || oreRemap || mobRemap || contentOverrides;
+    }
+
+    /**
+     * Reject any {@code structure_strategy} other than Identity (or a Pipe of Identity).
+     * Structure <em>placement density</em> (RandomSpread spacing/separation) is baked into
+     * the immutable {@code StructureSet} at codec-decode time and cannot be retargeted from
+     * a worldshape — there is no NeoForge StructureSet modifier hook. To change how often a
+     * structure spawns, override its {@code StructureSet} JSON directly in your datapack.
+     * Structure <em>exclusion</em> (via the structure modifier) and structure <em>placement
+     * conditions</em> (via {@code structure_predicates}) ARE supported.
      */
     private static void verifyStructureStrategyMeaningful(com.kuronami.isekaiapi.api.remap.RemapStrategy s) {
         if (s instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.Identity) return;
-        if (s instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.CountScale) return;
         if (s instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.Pipe p) {
             for (var child : p.chain()) verifyStructureStrategyMeaningful(child);
             return;
         }
         throw new IllegalArgumentException(
                 "structure_strategy: " + s.getClass().getSimpleName()
-                        + " has no effect on structure placement; only Identity, CountScale, "
-                        + "and Pipe (of those) are meaningful for the spacing/separation hook. "
-                        + "Use ore_strategy / mob_spawn_strategy for Linear-style remap.");
+                        + " has no effect — structure placement density can't be remapped from a "
+                        + "worldshape (StructureSet spacing is immutable; override the StructureSet "
+                        + "JSON in your datapack instead). Use ore_strategy / mob_spawn_strategy for "
+                        + "Y-range / count remap; structure_strategy must be isekai:identity.");
     }
 
     /** Cross-field checks for a {@code LayeredFile}: non-overlapping y_ranges, monotone. */

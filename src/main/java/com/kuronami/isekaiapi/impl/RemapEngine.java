@@ -5,24 +5,25 @@ import com.kuronami.isekaiapi.api.query.VerticalRange;
 import com.kuronami.isekaiapi.api.remap.RemapStrategy;
 
 import java.util.List;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * Pure-logic transformer that applies a {@link RemapStrategy} to an original
  * {@link VerticalRange}, producing the remapped range that a generated feature
  * should occupy under a consumer's worldshape.
  *
- * <p>v0.7 supports the data-driven strategies: {@code Identity}, {@code Linear},
- * {@code Inverted}, {@code FixedRange}, {@code CountScale} (no-op on Y), and
- * {@code Pipe} (fold over chain). {@code BandSplit} requires per-band metadata
- * the engine doesn't yet receive and falls back to {@code Linear} with a debug
- * note. The Java-only variants ({@code NonLinear}, {@code Custom}) are applied
- * directly via their captured functions.
+ * <p>Supports all 7 strategies: {@code Identity}, {@code Linear}, {@code Inverted},
+ * {@code FixedRange}, {@code CountScale} (no-op on Y; affects feature/mob count
+ * elsewhere), {@code Pipe} (fold over chain), and {@code BandSplit} (per-band
+ * piecewise projection — see {@link #bandSplit}, with a graceful linear fallback
+ * when a feature's midpoint lies outside every declared band).
  *
  * <p>The source range for {@code Linear} / {@code Inverted} is the original feature's
  * {@link VerticalRange} interpreted as a sub-range of {@code [worldBottom, worldTop]};
  * the destination is the descriptor's {@code playableRange}. This preserves the
  * feature's proportional position and width within the new vertical envelope.
  */
+@ApiStatus.Internal
 public final class RemapEngine {
 
     private RemapEngine() {}

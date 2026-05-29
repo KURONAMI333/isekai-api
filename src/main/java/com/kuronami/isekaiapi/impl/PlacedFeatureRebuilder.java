@@ -13,6 +13,7 @@ import net.minecraft.world.level.levelgen.placement.PlacementModifier;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * Constructs a remapped {@link PlacedFeature} by swapping its {@link HeightRangePlacement}
@@ -33,6 +34,7 @@ import java.util.List;
  *   <li>Other / unknown -> UniformHeight (safe fallback)</li>
  * </ul>
  */
+@ApiStatus.Internal
 public final class PlacedFeatureRebuilder {
 
     private PlacedFeatureRebuilder() {}
@@ -60,8 +62,16 @@ public final class PlacedFeatureRebuilder {
 
     /**
      * Rebuild a HeightRangePlacement preserving the original {@link HeightProvider}'s type
-     * (and {@code inner} bias intensity for the BIASED variants). Falls back to uniform
-     * when the original is a type we don't know how to clone.
+     * (and {@code inner} bias intensity for the BIASED variants). Falls back to uniform when
+     * the original is a type we don't know how to clone, or when the rebuilt range is too
+     * narrow for a BIASED provider to sample.
+     *
+     * <p>Critical for remap: a deep ore remapped into a thin worldshape band (e.g. a 26-block
+     * island band) can end up with {@code span < inner}. {@code BiasedToBottomHeight.sample}
+     * does NOT validate at construction — it logs {@code "Empty height range"} and returns the
+     * floor on EVERY placement attempt (per chunk) when {@code max - min - inner + 1 <= 0}.
+     * We pre-check that condition and collapse to UniformHeight instead, preserving the band
+     * without the per-chunk log spam.
      */
     private static HeightRangePlacement rebuildHRP(HeightProvider original, VerticalRange newRange) {
         VerticalAnchor min = VerticalAnchor.absolute(newRange.minY());
@@ -69,15 +79,18 @@ public final class PlacedFeatureRebuilder {
         if (original instanceof TrapezoidHeight) {
             return HeightRangePlacement.of(TrapezoidHeight.of(min, max));
         }
-        if (original instanceof BiasedToBottomHeight orig) {
+        // span+1 is the inclusive block count; a BIASED provider needs span+1 > inner.
+        int usable = newRange.maxY() - newRange.minY() + 1;
+        if (original instanceof BiasedToBottomHeight orig && usable > orig.inner) {
             return HeightRangePlacement.of(BiasedToBottomHeight.of(min, max, orig.inner));
         }
-        if (original instanceof VeryBiasedToBottomHeight orig) {
+        if (original instanceof VeryBiasedToBottomHeight orig && usable > orig.inner) {
             return HeightRangePlacement.of(VeryBiasedToBottomHeight.of(min, max, orig.inner));
         }
-        // UniformHeight, ConstantHeight (degenerate range), WeightedListHeight, or unknown:
-        // collapse to uniform for safety. UniformHeight is the most permissive sample
-        // distribution and stays well-defined when min == max.
+        // UniformHeight, ConstantHeight (degenerate range), WeightedListHeight, a BIASED
+        // variant whose bias no longer fits the remapped range, or unknown: collapse to
+        // uniform. UniformHeight is the most permissive distribution and stays well-defined
+        // even when min == max.
         return HeightRangePlacement.of(UniformHeight.of(min, max));
     }
 }

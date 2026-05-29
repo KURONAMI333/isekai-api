@@ -5,8 +5,10 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.ApiStatus;
 
 /** {@code /isekai version} — print mod version. */
+@ApiStatus.Internal
 public final class VersionCommand {
 
     private VersionCommand() {}

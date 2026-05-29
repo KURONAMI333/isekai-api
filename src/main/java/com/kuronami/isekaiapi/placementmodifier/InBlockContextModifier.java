@@ -15,6 +15,7 @@ import net.minecraft.world.level.levelgen.placement.PlacementModifier;
 import net.minecraft.world.level.levelgen.placement.PlacementModifierType;
 
 import java.util.stream.Stream;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * Filters placement positions by block context: the block at the position must be one
@@ -24,6 +25,7 @@ import java.util.stream.Stream;
  * <p>Useful for consumers that want ore/feature placement to be context-sensitive
  * (e.g., "only spawn this in stone or deepslate, with at least 1 block of air above").
  */
+@ApiStatus.Internal
 public class InBlockContextModifier extends PlacementModifier {
     public static final MapCodec<InBlockContextModifier> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             RegistryCodecs.homogeneousList(Registries.BLOCK).fieldOf("match_blocks").forGetter(m -> m.matchBlocks),

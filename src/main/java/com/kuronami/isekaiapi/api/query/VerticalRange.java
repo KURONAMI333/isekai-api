@@ -3,6 +3,13 @@ package com.kuronami.isekaiapi.api.query;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+/**
+ * An inclusive Y band with a vertical {@link HeightDistribution}. The core value type of
+ * the remap layer: {@code IsekaiQuery} reports a vanilla feature's range as a
+ * {@code VerticalRange}, and {@code RemapStrategy} maps it into the worldshape's playable
+ * range. JSON shape: {@code {"min_y": <int>, "max_y": <int>, "distribution":
+ * "<HeightDistribution>"}}. The canonical constructor rejects {@code minY > maxY}.
+ */
 public record VerticalRange(int minY, int maxY, HeightDistribution distribution) {
     public VerticalRange {
         if (minY > maxY) {

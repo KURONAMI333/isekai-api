@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * {@link IsekaiQuery} implementation backed by an immutable {@link VanillaRuleSnapshot}.
@@ -39,50 +40,51 @@ import java.util.concurrent.atomic.AtomicReference;
  * from the live registry via {@link ServerLifecycleHooks#getCurrentServer()}, so they
  * always reflect the post-reload state without needing a fresh scan.
  */
+@ApiStatus.Internal
 public final class IsekaiQueryImpl implements IsekaiQuery {
 
     private final AtomicReference<VanillaRuleSnapshot> snapshot =
             new AtomicReference<>(VanillaRuleSnapshot.EMPTY);
 
-    public void setSnapshot(VanillaRuleSnapshot s) {
+    void setSnapshot(VanillaRuleSnapshot s) {
         var prev = snapshot.getAndSet(s);
         IsekaiApi.LOGGER.debug("[Isekai] Vanilla rule snapshot replaced: prev empty={}, new empty={}",
                 prev.isEmpty(), s.isEmpty());
     }
 
     /**
-     * Direct read of the currently-published snapshot. Internal — exposed for
-     * {@link com.kuronami.isekaiapi.biomemodifier.ApplyWorldshapeBiomeModifier} which needs
-     * raw access to per-feature VerticalRanges + world bounds for strategy remapping.
+     * Direct read of the currently-published snapshot. Package-private — phase appliers
+     * reach this via {@link IsekaiInternal#currentSnapshot()} for raw access to per-feature
+     * VerticalRanges and world bounds during strategy remapping.
      */
-    public VanillaRuleSnapshot getSnapshot() {
+    VanillaRuleSnapshot getSnapshot() {
         return snapshot.get();
     }
 
     @Override
-    public Optional<VerticalRange> getOreVerticalRange(ResourceKey<PlacedFeature> ore) {
-        return snapshot.get().ores().stream()
-                .filter(info -> info.key().equals(ore))
+    public Optional<VerticalRange> getPlacedFeatureVerticalRange(ResourceKey<PlacedFeature> feature) {
+        return snapshot.get().placedFeatures().stream()
+                .filter(info -> info.key().equals(feature))
                 .findFirst()
                 .map(PlacedFeatureInfo::range);
     }
 
-    @Override public List<PlacedFeatureInfo> getAllOres() { return snapshot.get().ores(); }
+    @Override public List<PlacedFeatureInfo> getAllPlacedFeatures() { return snapshot.get().placedFeatures(); }
 
     @Override
-    public Optional<VerticalRange> getOreVerticalRangeInDimension(ResourceKey<PlacedFeature> ore,
-                                                                   ResourceKey<Level> dimension) {
+    public Optional<VerticalRange> getPlacedFeatureVerticalRangeInDimension(ResourceKey<PlacedFeature> feature,
+                                                                             ResourceKey<Level> dimension) {
         // Try the per-dim override first; fall back to the global (overworld-resolved) entry
         // when the dimension shares overworld bounds (no override stored).
         VanillaRuleSnapshot snap = snapshot.get();
-        var override = snap.oreRangeInDimension(ore, dimension);
+        var override = snap.placedFeatureRangeInDimension(feature, dimension);
         if (override.isPresent()) return override;
-        return getOreVerticalRange(ore);
+        return getPlacedFeatureVerticalRange(feature);
     }
 
     @Override
-    public List<PlacedFeatureInfo> getOresByTag(TagKey<PlacedFeature> tag) {
-        return snapshot.get().oresForTag(tag);
+    public List<PlacedFeatureInfo> getPlacedFeaturesByTag(TagKey<PlacedFeature> tag) {
+        return snapshot.get().placedFeaturesForTag(tag);
     }
 
     @Override
@@ -128,7 +130,7 @@ public final class IsekaiQueryImpl implements IsekaiQuery {
     /**
      * Per-dimension snapshot. Filters the global feature list down to entries whose Y
      * range overlaps the dimension's build height, and pulls the per-dim VerticalRange
-     * override (set by {@link VanillaRuleSnapshot#oreRangeInDimension}) when available.
+     * override (set by {@link VanillaRuleSnapshot#placedFeatureRangeInDimension}) when available.
      * Structures pass through unchanged; mob spawn entries are absent here (callers should
      * use {@link #getMobSpawnsForBiome} for per-biome spawn data).
      *
@@ -139,13 +141,13 @@ public final class IsekaiQueryImpl implements IsekaiQuery {
     @Override
     public WorldshapeSnapshot getSnapshot(ResourceKey<Level> dimension) {
         VanillaRuleSnapshot snap = snapshot.get();
-        List<PlacedFeatureInfo> dimOres = snap.ores().stream().map(info -> {
-            var override = snap.oreRangeInDimension(info.key(), dimension);
+        List<PlacedFeatureInfo> dimFeatures = snap.placedFeatures().stream().map(info -> {
+            var override = snap.placedFeatureRangeInDimension(info.key(), dimension);
             return override.isPresent()
                     ? new PlacedFeatureInfo(info.key(), override.get(), info.count(), info.biomes())
                     : info;
         }).toList();
-        return new WorldshapeSnapshot(dimension, dimOres, snap.structures(), List.of());
+        return new WorldshapeSnapshot(dimension, dimFeatures, snap.structures(), List.of());
     }
 
     @Override

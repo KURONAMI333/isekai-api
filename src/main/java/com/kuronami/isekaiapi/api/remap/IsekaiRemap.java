@@ -23,11 +23,12 @@ public interface IsekaiRemap {
 
     /**
      * Multi-layer worldshape stacked along Y. Layers must not overlap in their
-     * {@code yRange}; the layered transition (Hard / Blend / Gap) controls the seam.
+     * {@code yRange}; each {@link LayeredDescriptor} carries its own
+     * {@link TransitionRule} (Hard / Blend / Gap) controlling the seam to the next layer
+     * above it.
      */
     void declareLayeredWorldshape(ResourceKey<Level> dimension,
-                                   List<LayeredDescriptor> layers,
-                                   TransitionRule transition);
+                                   List<LayeredDescriptor> layers);
 
     /** Debug helper. Triggers a worldgen reload to re-apply biome modifiers. */
     void updateWorldshape(ResourceKey<Level> dimension, WorldshapeDescriptor newDescriptor);

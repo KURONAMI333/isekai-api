@@ -3,7 +3,6 @@ package com.kuronami.isekaiapi.impl;
 import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.api.remap.IsekaiRemap;
 import com.kuronami.isekaiapi.api.remap.LayeredDescriptor;
-import com.kuronami.isekaiapi.api.remap.TransitionRule;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
@@ -14,6 +13,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * Concurrent in-memory registry of consumer-declared worldshape descriptors. Single-layer
@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * and {@link com.kuronami.isekaiapi.structuremodifier.ApplyWorldshapeStructureModifier}) — this
  * class only owns the registry, not the application.
  */
+@ApiStatus.Internal
 public final class IsekaiRemapImpl implements IsekaiRemap {
 
     private final Map<ResourceKey<Level>, WorldshapeDescriptor> singleLayer = new ConcurrentHashMap<>();
@@ -57,11 +58,10 @@ public final class IsekaiRemapImpl implements IsekaiRemap {
 
     @Override
     public void declareLayeredWorldshape(ResourceKey<Level> dimension,
-                                          List<LayeredDescriptor> layers,
-                                          TransitionRule transition) {
+                                          List<LayeredDescriptor> layers) {
         multiLayer.put(dimension, List.copyOf(layers));
-        IsekaiApi.LOGGER.info("[Isekai] declareLayeredWorldshape: dim={}, layers={}, transition={}",
-                dimension, layers.size(), transition.getClass().getSimpleName());
+        IsekaiApi.LOGGER.info("[Isekai] declareLayeredWorldshape: dim={}, layers={}",
+                dimension, layers.size());
     }
 
     @Override

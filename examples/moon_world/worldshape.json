@@ -1,0 +1,41 @@
+{
+  "dimension": "minecraft:overworld",
+  "playable_range": { "min_y": -64, "max_y": 320, "distribution": "uniform" },
+  "surface_anchor": { "type": "isekai:world_surface" },
+  "ore_strategy": { "type": "isekai:identity" },
+  "structure_strategy": { "type": "isekai:identity" },
+  "mob_spawn_strategy": { "type": "isekai:identity" },
+  "default_structure_predicate": { "type": "isekai:always" },
+  "applies_to": {
+    "tags": ["#minecraft:is_overworld"]
+  },
+  "atmosphere": {
+    "sky_color": 3486504,
+    "fog_color": 7240575
+  },
+  "content_overrides": {
+    "block_overrides": {
+      "surface_top": {
+        "minecraft:plains":          { "Name": "minecraft:light_gray_concrete" },
+        "minecraft:forest":          { "Name": "minecraft:light_gray_concrete" },
+        "minecraft:desert":          { "Name": "minecraft:light_gray_concrete" },
+        "minecraft:savanna":         { "Name": "minecraft:light_gray_concrete" },
+        "minecraft:jungle":          { "Name": "minecraft:light_gray_concrete" },
+        "minecraft:taiga":           { "Name": "minecraft:light_gray_concrete" },
+        "minecraft:snowy_plains":    { "Name": "minecraft:light_gray_concrete" },
+        "minecraft:windswept_hills": { "Name": "minecraft:light_gray_concrete" }
+      },
+      "default_block": {
+        "minecraft:plains":          { "Name": "minecraft:diorite" },
+        "minecraft:forest":          { "Name": "minecraft:diorite" },
+        "minecraft:desert":          { "Name": "minecraft:diorite" },
+        "minecraft:savanna":         { "Name": "minecraft:diorite" },
+        "minecraft:jungle":          { "Name": "minecraft:diorite" },
+        "minecraft:taiga":           { "Name": "minecraft:diorite" },
+        "minecraft:snowy_plains":    { "Name": "minecraft:diorite" },
+        "minecraft:windswept_hills": { "Name": "minecraft:diorite" }
+      }
+    }
+  },
+  "priority": 100
+}

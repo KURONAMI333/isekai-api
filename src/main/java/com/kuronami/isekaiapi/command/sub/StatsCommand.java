@@ -6,15 +6,17 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.MobCategory;
+import org.jetbrains.annotations.ApiStatus;
 
 /** {@code /isekai stats} — concise snapshot health report. */
+@ApiStatus.Internal
 public final class StatsCommand {
 
     private StatsCommand() {}
 
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("stats").executes(ctx -> {
-            var ores = Isekai.query().getAllOres();
+            var placedFeatures = Isekai.query().getAllPlacedFeatures();
             var structures = Isekai.query().getAllStructures();
             int totalMobs = 0;
             for (var category : MobCategory.values()) {
@@ -23,7 +25,7 @@ public final class StatsCommand {
             var dimsDeclared = Isekai.remap().getDeclaredDimensions().size();
             int totalMobsFinal = totalMobs;
             ctx.getSource().sendSuccess(() -> Component.literal("Isekai snapshot stats:"), false);
-            ctx.getSource().sendSuccess(() -> Component.literal("  PlacedFeatures: " + ores.size()), false);
+            ctx.getSource().sendSuccess(() -> Component.literal("  PlacedFeatures: " + placedFeatures.size()), false);
             ctx.getSource().sendSuccess(() -> Component.literal("  Structure placements: " + structures.size()), false);
             ctx.getSource().sendSuccess(() -> Component.literal("  Mob spawn entries: " + totalMobsFinal), false);
             ctx.getSource().sendSuccess(() -> Component.literal("  Declared worldshape dimensions: " + dimsDeclared), false);

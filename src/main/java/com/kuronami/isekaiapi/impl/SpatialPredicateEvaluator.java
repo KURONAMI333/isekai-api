@@ -12,6 +12,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.RandomState;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * Evaluate a {@link SpatialPredicate} against a (position, world context) pair. Used by
@@ -37,6 +38,7 @@ import net.minecraft.world.level.levelgen.RandomState;
  * columns. Keep {@code maxDistance} small (≤ 8) in production to avoid per-chunk-gen
  * hitch.
  */
+@ApiStatus.Internal
 public final class SpatialPredicateEvaluator {
 
     private SpatialPredicateEvaluator() {}
@@ -195,7 +197,9 @@ public final class SpatialPredicateEvaluator {
             int qx = pos.getX() >> 2;
             int qy = pos.getY() >> 2;
             int qz = pos.getZ() >> 2;
-            int rq = Math.max(1, nb.maxDistance() >> 2);
+            // Round UP — consumer specifies block radius; (N + 3) >> 2 == ceil(N / 4) ensures
+            // small radii (e.g. 7 blocks) still produce a ≥1 quart radius that fully covers them.
+            int rq = Math.max(1, (nb.maxDistance() + 3) >> 2);
             for (int dqx = -rq; dqx <= rq; dqx++) {
                 for (int dqz = -rq; dqz <= rq; dqz++) {
                     Holder<Biome> here = biomeSource.getNoiseBiome(qx + dqx, qy, qz + dqz, sampler);

@@ -5,13 +5,15 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.util.KeyDispatchDataCodec;
 import net.minecraft.world.level.levelgen.DensityFunction;
+import org.jetbrains.annotations.ApiStatus;
 
 /** Constant value. Primitive: scalar. */
+@ApiStatus.Internal
 public record ConstantDF(double value) implements DensityFunction.SimpleFunction {
     public static final MapCodec<ConstantDF> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             Codec.DOUBLE.fieldOf("value").forGetter(ConstantDF::value)
     ).apply(i, ConstantDF::new));
-    public static final KeyDispatchDataCodec<ConstantDF> KEY_CODEC = new KeyDispatchDataCodec<>(CODEC);
+    static final KeyDispatchDataCodec<ConstantDF> KEY_CODEC = new KeyDispatchDataCodec<>(CODEC);
 
     @Override public double compute(FunctionContext ctx) { return value; }
     @Override public double minValue() { return value; }

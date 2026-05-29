@@ -8,6 +8,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 import java.util.function.Supplier;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * Neutral density function primitives. Each primitive is a small mathematical / geometric
@@ -27,6 +28,7 @@ import java.util.function.Supplier;
  * <p>Vanilla density functions remain accessible via standard {@code minecraft:} keys —
  * Isekai does not re-export them.
  */
+@ApiStatus.Internal
 public final class IsekaiDensityFunctions {
 
     public static final DeferredRegister<MapCodec<? extends DensityFunction>> CODECS =
@@ -65,10 +67,20 @@ public final class IsekaiDensityFunctions {
     public static final Supplier<MapCodec<? extends DensityFunction>> MASK_Y_RANGE =
             CODECS.register("mask_y_range", () -> MaskYRangeDF.CODEC);
 
+    // Neutral worldshape composers — theme-agnostic, combine with the primitives above.
+    public static final Supplier<MapCodec<? extends DensityFunction>> SQUEEZE =
+            CODECS.register("squeeze", () -> SqueezeDF.CODEC);
+    public static final Supplier<MapCodec<? extends DensityFunction>> Y_ENVELOPE =
+            CODECS.register("y_envelope", () -> YEnvelopeDF.CODEC);
+    public static final Supplier<MapCodec<? extends DensityFunction>> BLENDED_NOISE =
+            CODECS.register("blended_noise", () -> BlendedNoiseDF.CODEC);
+    public static final Supplier<MapCodec<? extends DensityFunction>> BAND_DENSITY =
+            CODECS.register("band_density", () -> BandDensityDF.CODEC);
+
     private IsekaiDensityFunctions() {}
 
     public static void register(IEventBus modBus) {
         CODECS.register(modBus);
-        IsekaiApi.LOGGER.info("[Isekai] density function primitives registered: 16 neutral primitives");
+        IsekaiApi.LOGGER.info("[Isekai] density function primitives registered: 16 neutral + 4 worldshape (squeeze, y_envelope, blended_noise, band_density)");
     }
 }

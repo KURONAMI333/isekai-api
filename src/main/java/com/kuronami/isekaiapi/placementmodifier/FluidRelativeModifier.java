@@ -15,16 +15,17 @@ import net.minecraft.world.level.levelgen.placement.PlacementModifierType;
 import net.minecraft.world.level.material.Fluids;
 
 import java.util.stream.Stream;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * Places features at a Y offset from the top or bottom of the column's
  * contiguous water body. Useful for Deep Sea / Island World style consumers
  * that want kelp/coral/etc. anchored to fluid boundaries rather than terrain.
  *
- * <p>Fluid is currently hardcoded to {@link Fluids#WATER}; arbitrary-fluid support is a
- * future enhancement (would require extending the codec with a {@code Fluid} key).
- * The anchor (FLUID_TOP / FLUID_BOTTOM) is already configurable via the codec.
+ * <p>Targeted fluid is {@link Fluids#WATER}; the anchor (FLUID_TOP / FLUID_BOTTOM) is
+ * configurable via the codec.
  */
+@ApiStatus.Internal
 public class FluidRelativeModifier extends PlacementModifier {
     public static final MapCodec<FluidRelativeModifier> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             Anchor.CODEC.fieldOf("anchor").forGetter(m -> m.anchor),
