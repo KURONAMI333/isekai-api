@@ -1,7 +1,6 @@
 # Isekai API
 
-> A universal worldgen library for NeoForge 1.21.1.
-> Provides world rule extraction and remap for Java MOD and datapack consumers.
+> Build any world from datapack — a toolbox of neutral worldgen primitives for shape, biomes, dimensions, and re-placing existing content. NeoForge 1.21.1.
 > **Unrelated to the *Isekai Adventure* modpack.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -11,11 +10,11 @@
 
 ## What is Isekai API?
 
-Isekai API is a small, complete *language* for expressing Minecraft worldgen — not a toolbox for any specific worldshape.
+Isekai API is a toolbox for the *shape and rules* of a Minecraft world — not a world, but the machine that makes worlds.
 
-Think of it the way HTML/CSS are languages for expressing web pages, not tools for building Twitter. The library provides a set of neutral mathematical primitives; consumers compose them to express any worldshape they can imagine — floating islands, submerged worlds, hollow earths, archipelagos, mesa canyons, fully inverted Y axes, anything.
+Think of it the way HTML's `div`/`span` are primitives for any web page, not a tool for one specific site. Isekai gives you a small set of neutral, composable primitives — terrain shape, biome placement, surface blocks, new dimensions, atmosphere, placement control, and re-placement of existing content — and you combine them to express *any* worldshape you can imagine: floating islands, submerged worlds, hollow earths, archipelagos, mesa canyons, fully inverted Y axes, anything.
 
-The 9 consumer mods shipped alongside this library are **validation set, not design target**: they exist to prove the API is expressive enough, and they ride on the same primitives any third-party modder gets.
+It ships no biomes, structures, or themes of its own. **Built to be built on — however you want to use it, you're welcome:** datapack worldshapes, full Java mods, modpack glue, quick experiments, total conversions. The same primitives power everything; there's no privileged "first-party" path.
 
 ## Quick start
 
@@ -260,7 +259,7 @@ See `examples/README.md` for the layout and `docs/DATAPACK_REFERENCE.md` for eve
 
 A *universal* worldgen library has to be a small set of primitives you can combine to express *any* worldshape — including ones nobody has thought of yet. Naming primitives after specific use cases (`floating_island`, `tall_mountain`, etc.) freezes the design around those use cases and quietly excludes everything else.
 
-Isekai ships 16 mathematical primitives instead of named helpers. The 9 consumer mods that ride this library express their worldshapes using only those primitives — and so does any third-party consumer, with the same expressive power.
+Isekai ships 16 mathematical primitives instead of named helpers. Every consumer — whether a worldshape built by the author or by any third-party modder — expresses its world using only those primitives, with the same expressive power.
 
 ## License
 
