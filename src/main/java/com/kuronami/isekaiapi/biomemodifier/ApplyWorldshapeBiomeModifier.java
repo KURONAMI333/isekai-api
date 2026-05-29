@@ -8,9 +8,11 @@ import com.kuronami.isekaiapi.biomemodifier.phase.RemovePhase;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.biome.Biome;
 import net.neoforged.neoforge.common.world.BiomeModifier;
 import net.neoforged.neoforge.common.world.ModifiableBiomeInfo;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * Applies an entire Isekai {@link WorldshapeDescriptor} to matching biomes via a single
@@ -35,6 +37,7 @@ import net.neoforged.neoforge.common.world.ModifiableBiomeInfo;
  * reusable across dimensions — consumers wanting "only in the overworld" should either
  * list every overworld biome explicitly, or pair this modifier with a biome tag.
  */
+@ApiStatus.Internal
 public record ApplyWorldshapeBiomeModifier(WorldshapeDescriptor worldshape) implements BiomeModifier {
 
     public static final MapCodec<ApplyWorldshapeBiomeModifier> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
@@ -46,19 +49,23 @@ public record ApplyWorldshapeBiomeModifier(WorldshapeDescriptor worldshape) impl
         if (!BiomeMatcher.matches(worldshape, biome)) {
             return;
         }
+        // Biome key drives the per-biome scoping of ore re-injection in ADD/REMOVE — without
+        // it, every matched biome would receive every snapshot ore (incl. modded ores).
+        ResourceKey<Biome> biomeKey = biome.unwrapKey().orElse(null);
         switch (phase) {
             case REMOVE -> {
                 RemovePhase.excludedFeatures(worldshape, builder);
                 RemovePhase.excludedCarvers(worldshape, builder);
-                RemovePhase.originalsPendingRemap(worldshape, builder);
+                RemovePhase.originalsPendingRemap(worldshape, biomeKey, builder);
             }
             case ADD -> {
                 AddPhase.additionalFeatures(worldshape, builder);
                 AddPhase.additionalCarvers(worldshape, builder);
-                AddPhase.remappedOreFeatures(worldshape, builder);
+                AddPhase.remappedOreFeatures(worldshape, biomeKey, builder);
             }
             case MODIFY -> {
                 ModifyPhase.mobSpawnStrategy(worldshape, builder);
+                ModifyPhase.featurePredicates(worldshape, builder);
                 ModifyPhase.atmosphereOverride(worldshape, builder);
             }
             default -> { /* BEFORE_EVERYTHING / AFTER_EVERYTHING — no-op */ }

@@ -1,14 +1,25 @@
 package com.kuronami.isekaiapi.biomemodifier.phase;
 
 import com.kuronami.isekaiapi.IsekaiApi;
+import com.kuronami.isekaiapi.api.predicate.SpatialPredicate;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
 import com.kuronami.isekaiapi.impl.RemapEngine;
+import com.kuronami.isekaiapi.placementmodifier.SpatialPredicatePlacementModifier;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.biome.MobSpawnSettings;
+import net.minecraft.world.level.levelgen.GenerationStep;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
+import net.minecraft.world.level.levelgen.placement.PlacementModifier;
 import net.neoforged.neoforge.common.world.ModifiableBiomeInfo;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * MODIFY-phase logic for {@code isekai_api:apply_worldshape}. Two concerns:
@@ -22,6 +33,7 @@ import java.util.Set;
  *       Unset fields (Optional.empty()) leave the biome's value unchanged.</li>
  * </ul>
  */
+@ApiStatus.Internal
 public final class ModifyPhase {
 
     private ModifyPhase() {}
@@ -39,6 +51,17 @@ public final class ModifyPhase {
                 int before = list.size();
                 list.removeIf(sd -> excludedTypes.contains(sd.type));
                 removed += before - list.size();
+            }
+            // Warn when an EntityType appears in both exclusions and additions — Step 3 will
+            // silently re-create the entry that Step 1 just removed, which is usually a config
+            // mistake (the user meant either to re-tune OR to fully exclude, not both).
+            for (var add : descriptor.additions().mobSpawns()) {
+                if (excludedTypes.contains(add.type())) {
+                    IsekaiApi.LOGGER.warn(
+                            "[Isekai] mob spawn additions include {} which is also in exclusions (dim={}) "
+                                    + "— addition will override exclusion; remove one to clarify intent",
+                            EntityType.getKey(add.type()), descriptor.dimension().location());
+                }
             }
         }
 
@@ -72,6 +95,45 @@ public final class ModifyPhase {
             IsekaiApi.LOGGER.debug(
                     "[Isekai] mob spawn modify (dim={}): removed={}, rescaled={}, added={}",
                     descriptor.dimension().location(), removed, rebuilt, added);
+        }
+    }
+
+    /**
+     * For every entry in {@code featurePredicates}, replace matching placed features in this
+     * biome with a rebuilt copy that prepends a {@link SpatialPredicatePlacementModifier} —
+     * this lets the consumer keep the original feature (so vanilla decoration runs unchanged
+     * outside the worldshape) while gating its placement on a spatial condition (e.g. "lake
+     * only where there's a solid floor with 3 blocks of clearance below"). Done in-place
+     * per biome so other biomes that match the feature elsewhere are untouched.
+     */
+    public static void featurePredicates(WorldshapeDescriptor descriptor,
+                                         ModifiableBiomeInfo.BiomeInfo.Builder builder) {
+        Map<ResourceKey<PlacedFeature>, SpatialPredicate> predicates = descriptor.featurePredicates();
+        if (predicates.isEmpty()) return;
+        var gen = builder.getGenerationSettings();
+        int replaced = 0;
+        for (GenerationStep.Decoration step : GenerationStep.Decoration.values()) {
+            List<Holder<PlacedFeature>> stepFeatures = gen.getFeatures(step);
+            for (int i = 0; i < stepFeatures.size(); i++) {
+                Holder<PlacedFeature> holder = stepFeatures.get(i);
+                ResourceKey<PlacedFeature> key = holder.unwrapKey().orElse(null);
+                if (key == null) continue;
+                SpatialPredicate predicate = predicates.get(key);
+                if (predicate == null) continue;
+                PlacedFeature original = holder.value();
+                // Prepend the predicate modifier — it runs first, so if the position fails
+                // the predicate we short-circuit to empty before any other modifier evaluates.
+                List<PlacementModifier> newMods = new ArrayList<>(original.placement().size() + 1);
+                newMods.add(new SpatialPredicatePlacementModifier(predicate));
+                newMods.addAll(original.placement());
+                PlacedFeature rebuilt = new PlacedFeature(original.feature(), List.copyOf(newMods));
+                stepFeatures.set(i, Holder.direct(rebuilt));
+                replaced++;
+            }
+        }
+        if (replaced > 0) {
+            IsekaiApi.LOGGER.debug("[Isekai] applied {} feature predicate(s) (dim={})",
+                    replaced, descriptor.dimension().location());
         }
     }
 

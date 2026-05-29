@@ -5,7 +5,6 @@ import com.google.gson.JsonElement;
 import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.api.Isekai;
 import com.kuronami.isekaiapi.api.remap.LayeredDescriptor;
-import com.kuronami.isekaiapi.api.remap.TransitionRule;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
@@ -19,6 +18,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.jetbrains.annotations.ApiStatus;
 
 /**
  * Loads {@code data/<ns>/isekai/worldshape/*.json} on every datapack reload and invokes
@@ -37,10 +37,11 @@ import java.util.Set;
  * </ul>
  *
  * <p>The companion {@code layered_worldshape/} directory is handled the same way; each
- * file there is a list of {@link LayeredDescriptor} for one dimension, with an optional
- * {@code transition} at the top level. v0.5 ships both listeners; richer cross-file
- * validation (no overlapping yRange, no duplicate dimension entries) lands in v0.6.
+ * file there is a list of {@link LayeredDescriptor} for one dimension. Each layer carries
+ * its own {@link com.kuronami.isekaiapi.api.remap.TransitionRule} that controls the seam
+ * to the layer above it.
  */
+@ApiStatus.Internal
 public final class IsekaiReloadListener extends SimpleJsonResourceReloadListener {
 
     /** Directory under {@code data/<ns>/} scanned for single-layer worldshape JSON. */
@@ -156,7 +157,7 @@ public final class IsekaiReloadListener extends SimpleJsonResourceReloadListener
         boolean[] failed = {false};
         result.ifSuccess(f -> {
             try {
-                Isekai.remap().declareLayeredWorldshape(f.dimension(), f.layers(), f.transition());
+                Isekai.remap().declareLayeredWorldshape(f.dimension(), f.layers());
                 lastJsonDimensions.add(f.dimension());
             } catch (RuntimeException ex) {
                 IsekaiApi.LOGGER.error("[Isekai] reload: declareLayeredWorldshape failed for {}: {}",
@@ -180,11 +181,14 @@ public final class IsekaiReloadListener extends SimpleJsonResourceReloadListener
         }
     }
 
-    /** Wire format for one file under {@code isekai/layered_worldshape/}. */
+    /**
+     * Wire format for one file under {@code isekai/layered_worldshape/}. Each layer's
+     * {@link LayeredDescriptor#transition()} controls the seam to the layer above it —
+     * there is no file-level transition, since per-layer is strictly more expressive.
+     */
     public record LayeredFile(
             net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension,
-            List<LayeredDescriptor> layers,
-            TransitionRule transition
+            List<LayeredDescriptor> layers
     ) {
         public LayeredFile {
             layers = List.copyOf(layers);
@@ -196,9 +200,7 @@ public final class IsekaiReloadListener extends SimpleJsonResourceReloadListener
         public static final Codec<LayeredFile> CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.create(i -> i.group(
                 net.minecraft.resources.ResourceKey.codec(net.minecraft.core.registries.Registries.DIMENSION)
                         .fieldOf("dimension").forGetter(LayeredFile::dimension),
-                LayeredDescriptor.CODEC.listOf().fieldOf("layers").forGetter(LayeredFile::layers),
-                TransitionRule.CODEC.optionalFieldOf("transition", new TransitionRule.Hard())
-                        .forGetter(LayeredFile::transition)
+                LayeredDescriptor.CODEC.listOf().fieldOf("layers").forGetter(LayeredFile::layers)
         ).apply(i, LayeredFile::new));
     }
 }
