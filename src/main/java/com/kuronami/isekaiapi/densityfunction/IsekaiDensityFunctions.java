@@ -77,10 +77,23 @@ public final class IsekaiDensityFunctions {
     public static final Supplier<MapCodec<? extends DensityFunction>> BAND_DENSITY =
             CODECS.register("band_density", () -> BandDensityDF.CODEC);
 
+    // Neutral re-implementation of vanilla's package-private DensityFunctions.Mapped.QUARTER_NEGATIVE
+    // (v -> v > 0 ? v : v*0.25). Same rationale as squeeze: vanilla's Mapped enum is unreachable
+    // from outside, so the math is exposed here as a primitive. Pure value mapping, no terrain
+    // semantics baked in.
+    public static final Supplier<MapCodec<? extends DensityFunction>> QUARTER_NEGATIVE =
+            CODECS.register("quarter_negative", () -> QuarterNegativeDF.CODEC);
+
+    // Neutral terrain-density composer — assembles the proven non-terraced surface formula
+    // from three structural inputs (depth_field, factor, base_noise). No themes baked in;
+    // the consumer holds all theme vocabulary in their depth_field.
+    public static final Supplier<MapCodec<? extends DensityFunction>> SLOPED_DENSITY =
+            CODECS.register("sloped_density", () -> SlopedDensityDF.CODEC);
+
     private IsekaiDensityFunctions() {}
 
     public static void register(IEventBus modBus) {
         CODECS.register(modBus);
-        IsekaiApi.LOGGER.info("[Isekai] density function primitives registered: 16 neutral + 4 worldshape (squeeze, y_envelope, blended_noise, band_density)");
+        IsekaiApi.LOGGER.info("[Isekai] density function types registered: 16 primitives + 6 composers (squeeze, y_envelope, blended_noise, band_density, quarter_negative, sloped_density)");
     }
 }

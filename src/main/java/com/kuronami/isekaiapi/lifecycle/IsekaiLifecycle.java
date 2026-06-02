@@ -52,10 +52,47 @@ public final class IsekaiLifecycle {
         // server log only. /isekai validate stays available for on-demand re-checks.
         autoValidateAllNamespaces(event.getServer().getResourceManager());
 
+        // World-preset structural check: catches a consumer overriding
+        // data/minecraft/worldgen/world_preset/normal.json without re-declaring Nether/End,
+        // which silently breaks those dimensions. Warning only, never blocks.
+        for (String w : com.kuronami.isekaiapi.validation.IsekaiValidator
+                .validateWorldPresets(event.getServer().getResourceManager())) {
+            IsekaiApi.LOGGER.warn("[Isekai] world_preset check: {}", w);
+        }
+
         // After codec-level validation, do a deeper registry-existence pass on every
         // active worldshape: catches "minecraft:ocean_monument"-style typos where the
         // ResourceKey decodes fine but doesn't resolve to anything in the registry.
         checkActiveWorldshapeReferences(event.getServer());
+
+        // Report which structures in this world use an Isekai structure type. Confirms a
+        // consumer's data/<ns>/worldgen/structure/*.json decoded against the right codec and
+        // is present in the live registry (a JSON that fails to decode is silently dropped,
+        // so /place and /locate then report the id as unknown).
+        logIsekaiStructures(event.getServer());
+    }
+
+    /** Log every entry of the world's structure registry whose {@code type} is one Isekai
+     * registered. Neutral diagnostic — no per-consumer ids hardcoded. */
+    private static void logIsekaiStructures(net.minecraft.server.MinecraftServer server) {
+        try {
+            var structureLookup = server.registryAccess()
+                    .lookupOrThrow(net.minecraft.core.registries.Registries.STRUCTURE);
+            var grounded = com.kuronami.isekaiapi.structure.IsekaiStructures.GROUNDED_TEMPLATE.get();
+            var assembled = com.kuronami.isekaiapi.structure.IsekaiStructures.ASSEMBLED.get();
+            int[] n = {0};
+            structureLookup.listElements().forEach(ref -> {
+                var t = ref.value().type();
+                if (t == grounded || t == assembled) {
+                    IsekaiApi.LOGGER.info("[Isekai] world structure present: {} (type {})",
+                            ref.key().location(), (t == grounded ? "grounded_template" : "assembled"));
+                    n[0]++;
+                }
+            });
+            IsekaiApi.LOGGER.info("[Isekai] {} structure(s) using isekai_api types loaded in this world", n[0]);
+        } catch (RuntimeException e) {
+            IsekaiApi.LOGGER.warn("[Isekai] structure-presence check failed: {}", e.toString());
+        }
     }
 
     @SubscribeEvent

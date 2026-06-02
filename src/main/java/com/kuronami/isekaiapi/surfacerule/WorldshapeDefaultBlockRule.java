@@ -52,20 +52,23 @@ public record WorldshapeDefaultBlockRule(ResourceKey<Level> dimension) implement
 
     @Override
     public SurfaceRules.SurfaceRule apply(SurfaceRules.Context context) {
-        var worldshape = Isekai.remap().getActiveDescriptor(dimension).orElse(null);
-        if (worldshape == null) {
+        // Per-block layer resolution: layered dims have different defaultBlock per Y band, so
+        // the lookup must happen at tryApply time. See WorldshapeSurfaceTopRule for the same
+        // pattern + rationale.
+        if (Isekai.remap().getActiveDescriptor(dimension).isEmpty()
+                && Isekai.remap().getActiveLayers(dimension).isEmpty()) {
             warnMissingOnce(dimension);
             return NULL_RULE;
         }
-        var defaultBlock = worldshape.blockOverrides().defaultBlock();
-        if (defaultBlock.isEmpty()) return NULL_RULE;
         return new SurfaceRules.SurfaceRule() {
             @Override
             public @Nullable BlockState tryApply(int blockX, int blockY, int blockZ) {
                 var biome = context.biome.get();
                 var key = biome.unwrapKey().orElse(null);
                 if (key == null) return null;
-                return defaultBlock.get(key);
+                var worldshape = Isekai.remap().getDescriptorAt(dimension, blockY).orElse(null);
+                if (worldshape == null) return null;
+                return worldshape.blockOverrides().defaultBlock().get(key);
             }
         };
     }

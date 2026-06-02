@@ -3,9 +3,12 @@ package com.kuronami.isekaiapi;
 import com.kuronami.isekaiapi.biomemodifier.IsekaiBiomeModifiers;
 import com.kuronami.isekaiapi.structuremodifier.IsekaiStructureModifiers;
 import com.kuronami.isekaiapi.densityfunction.IsekaiDensityFunctions;
+import com.kuronami.isekaiapi.feature.IsekaiFeatures;
 import com.kuronami.isekaiapi.placementmodifier.IsekaiPlacementModifiers;
+import com.kuronami.isekaiapi.structure.IsekaiStructures;
 import com.kuronami.isekaiapi.surfacerule.IsekaiSurfaceRules;
 import com.kuronami.isekaiapi.biomesource.IsekaiBiomeSources;
+import com.kuronami.isekaiapi.tree.IsekaiTreePlacers;
 import com.mojang.logging.LogUtils;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
@@ -25,5 +28,8 @@ public final class IsekaiApi {
         IsekaiStructureModifiers.register(modBus);
         IsekaiSurfaceRules.register(modBus);
         IsekaiBiomeSources.register(modBus);
+        IsekaiTreePlacers.register(modBus);
+        IsekaiFeatures.register(modBus);
+        IsekaiStructures.register(modBus);
     }
 }

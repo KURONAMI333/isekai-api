@@ -47,11 +47,15 @@ public record ApplyWorldshapeRefBiomeModifier(ResourceKey<Level> dimension) impl
 
     @Override
     public void modify(Holder<Biome> biome, Phase phase, ModifiableBiomeInfo.BiomeInfo.Builder builder) {
-        WorldshapeDescriptor worldshape = Isekai.remap().getActiveDescriptor(dimension).orElse(null);
+        // Layered dims: at biome-modifier time we have no Y context, so we can't pick by Y.
+        // Instead we walk layers in declaration order and apply the FIRST layer whose
+        // applies_to claims this biome. A biome belongs to at most one layer; non-claimed
+        // biomes are untouched. This pairs with the Y-aware surface/structure paths so the
+        // visual result of a layered world is consistent: layer 1's blocks at layer 1's Y,
+        // layer 2's blocks at layer 2's Y, layer-specific biome modifications applied to
+        // biomes that layer claims.
+        WorldshapeDescriptor worldshape = pickDescriptorForBiome(biome);
         if (worldshape == null) {
-            // Without a descriptor there is nothing meaningful to do; the warn surfaces the
-            // dependency loop if a consumer registers this modifier without shipping a
-            // matching worldshape JSON.
             warnMissingOnce(dimension);
             return;
         }
@@ -82,6 +86,24 @@ public record ApplyWorldshapeRefBiomeModifier(ResourceKey<Level> dimension) impl
     @Override
     public MapCodec<? extends BiomeModifier> codec() {
         return IsekaiBiomeModifiers.APPLY_WORLDSHAPE_REF.get();
+    }
+
+    /**
+     * Resolve the descriptor that should govern this biome's modification: layered dims pick
+     * the first layer whose {@code applies_to} claims the biome; single-descriptor dims fall
+     * back to {@link Isekai#remap()}'s {@code getActiveDescriptor}.
+     */
+    private WorldshapeDescriptor pickDescriptorForBiome(Holder<Biome> biome) {
+        var layers = Isekai.remap().getActiveLayers(dimension);
+        if (!layers.isEmpty()) {
+            for (var layer : layers) {
+                if (BiomeMatcher.matches(layer.descriptor(), biome)) {
+                    return layer.descriptor();
+                }
+            }
+            return null;
+        }
+        return Isekai.remap().getActiveDescriptor(dimension).orElse(null);
     }
 
     private static final java.util.Set<ResourceKey<Level>> WARNED = java.util.concurrent.ConcurrentHashMap.newKeySet();

@@ -3,7 +3,10 @@ package com.kuronami.isekaiapi.api.biomesource;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,6 +47,13 @@ import java.util.Map;
  *       distance &gt; radius.</li>
  *   <li>{@code isekai:and} {@code {all: [...]}} / {@code isekai:or} {@code {any: [...]}} /
  *       {@code isekai:not} {@code {inner}} — combinators.</li>
+ *   <li>{@code isekai:noise_threshold} {@code {noise, seed?, threshold?, size_xz?, size_y?}}
+ *       — true where a deterministic noise sample exceeds {@code threshold}; lets datapack
+ *       authors lay biomes by an organic noise mask rather than geometric shape.</li>
+ *   <li>{@code isekai:edge_jitter} {@code {inner, noise, seed?, strength?, size_xz?}} —
+ *       perturbs the test coordinate by a small noise offset before delegating to {@code inner},
+ *       so geometric borders (cylinders, half-planes, y-bands) get wavy, natural-looking
+ *       boundaries without changing the inner zone's intent.</li>
  * </ul>
  */
 public sealed interface BiomeZone {
@@ -177,6 +187,81 @@ public sealed interface BiomeZone {
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
     }
 
+    /**
+     * Match where a {@link NormalNoise} sampled at the position exceeds {@code threshold}. The
+     * noise is built once at zone construction from a {@link NoiseParameters} ref + a
+     * {@code seed} (so the pattern is deterministic and independent of the world seed — by
+     * design, since {@code BiomeZone} has no access to world context). Use to introduce
+     * organic, non-geometric biome borders.
+     *
+     * <p>{@code size_xz} / {@code size_y} are 1/scale factors applied to the sampled block
+     * coordinate — bigger values produce wider noise features.
+     */
+    record NoiseThreshold(Holder<NormalNoise.NoiseParameters> noise, long seed, double threshold,
+                          double sizeXz, double sizeY, NormalNoise sampler) implements BiomeZone {
+        public static final MapCodec<NoiseThreshold> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+                NormalNoise.NoiseParameters.CODEC.fieldOf("noise").forGetter(NoiseThreshold::noise),
+                Codec.LONG.optionalFieldOf("seed", 0L).forGetter(NoiseThreshold::seed),
+                Codec.DOUBLE.optionalFieldOf("threshold", 0.0).forGetter(NoiseThreshold::threshold),
+                Codec.doubleRange(1.0, 1024.0).optionalFieldOf("size_xz", 64.0).forGetter(NoiseThreshold::sizeXz),
+                Codec.doubleRange(1.0, 1024.0).optionalFieldOf("size_y", 64.0).forGetter(NoiseThreshold::sizeY))
+                .apply(i, NoiseThreshold::fromConfig));
+        public static NoiseThreshold fromConfig(Holder<NormalNoise.NoiseParameters> noise, long seed,
+                                                double threshold, double sizeXz, double sizeY) {
+            NormalNoise n = NormalNoise.create(RandomSource.create(seed), noise.value());
+            return new NoiseThreshold(noise, seed, threshold, sizeXz, sizeY, n);
+        }
+        @Override public boolean test(int qx, int qy, int qz) {
+            double x = QuartPos.toBlock(qx) / sizeXz;
+            double y = QuartPos.toBlock(qy) / sizeY;
+            double z = QuartPos.toBlock(qz) / sizeXz;
+            return sampler.getValue(x, y, z) > threshold;
+        }
+        @Override public String typeId() { return "isekai:noise_threshold"; }
+        @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
+    }
+
+    /**
+     * Wrap an inner zone and perturb the test coordinate by a small noise offset before
+     * delegating — turns geometric borders (cylinders, half-planes, y-bands) into wavy,
+     * organic ones without changing the inner zone's intent. The {@code strength} is the
+     * maximum block-distance the test position is shifted.
+     *
+     * <p>Like {@link NoiseThreshold} the jitter noise is deterministic from a fixed
+     * {@code seed} (no world context available).
+     */
+    record EdgeJitter(BiomeZone inner, Holder<NormalNoise.NoiseParameters> noise, long seed,
+                      double strength, double sizeXz, NormalNoise xSampler, NormalNoise zSampler)
+            implements BiomeZone {
+        public static final MapCodec<EdgeJitter> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+                Codec.lazyInitialized(() -> CODEC).fieldOf("inner").forGetter(EdgeJitter::inner),
+                NormalNoise.NoiseParameters.CODEC.fieldOf("noise").forGetter(EdgeJitter::noise),
+                Codec.LONG.optionalFieldOf("seed", 0L).forGetter(EdgeJitter::seed),
+                Codec.doubleRange(0.0, 32.0).optionalFieldOf("strength", 4.0).forGetter(EdgeJitter::strength),
+                Codec.doubleRange(1.0, 512.0).optionalFieldOf("size_xz", 32.0).forGetter(EdgeJitter::sizeXz))
+                .apply(i, EdgeJitter::fromConfig));
+        public static EdgeJitter fromConfig(BiomeZone inner, Holder<NormalNoise.NoiseParameters> noise,
+                                            long seed, double strength, double sizeXz) {
+            // Two independent samplers (different seed bits) so x-offset and z-offset are
+            // decorrelated — otherwise both axes jitter together and the warp collapses to a
+            // diagonal stretch instead of an organic ripple.
+            NormalNoise nx = NormalNoise.create(RandomSource.create(seed), noise.value());
+            NormalNoise nz = NormalNoise.create(RandomSource.create(seed ^ 0x9E3779B97F4A7C15L), noise.value());
+            return new EdgeJitter(inner, noise, seed, strength, sizeXz, nx, nz);
+        }
+        @Override public boolean test(int qx, int qy, int qz) {
+            double bx = QuartPos.toBlock(qx);
+            double bz = QuartPos.toBlock(qz);
+            double ox = xSampler.getValue(bx / sizeXz, 0.0, bz / sizeXz) * strength;
+            double oz = zSampler.getValue(bx / sizeXz, 0.0, bz / sizeXz) * strength;
+            int jqx = QuartPos.fromBlock((int) Math.round(bx + ox));
+            int jqz = QuartPos.fromBlock((int) Math.round(bz + oz));
+            return inner.test(jqx, qy, jqz);
+        }
+        @Override public String typeId() { return "isekai:edge_jitter"; }
+        @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
+    }
+
     // ---------------------------------------------------------------------
     // Dispatch wiring (matches SpatialPredicate's idiom exactly)
     // ---------------------------------------------------------------------
@@ -196,6 +281,8 @@ public sealed interface BiomeZone {
         registry.put("isekai:and",             And.MAP_CODEC);
         registry.put("isekai:or",              Or.MAP_CODEC);
         registry.put("isekai:not",             Not.MAP_CODEC);
+        registry.put("isekai:noise_threshold", NoiseThreshold.MAP_CODEC);
+        registry.put("isekai:edge_jitter",     EdgeJitter.MAP_CODEC);
         Map<String, MapCodec<? extends BiomeZone>> frozen = Map.copyOf(registry);
 
         return Codec.STRING.dispatch(

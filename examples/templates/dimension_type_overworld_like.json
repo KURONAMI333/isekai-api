@@ -1,0 +1,32 @@
+{
+  "//": "Path: data/<ns>/dimension_type/<name>.json — a new overworld-style dimension type.",
+  "//1": "Every field listed is REQUIRED. Floor values are the vanilla overworld; edit only what you want to change.",
+  "//2": "For a sky-world, set has_ceiling:false, ambient_light:0.0, min_y:0, height:256, logical_height:256.",
+  "//3": "For a nether-style: ultrawarm:true, natural:false, has_skylight:false, has_ceiling:true, ambient_light:0.1, fixed_time:18000.",
+  "//4": "monster_spawn_light_level is a vanilla IntProvider — the form below is the overworld default (uniform 0..7).",
+
+  "ultrawarm": false,
+  "natural": true,
+  "piglin_safe": false,
+  "respawn_anchor_works": false,
+  "bed_works": true,
+  "has_raids": true,
+  "has_skylight": true,
+  "has_ceiling": false,
+  "coordinate_scale": 1.0,
+  "ambient_light": 0.0,
+  "logical_height": 384,
+
+  "effects": "minecraft:overworld",
+  "infiniburn": "#minecraft:infiniburn_overworld",
+
+  "min_y": -64,
+  "height": 384,
+
+  "monster_spawn_block_light_limit": 0,
+  "monster_spawn_light_level": {
+    "type": "minecraft:uniform",
+    "min_inclusive": 0,
+    "max_inclusive": 7
+  }
+}

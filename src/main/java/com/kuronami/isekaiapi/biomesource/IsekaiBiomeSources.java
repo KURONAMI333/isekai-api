@@ -31,10 +31,13 @@ public final class IsekaiBiomeSources {
     public static final Supplier<MapCodec<? extends BiomeSource>> RULE =
             CODECS.register("rule", () -> RuleBiomeSource.CODEC);
 
+    public static final Supplier<MapCodec<? extends BiomeSource>> CLIMATE_ZONES =
+            CODECS.register("climate_zones", () -> ClimateZonesBiomeSource.CODEC);
+
     private IsekaiBiomeSources() {}
 
     public static void register(IEventBus modBus) {
         CODECS.register(modBus);
-        IsekaiApi.LOGGER.info("[Isekai] biome sources registered: rule");
+        IsekaiApi.LOGGER.info("[Isekai] biome sources registered: rule, climate_zones");
     }
 }

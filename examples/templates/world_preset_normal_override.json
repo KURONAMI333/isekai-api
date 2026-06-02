@@ -1,0 +1,48 @@
+{
+  "//": "Path: data/minecraft/worldgen/world_preset/normal.json — overrides the vanilla 'normal' preset.",
+  "//1": "When you override this file you REPLACE vanilla's preset entirely; the dimensions map must list ALL three dimensions.",
+  "//2": "If you only customise the overworld, the Nether and End stanzas below MUST be present verbatim — leaving them out silently breaks those dimensions (the IsekaiValidator world-preset check warns about this on server start).",
+  "//3": "Swap the overworld block to point at YOUR generator/biome_source/settings; keep Nether and End untouched unless you're also customising them.",
+
+  "dimensions": {
+    "minecraft:overworld": {
+      "type": "minecraft:overworld",
+      "generator": {
+        "type": "minecraft:noise",
+        "biome_source": {
+          "//": "YOUR biome source — e.g. isekai_api:rule with BiomeZones, or isekai_api:climate_zones, or a custom multi_noise list.",
+          "type": "minecraft:multi_noise",
+          "preset": "minecraft:overworld"
+        },
+        "settings": {
+          "//": "YOUR noise_settings key — either minecraft:overworld (vanilla) or your namespace's noise_settings."
+        }
+      }
+    },
+
+    "minecraft:the_nether": {
+      "//": "VERBATIM vanilla Nether. Do not edit unless you're customising the Nether.",
+      "type": "minecraft:the_nether",
+      "generator": {
+        "type": "minecraft:noise",
+        "biome_source": {
+          "type": "minecraft:multi_noise",
+          "preset": "minecraft:nether"
+        },
+        "settings": "minecraft:nether"
+      }
+    },
+
+    "minecraft:the_end": {
+      "//": "VERBATIM vanilla End. Do not edit unless you're customising the End.",
+      "type": "minecraft:the_end",
+      "generator": {
+        "type": "minecraft:noise",
+        "biome_source": {
+          "type": "minecraft:the_end"
+        },
+        "settings": "minecraft:end"
+      }
+    }
+  }
+}

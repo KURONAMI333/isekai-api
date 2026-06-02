@@ -40,11 +40,28 @@ public record ApplyWorldshapeStructuresRefStructureModifier(ResourceKey<Level> d
 
     @Override
     public void modify(Holder<Structure> structure, Phase phase, ModifiableStructureInfo.StructureInfo.Builder builder) {
+        // Layered dims: structure modification has no Y context, so we apply every layer's
+        // declared exclusion / spawn-override for this structure (union semantics). This is
+        // permissive on purpose — if any layer wants to exclude or re-spawn-override a
+        // structure, honour it. Different from biome modifier (which uses first-match per
+        // biome) because structures don't have a single "claim" the way biomes do.
+        var layers = Isekai.remap().getActiveLayers(dimension);
+        if (!layers.isEmpty()) {
+            for (var layer : layers) {
+                applyOne(layer.descriptor(), structure, phase, builder);
+            }
+            return;
+        }
         WorldshapeDescriptor worldshape = Isekai.remap().getActiveDescriptor(dimension).orElse(null);
         if (worldshape == null) {
             warnMissingOnce(dimension);
             return;
         }
+        applyOne(worldshape, structure, phase, builder);
+    }
+
+    private void applyOne(WorldshapeDescriptor worldshape, Holder<Structure> structure,
+                          Phase phase, ModifiableStructureInfo.StructureInfo.Builder builder) {
         if (phase == Phase.REMOVE) {
             applyExclusion(worldshape, structure, builder);
         } else if (phase == Phase.MODIFY) {
