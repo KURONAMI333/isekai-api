@@ -153,6 +153,13 @@ public final class ModifyPhase {
         atmos.waterFogColor().ifPresent(effects::waterFogColor);
         atmos.foliageColor().ifPresent(effects::foliageColorOverride);
         atmos.grassColor().ifPresent(effects::grassColorOverride);
+        var extras = atmos.effectsExtras();
+        extras.grassColorModifier().ifPresent(effects::grassColorModifier);
+        extras.ambientParticle().ifPresent(effects::ambientParticle);
+        extras.ambientLoopSound().ifPresent(effects::ambientLoopSound);
+        extras.ambientMoodSound().ifPresent(effects::ambientMoodSound);
+        extras.ambientAdditionsSound().ifPresent(effects::ambientAdditionsSound);
+        extras.backgroundMusic().ifPresent(effects::backgroundMusic);
 
         // creature_generation_probability lives on MobSpawnSettings, not BiomeSpecialEffects;
         // grouped here with the other atmospheric tunables since it's a per-biome scalar

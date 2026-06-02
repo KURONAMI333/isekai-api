@@ -88,6 +88,23 @@ public final class IsekaiRemapImpl implements IsekaiRemap {
     }
 
     @Override
+    public Optional<WorldshapeDescriptor> getDescriptorAt(ResourceKey<Level> dimension, int y) {
+        List<LayeredDescriptor> layers = multiLayer.get(dimension);
+        if (layers != null && !layers.isEmpty()) {
+            // half-open interval [minY, maxY): standard for consecutive non-overlapping bands
+            for (LayeredDescriptor l : layers) {
+                if (y >= l.yRange().minY() && y < l.yRange().maxY()) {
+                    return Optional.of(l.descriptor());
+                }
+            }
+            // Y falls in a gap between layers — no descriptor applies. (TransitionRule.Gap
+            // explicitly models this; for Hard / Blend the validator enforces no gaps.)
+            return Optional.empty();
+        }
+        return getActiveDescriptor(dimension);
+    }
+
+    @Override
     public Set<ResourceKey<Level>> getDeclaredDimensions() {
         Set<ResourceKey<Level>> all = new HashSet<>(singleLayer.keySet());
         all.addAll(multiLayer.keySet());

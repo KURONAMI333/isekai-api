@@ -31,7 +31,7 @@ Pick your path — most worldgen work needs no Java at all.
 
 ## What it gives you
 
-### 16 neutral density function primitives + 4 worldshape composers
+### 17 neutral density function primitives + 5 worldshape composers
 
 Registered under the `isekai_api:` namespace (mod id), usable from `noise_settings` JSON or Java:
 
@@ -39,12 +39,13 @@ Registered under the `isekai_api:` namespace (mod id), usable from `noise_settin
 |---|---|
 | Value sources | `constant`, `coordinate` (axis x/y/z) |
 | Arithmetic | `add`, `multiply`, `negate`, `abs` |
+| Mapping | `quarter_negative` (vanilla `quarter_negative` re-exposed — `Mapped.Type` is package-private) |
 | Range | `clamp` |
 | Combinators | `min`, `max`, `lerp`, `step` |
 | Spatial reference | `distance` (mode xz / xyz) |
 | Coordinate transforms | `translate`, `scale_coord` (negative factors mirror the axis), `repeat` (XZ-plane tiling) |
 | Masks | `mask_y_range` |
-| **Worldshape composers** | `squeeze`, `y_envelope`, `blended_noise`, `band_density` |
+| **Worldshape composers** | `squeeze`, `y_envelope`, `blended_noise`, `band_density`, `sloped_density` |
 
 The four worldshape composers build common terrain patterns without leaking consumer-theme names into the API:
 
@@ -55,9 +56,11 @@ The four worldshape composers build common terrain patterns without leaking cons
 
 Vanilla density functions stay accessible via standard `minecraft:` keys — Isekai does not re-export them. Compose Isekai primitives with vanilla density via standard density function references.
 
-### Rule-based biome source (`isekai_api:rule`)
+### Biome sources
 
-Density functions decide the *shape* of terrain; the biome source decides *which biome goes where*. `isekai_api:rule` is a `BiomeSource` that places biomes by spatial rules, evaluated in declaration order — the first matching `BiomeZone` wins. Reference it from a dimension's `biome_source` field:
+Density functions decide the *shape* of terrain; the biome source decides *which biome goes where*. Isekai offers two complementary biome sources — both go in a dimension's `biome_source` field, pick whichever fits.
+
+**`isekai_api:rule`** — places biomes by spatial `BiomeZone` rules (Y bands, radial distance, noise threshold, edge jitter, combinators), evaluated in declaration order; first match wins. Suited to layered / radial / explicitly-shaped worlds. Reference it from a dimension's `biome_source` field:
 
 ```jsonc
 // data/<ns>/dimension/<name>.json → generator.biome_source
@@ -87,9 +90,13 @@ Density functions decide the *shape* of terrain; the biome source decides *which
 
 This makes arbitrary biome distributions expressible from datapack: vertical layers, concentric rings, half-and-half regions, etc.
 
+**`isekai_api:climate_zones`** — places biomes by matching the vanilla climate axes (temperature / humidity / continentalness / erosion / weirdness / depth) against per-rule range constraints. Same purpose as vanilla `minecraft:multi_noise` but each rule lists only the axes it cares about (others default to no constraint), and order is explicit (first match wins) instead of vanilla's nearest-point matching. Suited to Overworld-style multi-biome worlds where biome choice is climate-driven rather than position-driven.
+
 ### New dimensions
 
 A new dimension is pure datapack — no Java. Combine `dimension/` + `dimension_type/` + `worldgen/noise_settings/` with the `isekai_api:rule` biome source (which biomes) and `isekai_api:band_density` (terrain shape). New biomes are likewise plain `worldgen/biome/` JSON, placed by the rule biome source.
+
+If you're **overriding** vanilla's `minecraft:normal` world_preset to customise the overworld instead of adding a new dimension, you must re-declare the Nether and End stanzas verbatim — leaving them out silently breaks those dimensions. The Isekai validator warns on server start when this trap fires; see [`examples/templates/world_preset_normal_override.json`](examples/templates/world_preset_normal_override.json) for an annotated copy-paste starting point.
 
 ### Per-biome surface block overrides
 
@@ -99,6 +106,58 @@ Two `SurfaceRules.RuleSource` types let you re-skin per-biome blocks without wri
 - **`isekai_api:worldshape_default_block`** — overrides the default block (the stone-equivalent bulk fill) from `block_overrides.default_block`.
 
 Wire either rule into your dimension's `surface_rule` sequence — surface_top should come first, default_block should come last (after vanilla rules) so the surface band stays intact and only sub-surface stone gets remapped.
+
+A third rule, **`isekai_api:strata`**, takes an ordered list of `{block, thickness}` bands measured downward from the floor surface — collapses an N-layer nested `stone_depth` sequence (e.g. sand → sandstone → stone) into one flat list.
+
+### Tree placers — neutral, decay-safe geometry
+
+Used as the `trunk_placer` / `foliage_placer` of a vanilla `minecraft:tree` configured feature. The wood/leaf blocks come from the feature's own `trunk_provider` / `foliage_provider` slots — the placer only decides geometry. Compose any trunk with any foliage. Spread leaves are placed with their `LeavesBlock.DISTANCE` pinned internally so the tree never decays.
+
+| | Placers |
+|---|---|
+| Trunks | `leaning` (palm/wind-bent, optional sandy beach mode, optional single-tip crown), `branching` (vertical + N upward branches, one crown per branch tip) |
+| Foliage | `sphere` (ellipsoid), `fan` (palm head), `cone` (linear or concave taper — conifer), `disc` (flat umbrella), `weeping` (stacked discs + hanging strands — willow) |
+
+See [docs/DATAPACK_REFERENCE.md](docs/DATAPACK_REFERENCE.md#tree-placers-isekai_api) for the full field list and a minimal palm example.
+
+### Placement modifiers
+
+Beyond vanilla `count`/`in_square`/`rarity_filter`/etc.:
+
+- **`isekai_api:surface_relative`** / **`fluid_relative`** — anchor to the world surface or the water column top/bottom + offset.
+- **`isekai_api:in_block_context`** — gate placement on the surrounding block context (match a block/tag, optionally require air above, optionally exclude in fluid).
+- **`isekai_api:spatial_predicate`** — gate placement on any `SpatialPredicate` (Y range, slope, near block, near biome…).
+- **`isekai_api:scatter`** — jitter the input into N samples within a radius, optionally rejecting any sample within `min_spacing` blocks of an already-accepted one. Replaces `count + in_square` whenever you want clustered features that don't stack on each other.
+- **`isekai_api:fluid_edge`** — accept positions within (or beyond) `max_distance` blocks of a fluid. Pure distance filter — use for placements that need a water-adjacent context without baking "shoreline" into the API.
+- **`isekai_api:slope_filter`** — accept positions whose local heightmap slope falls in `[min, max]`. 0 = flat, 1 ≈ 45°+ cliff.
+
+### Features — neutral geometric primitives
+
+Two `Feature<?>` types for the patterns consumers hit constantly:
+
+- **`isekai_api:cluster`** — random-walk BFS blob of N connected blocks. Use for moss patches, dirt veins, fungus spreads, ore clusters.
+- **`isekai_api:pool`** — carves a disc into terrain, lines floor + outer rim with `rim_block`, fills with `fluid`. Dodges the `waterlogged_vegetation_patch` grass→dirt drowning trap.
+
+### Composite landmarks — `isekai_api:assembled` Structure
+
+For locatable landmarks that are made of several Features placed at a common origin (a pool plus a rim plus some trees, an arrangement of clusters around a centre block, etc.). Declare them as `Structure` JSON whose `features` field lists `configured_feature` ids — Isekai handles `/locate` support, biome filtering, generation-step ordering, and `structure_set` spacing; the Features do the block placement.
+
+Datapack-only on-ramp: zero Java required. This is the gap every existing worldgen MOD currently leaves open — they either hand-write a Structure subclass per landmark, or skip `/locate` and spawn the landmark as a rare Feature.
+
+### Per-biome atmosphere overrides
+
+The worldshape descriptor's `atmosphere` field overrides every per-biome `BiomeSpecialEffects` value plus climate axes — colours (sky / fog / water / water_fog / foliage / grass), precipitation / temperature / downfall, and (under `effects_extras`) grass-colour algorithm, ambient particles, ambient loop / mood / additions sound, and background music. Plus spawning tunables (creature generation probability, per-entity mob spawn cost). Each field is independently optional — only set what you want to change.
+
+This covers the whole server-side atmosphere surface.
+
+### Client-side rendering — fog overrides
+
+In addition to the per-biome `atmosphere` field, the worldshape descriptor has a `client_atmosphere` field for **dimension-wide rendering overrides** that apply via NeoForge's `ViewportEvent` hooks at the camera's current position. Currently exposes:
+
+- `fog_color` — overrides the rendered fog colour dimension-wide (or per layer, in a layered worldshape, resolved by camera Y)
+- `fog_near_distance` / `fog_far_distance` — fog gradient band, in blocks
+
+Sky / cloud / weather / sun / moon rendering remain hardcoded by vanilla; reaching those requires a `DimensionSpecialEffects` subclass + client mixin (not currently shipped). For sky colour, use the per-biome `atmosphere.sky_color` — same visual effect, biome-driven.
 
 ### `BiomeSelection` with tag support
 
@@ -120,7 +179,7 @@ Five in-house sealed interfaces let you adapt vanilla / modded rules to your wor
 - **`RemapStrategy`** (7 variants) — `Identity` / `Linear` / `Inverted` / `FixedRange` / `CountScale` / `BandSplit(List<Band>)` / `Pipe(List<RemapStrategy>)`. Map vanilla Y bands and feature counts onto your playable range. Every variant is JSON-encodable.
 - **`SurfaceAnchor`** (3 variants) — `WorldSurface` / `BelowFluid(fluid)` / `FixedY(y)`. Defines what "the surface" means in your worldshape.
 - **`TransitionRule`** — `Hard` / `Blend(blend_height)` / `Gap(gap_height)` for multi-layer worldshapes.
-- **`BiomeZone`** (9 variants) — the biome-placement conditions used by the `isekai_api:rule` biome source (see above): `always` / `y_above` / `y_below` / `y_between` / `within_distance` / `beyond_distance` plus combinators `and` / `or` / `not`.
+- **`BiomeZone`** (11 variants) — the biome-placement conditions used by the `isekai_api:rule` biome source (see above): `always` / `y_above` / `y_below` / `y_between` / `within_distance` / `beyond_distance` / `noise_threshold` (organic noise mask) / `edge_jitter` (perturbs an inner zone's borders with a small noise offset) plus combinators `and` / `or` / `not`.
 
 ### Biome / Structure modifier integration
 

@@ -1,0 +1,43 @@
+{
+  "//": "Path: data/<ns>/worldgen/biome/<name>.json — a new overworld-style biome.",
+  "//1": "Every field listed is REQUIRED — vanilla refuses to load a biome JSON missing any of them. Use this as the floor and edit only what you want to change.",
+  "//2": "The 11 empty feature arrays correspond to GenerationStep.Decoration values (raw_generation, lakes, local_modifications, underground_structures, surface_structures, strongholds, underground_ores, underground_decoration, fluid_springs, vegetal_decoration, top_layer_modification). Add placed_feature ids to the right slot for your biome's content.",
+  "//3": "Colours are 24-bit RGB packed as a single int (calculate via R*65536+G*256+B). The values below match vanilla 'plains'.",
+
+  "has_precipitation": true,
+  "temperature": 0.8,
+  "downfall": 0.4,
+
+  "effects": {
+    "fog_color":       12638463,
+    "water_color":     4159204,
+    "water_fog_color": 329011,
+    "sky_color":       7907327,
+    "mood_sound": {
+      "sound":              "minecraft:ambient.cave",
+      "tick_delay":         6000,
+      "block_search_extent": 8,
+      "offset":             2.0
+    }
+  },
+
+  "carvers": {},
+
+  "features": [
+    [], [], [], [], [],
+    [], [], [], [], [],
+    []
+  ],
+
+  "spawners": {
+    "monster":     [],
+    "creature":    [],
+    "ambient":     [],
+    "axolotls":    [],
+    "underground_water_creature": [],
+    "water_creature": [],
+    "water_ambient":  [],
+    "misc":        []
+  },
+  "spawn_costs": {}
+}
