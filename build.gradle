@@ -52,6 +52,13 @@ neoForge {
             sourceSet(sourceSets.main)
         }
     }
+
+    // Put Minecraft + NeoForge on the test classpath and load this mod in a minimal FML
+    // environment, so unit tests can bootstrap registries and exercise real codecs.
+    unitTest {
+        enable()
+        testedMod = mods."${mod_id}"
+    }
 }
 
 configurations {

@@ -20,6 +20,10 @@ import org.jetbrains.annotations.ApiStatus;
  *   <li>{@code isekai_api:surface_relative} — anchor to WORLD_SURFACE_WG + offset</li>
  *   <li>{@code isekai_api:fluid_relative} — anchor to water top/bottom + offset</li>
  *   <li>{@code isekai_api:in_block_context} — filter by surrounding block context</li>
+ *   <li>{@code isekai_api:spatial_predicate} — filter by any {@link
+ *       com.kuronami.isekaiapi.api.predicate.SpatialPredicate}</li>
+ *   <li>{@code isekai_api:scatter} — jitter into N samples within a radius with optional
+ *       minimum spacing (vanilla {@code count + in_square} plus non-overlap)</li>
  * </ul>
  */
 @ApiStatus.Internal
@@ -40,10 +44,19 @@ public final class IsekaiPlacementModifiers {
     public static final Supplier<PlacementModifierType<SpatialPredicatePlacementModifier>> SPATIAL_PREDICATE =
             TYPES.register("spatial_predicate", () -> () -> SpatialPredicatePlacementModifier.CODEC);
 
+    public static final Supplier<PlacementModifierType<ScatterPlacementModifier>> SCATTER =
+            TYPES.register("scatter", () -> () -> ScatterPlacementModifier.CODEC);
+
+    public static final Supplier<PlacementModifierType<FluidEdgeModifier>> FLUID_EDGE =
+            TYPES.register("fluid_edge", () -> () -> FluidEdgeModifier.CODEC);
+
+    public static final Supplier<PlacementModifierType<SlopeFilterModifier>> SLOPE_FILTER =
+            TYPES.register("slope_filter", () -> () -> SlopeFilterModifier.CODEC);
+
     private IsekaiPlacementModifiers() {}
 
     public static void register(IEventBus modBus) {
         TYPES.register(modBus);
-        IsekaiApi.LOGGER.info("[Isekai] placement modifiers registered: surface_relative, fluid_relative, in_block_context, spatial_predicate");
+        IsekaiApi.LOGGER.info("[Isekai] placement modifiers registered: surface_relative, fluid_relative, in_block_context, spatial_predicate, scatter, fluid_edge, slope_filter");
     }
 }

@@ -55,19 +55,25 @@ public record WorldshapeSurfaceTopRule(ResourceKey<Level> dimension) implements 
 
     @Override
     public SurfaceRules.SurfaceRule apply(SurfaceRules.Context context) {
-        var worldshape = Isekai.remap().getActiveDescriptor(dimension).orElse(null);
-        if (worldshape == null) {
+        // Per-block layer resolution. We can't cache the descriptor outside the lambda because
+        // a layered dimension has different blockOverrides per Y band — the lookup happens at
+        // tryApply time when we know blockY. For single-descriptor dims the cost is one extra
+        // map lookup; for layered dims it's the only correct path. Warns once per dim if
+        // nothing is declared at all (regardless of Y).
+        if (Isekai.remap().getActiveDescriptor(dimension).isEmpty()
+                && Isekai.remap().getActiveLayers(dimension).isEmpty()) {
             warnMissingOnce(dimension);
             return NULL_RULE;
         }
-        var surfaceTop = worldshape.blockOverrides().surfaceTop();
-        if (surfaceTop.isEmpty()) return NULL_RULE;
         return new SurfaceRules.SurfaceRule() {
             @Override
             public @Nullable BlockState tryApply(int blockX, int blockY, int blockZ) {
                 var biome = context.biome.get();
                 var key = biome.unwrapKey().orElse(null);
                 if (key == null) return null;
+                var worldshape = Isekai.remap().getDescriptorAt(dimension, blockY).orElse(null);
+                if (worldshape == null) return null;
+                var surfaceTop = worldshape.blockOverrides().surfaceTop();
                 return surfaceTop.get(key);
             }
         };

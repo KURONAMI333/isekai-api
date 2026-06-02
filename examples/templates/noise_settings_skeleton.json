@@ -1,0 +1,67 @@
+{
+  "//": "Path: data/<ns>/worldgen/noise_settings/<name>.json — a new noise_settings document.",
+  "//1": "Every top-level field is REQUIRED. The noise_router defines terrain shape and biome-sampling axes; the values here are the standard overworld pattern with the FINAL_DENSITY slot left as a placeholder (replace with your own terrain expression — typically wrapped in isekai_api:sloped_density).",
+  "//2": "For an ocean / island world set aquifers_enabled:false to avoid perched-water waterfalls on coasts.",
+  "//3": "Surface rule below is a minimal sand-over-sandstone — swap in isekai_api:strata for a multi-band stack.",
+
+  "sea_level": 63,
+  "disable_mob_generation": false,
+  "aquifers_enabled": true,
+  "ore_veins_enabled": true,
+  "legacy_random_source": false,
+
+  "default_block": { "Name": "minecraft:stone" },
+  "default_fluid": { "Name": "minecraft:water", "Properties": { "level": "0" } },
+
+  "noise": { "min_y": -64, "height": 384, "size_horizontal": 1, "size_vertical": 2 },
+
+  "noise_router": {
+    "barrier":         { "type": "minecraft:constant", "argument": 0 },
+    "fluid_level_floodedness": { "type": "minecraft:constant", "argument": 0 },
+    "fluid_level_spread":      { "type": "minecraft:constant", "argument": 0 },
+    "lava":            { "type": "minecraft:constant", "argument": 0 },
+
+    "temperature":      "minecraft:overworld/temperature",
+    "vegetation":       "minecraft:overworld/vegetation",
+    "continents":       "minecraft:overworld/continents",
+    "erosion":          "minecraft:overworld/erosion",
+    "depth":            "minecraft:overworld/depth",
+    "ridges":           "minecraft:overworld/ridges",
+
+    "initial_density_without_jaggedness": "minecraft:overworld/sloped_cheese",
+
+    "final_density": {
+      "//": "REPLACE THIS — wrap your terrain in minecraft:interpolated + minecraft:blend_density, the inner argument is the terrain shape. The recommended neutral wrapper is isekai_api:sloped_density.",
+      "type": "minecraft:constant", "argument": 0
+    },
+
+    "vein_toggle":     "minecraft:overworld/vein_toggle",
+    "vein_ridged":     "minecraft:overworld/vein_ridged",
+    "vein_gap":        "minecraft:overworld/vein_gap"
+  },
+
+  "spawn_target": [],
+
+  "surface_rule": {
+    "type": "minecraft:sequence",
+    "sequence": [
+      {
+        "type": "minecraft:condition",
+        "if_true": {
+          "type": "minecraft:vertical_gradient",
+          "random_name": "minecraft:bedrock_floor",
+          "true_at_and_below":  { "above_bottom": 0 },
+          "false_at_and_above": { "above_bottom": 5 }
+        },
+        "then_run": { "type": "minecraft:block", "result_state": { "Name": "minecraft:bedrock" } }
+      },
+      {
+        "type": "isekai_api:strata",
+        "bands": [
+          { "block": { "Name": "minecraft:grass_block", "Properties": { "snowy": "false" } }, "thickness": 1 },
+          { "block": { "Name": "minecraft:dirt" }, "thickness": 3 }
+        ]
+      }
+    ]
+  }
+}

@@ -20,6 +20,10 @@ import org.jetbrains.annotations.ApiStatus;
  * <ul>
  *   <li>{@code isekai_api:worldshape_surface_top} — biome-keyed top-block override read
  *       from the active worldshape's {@code block_overrides.surface_top}.</li>
+ *   <li>{@code isekai_api:worldshape_default_block} — biome-keyed default-fill override.</li>
+ *   <li>{@code isekai_api:strata} — ordered (block, thickness) bands measured downward from
+ *       the floor surface. Collapses N-layer nested {@code stone_depth} sequences into one
+ *       flat list.</li>
  * </ul>
  */
 @ApiStatus.Internal
@@ -34,10 +38,13 @@ public final class IsekaiSurfaceRules {
     public static final Supplier<MapCodec<? extends SurfaceRules.RuleSource>> WORLDSHAPE_DEFAULT_BLOCK =
             CODECS.register("worldshape_default_block", () -> WorldshapeDefaultBlockRule.CODEC);
 
+    public static final Supplier<MapCodec<? extends SurfaceRules.RuleSource>> STRATA =
+            CODECS.register("strata", () -> StrataRule.CODEC);
+
     private IsekaiSurfaceRules() {}
 
     public static void register(IEventBus modBus) {
         CODECS.register(modBus);
-        IsekaiApi.LOGGER.info("[Isekai] surface rule sources registered: worldshape_surface_top, worldshape_default_block");
+        IsekaiApi.LOGGER.info("[Isekai] surface rule sources registered: worldshape_surface_top, worldshape_default_block, strata");
     }
 }

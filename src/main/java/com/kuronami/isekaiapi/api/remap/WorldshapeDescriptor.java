@@ -63,6 +63,7 @@ public record WorldshapeDescriptor(
         Map<MobCategory, RemapStrategy> mobSpawnStrategyByCategory,
         Additions additions,
         AtmosphereOverride atmosphere,
+        ClientAtmosphereOverride clientAtmosphere,
         ContentOverrides contentOverrides,
         int priority
 ) {
@@ -73,6 +74,7 @@ public record WorldshapeDescriptor(
         if (exclusions == null) exclusions = Exclusions.EMPTY;
         if (additions == null) additions = Additions.EMPTY;
         if (atmosphere == null) atmosphere = AtmosphereOverride.EMPTY;
+        if (clientAtmosphere == null) clientAtmosphere = ClientAtmosphereOverride.EMPTY;
         if (contentOverrides == null) contentOverrides = ContentOverrides.EMPTY;
     }
 
@@ -269,6 +271,7 @@ public record WorldshapeDescriptor(
         private Map<MobCategory, RemapStrategy> mobSpawnStrategyByCategory = Map.of();
         private Additions additions = Additions.EMPTY;
         private AtmosphereOverride atmosphere = AtmosphereOverride.EMPTY;
+        private ClientAtmosphereOverride clientAtmosphere = ClientAtmosphereOverride.EMPTY;
         private ContentOverrides contentOverrides = ContentOverrides.EMPTY;
         private int priority = DEFAULT_PRIORITY;
 
@@ -289,6 +292,7 @@ public record WorldshapeDescriptor(
         public Builder mobSpawnStrategyByCategory(Map<MobCategory, RemapStrategy> v) { this.mobSpawnStrategyByCategory = v; return this; }
         public Builder additions(Additions v) { this.additions = v; return this; }
         public Builder atmosphere(AtmosphereOverride v) { this.atmosphere = v; return this; }
+        public Builder clientAtmosphere(ClientAtmosphereOverride v) { this.clientAtmosphere = v; return this; }
         public Builder contentOverrides(ContentOverrides v) { this.contentOverrides = v; return this; }
         public Builder priority(int v) { this.priority = v; return this; }
 
@@ -305,7 +309,7 @@ public record WorldshapeDescriptor(
                     oreStrategy, structureStrategy, mobSpawnStrategy,
                     structurePredicates, defaultStructurePredicate,
                     appliesTo, exclusions, mobSpawnStrategyByCategory,
-                    additions, atmosphere, contentOverrides, priority);
+                    additions, atmosphere, clientAtmosphere, contentOverrides, priority);
         }
     }
 
@@ -352,6 +356,8 @@ public record WorldshapeDescriptor(
                     .forGetter(WorldshapeDescriptor::additions),
             AtmosphereOverride.CODEC.optionalFieldOf("atmosphere", AtmosphereOverride.EMPTY)
                     .forGetter(WorldshapeDescriptor::atmosphere),
+            ClientAtmosphereOverride.CODEC.optionalFieldOf("client_atmosphere", ClientAtmosphereOverride.EMPTY)
+                    .forGetter(WorldshapeDescriptor::clientAtmosphere),
             ContentOverrides.CODEC.optionalFieldOf("content_overrides", ContentOverrides.EMPTY)
                     .forGetter(WorldshapeDescriptor::contentOverrides),
             Codec.INT.optionalFieldOf("priority", DEFAULT_PRIORITY)

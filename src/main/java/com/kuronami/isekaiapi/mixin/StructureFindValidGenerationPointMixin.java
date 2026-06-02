@@ -61,15 +61,16 @@ public class StructureFindValidGenerationPointMixin {
         // untouched.
         ResourceKey<Level> dimKey = DimensionResolver.resolveByBiomeSource(context.biomeSource());
         if (dimKey == null) return;
-        WorldshapeDescriptor descriptor = Isekai.remap().getActiveDescriptor(dimKey).orElse(null);
+        // Layered worlds: pick the descriptor that covers the structure's chosen Y. Single-
+        // descriptor dims fall through to getActiveDescriptor inside getDescriptorAt.
+        BlockPos pos = result.get().position();
+        WorldshapeDescriptor descriptor = Isekai.remap().getDescriptorAt(dimKey, pos.getY()).orElse(null);
         if (descriptor == null) return;
 
         Structure structure = (Structure) (Object) this;
         ResourceKey<Structure> structureKey = resolveStructureKey(structure);
         SpatialPredicate predicate = predicateFor(descriptor, structureKey);
         if (predicate == null) return;
-
-        BlockPos pos = result.get().position();
         SpatialPredicateEvaluator.Context evalCtx = new SpatialPredicateEvaluator.Context(
                 context.chunkGenerator(), context.heightAccessor(), context.randomState(),
                 context.biomeSource());
