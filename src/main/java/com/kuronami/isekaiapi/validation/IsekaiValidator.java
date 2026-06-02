@@ -287,4 +287,54 @@ public final class IsekaiValidator {
             return errors.isEmpty();
         }
     }
+
+    // -----------------------------------------------------------------------
+    // World preset overrides check — catches the silent-Nether/End-loss trap
+    // that overriding `data/minecraft/worldgen/world_preset/<id>.json` causes.
+    // -----------------------------------------------------------------------
+
+    /** Dimensions a world_preset MUST list (re-declared verbatim if not customised). */
+    private static final List<String> REQUIRED_DIMENSIONS = List.of(
+            "minecraft:overworld", "minecraft:the_nether", "minecraft:the_end");
+
+    /**
+     * Scan every {@code worldgen/world_preset/*.json} contributed by a non-{@code minecraft}
+     * datapack (i.e. authored by a mod / pack, not vanilla) and warn when its
+     * {@code dimensions} map is missing any of the standard three dimensions. Catches the
+     * exact trap where a consumer overrides {@code data/minecraft/worldgen/world_preset/normal.json}
+     * to customise the overworld and silently breaks Nether / End access because they
+     * forgot to re-declare those stanzas verbatim.
+     *
+     * <p>Returns a list of warning strings (one per file with missing dimensions); the
+     * caller is responsible for logging. Result is empty when nothing is wrong.
+     */
+    public static List<String> validateWorldPresets(ResourceManager rm) {
+        List<String> warnings = new ArrayList<>();
+        Map<ResourceLocation, Resource> files = rm.listResources(
+                "worldgen/world_preset", path -> path.getPath().endsWith(".json"));
+        for (Map.Entry<ResourceLocation, Resource> e : files.entrySet()) {
+            ResourceLocation id = e.getKey();
+            try (BufferedReader reader = e.getValue().openAsReader()) {
+                JsonElement json = JsonParser.parseReader(reader);
+                if (!json.isJsonObject()) continue;
+                JsonElement dims = json.getAsJsonObject().get("dimensions");
+                if (dims == null || !dims.isJsonObject()) {
+                    warnings.add("world_preset " + id + " has no dimensions map");
+                    continue;
+                }
+                List<String> missing = new ArrayList<>();
+                for (String required : REQUIRED_DIMENSIONS) {
+                    if (!dims.getAsJsonObject().has(required)) missing.add(required);
+                }
+                if (!missing.isEmpty()) {
+                    warnings.add("world_preset " + id + " is missing " + missing
+                            + " — Nether / End access will silently break unless those "
+                            + "stanzas are re-declared verbatim. See examples/templates/world_preset_normal_override.json.");
+                }
+            } catch (IOException ex) {
+                warnings.add("world_preset " + id + ": " + ex.getMessage());
+            }
+        }
+        return warnings;
+    }
 }

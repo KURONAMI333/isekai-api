@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kuronami.dev/isekai_api/layered_worldshape.schema.json",
+  "title": "Isekai API layered_worldshape",
+  "description": "Body of data/<ns>/isekai/layered_worldshape/<name>.json: one dimension stacked from Y-ranged worldshape layers. See docs/DATAPACK_REFERENCE.md.",
+  "type": "object",
+  "required": ["dimension", "layers"],
+  "additionalProperties": false,
+  "properties": {
+    "dimension": {
+      "type": "string",
+      "pattern": "^[a-z0-9_.-]+:[a-z0-9_./-]+$",
+      "description": "Target dimension key."
+    },
+    "layers": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/layer" }
+    }
+  },
+  "$defs": {
+    "layer": {
+      "type": "object",
+      "required": ["y_range", "descriptor", "transition"],
+      "additionalProperties": false,
+      "properties": {
+        "y_range": {
+          "type": "object",
+          "required": ["min_y", "max_y", "distribution"],
+          "additionalProperties": false,
+          "properties": {
+            "min_y": { "type": "integer" },
+            "max_y": { "type": "integer" },
+            "distribution": { "enum": ["uniform", "trapezoid", "triangle", "biased_low", "biased_high"] }
+          }
+        },
+        "descriptor": {
+          "$ref": "./worldshape.schema.json",
+          "description": "A full WorldshapeDescriptor for this Y-band."
+        },
+        "transition": { "$ref": "#/$defs/transitionRule" }
+      }
+    },
+    "transitionRule": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["isekai:hard", "isekai:blend", "isekai:gap"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "isekai:blend" } } },
+          "then": { "required": ["blend_height"], "properties": { "blend_height": { "type": "integer", "minimum": 0 } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "isekai:gap" } } },
+          "then": { "required": ["gap_height"], "properties": { "gap_height": { "type": "integer", "minimum": 0 } } }
+        }
+      ]
+    }
+  }
+}

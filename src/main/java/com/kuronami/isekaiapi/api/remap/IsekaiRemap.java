@@ -42,6 +42,23 @@ public interface IsekaiRemap {
     /** Currently-active layered descriptors for the given dimension, if any. */
     List<LayeredDescriptor> getActiveLayers(ResourceKey<Level> dimension);
 
+    /**
+     * The descriptor that applies at a specific Y in the dimension. Encapsulates the layered
+     * vs single-layer decision so runtime consumers (surface rules, structure placement
+     * mixins) can ask "which descriptor applies at this Y?" without knowing whether the dim
+     * was declared as a single descriptor or as layers.
+     *
+     * <p>Resolution: if {@link #getActiveLayers(ResourceKey)} returns layers, pick the layer
+     * whose {@link LayeredDescriptor#yRange()} contains {@code y} (half-open
+     * {@code [minY, maxY)}) and return that layer's descriptor; if no layer covers {@code y}
+     * (a gap), return empty. If no layered declaration exists for the dimension, fall back
+     * to {@link #getActiveDescriptor(ResourceKey)}.
+     *
+     * @return descriptor active at this Y, or empty if neither layer nor single descriptor
+     *         applies
+     */
+    Optional<WorldshapeDescriptor> getDescriptorAt(ResourceKey<Level> dimension, int y);
+
     /** All dimensions that currently have any worldshape declaration (single or layered). */
     Set<ResourceKey<Level>> getDeclaredDimensions();
 }

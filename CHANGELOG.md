@@ -3,6 +3,94 @@
 All notable changes to Isekai API follow this file. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.0] — 2026-06-02
+
+Set-piece, vegetation, and surface tooling. Everything below is datapack-authorable
+and registered under `isekai_api:`; the core language from 1.0.0 is unchanged.
+
+### Structures
+- **`isekai_api:grounded_template`** — places one hand-authored NBT template on flat,
+  dry ground. Vanilla `minecraft:jigsaw` gates placement on biome only; a biome assigned
+  by climate (continentalness) doesn't track the waterline or terrain steepness, so a
+  jigsaw set-piece spawns half-submerged in shallow sea or tilted across a cliff. This
+  structure adds the two gates vanilla can't express in a datapack: `clearance_above_fluid`
+  (every footprint column must rise this many blocks above sea level) and `max_slope`
+  (footprint height-spread ceiling). Placement reuses vanilla template machinery (correct
+  per-chunk clamping) and honours `terrain_adaptation` (`beard_thin`). `vertical_offset`
+  tunes sink/raise.
+- **`isekai_api:assembled`** — a structure that places a list of `PlacedFeature`s at one
+  origin (Y snapped to `WORLD_SURFACE_WG`). For a loose scatter of independent features
+  near a point; not for coordinated set-pieces (use `grounded_template` or
+  `minecraft:jigsaw` for those).
+
+### Features
+- **`isekai_api:cluster`** — a connected blob of N blocks grown by random walk
+  (`block` provider, `size`, `can_replace_solid`).
+- **`isekai_api:pool`** — carves a fluid basin, lines its floor/rim with `rim_block`, then
+  fills with `fluid`, in one pass — avoiding the `waterlogged_vegetation_patch` failure
+  where grass placed underwater decays to dirt. `xz_radius`, `depth`.
+
+### Tree placers
+- Trunk placers `isekai_api:branching`, `isekai_api:leaning`; foliage placers
+  `isekai_api:cone`, `isekai_api:disc`, `isekai_api:fan`, `isekai_api:sphere`,
+  `isekai_api:weeping`. Spread-leaf placement pins `LeavesBlock.DISTANCE` so foliage
+  detached from the trunk doesn't decay.
+
+### Density functions
+- **`isekai_api:sloped_density`** — emits the vanilla `sloped_cheese` shape
+  `add(mul(4, quarter_negative(mul(depth_field, factor))), base_noise)` from a neutral
+  `depth_field` + `factor` + `base_noise`, encapsulating the anti-terracing knowledge
+  (full-weight 3D base noise) without theme vocabulary.
+- **`isekai_api:quarter_negative`** — `v > 0 ? v : v*0.25`, re-implemented because
+  vanilla's `Mapped` type is package-private; used internally by `sloped_density`.
+
+### Biome source
+- **`isekai_api:climate_zones`** — assigns biomes by per-axis `Climate.Parameter` ranges
+  (temperature/humidity/continentalness/erosion/weirdness/depth), first match wins, with a
+  fallback. Complements `isekai_api:rule` (spatial) with a climate-space router.
+- `BiomeZone` gains `noise_threshold` and `edge_jitter` variants for organic, non-straight
+  zone borders (deterministic — fixed seed).
+
+### Surface rule
+- **`isekai_api:strata`** — an ordered list of `(block, thickness)` bands compiled to the
+  vanilla stone-depth-check sequence, for layered surface columns.
+
+### Placement modifiers
+- **`isekai_api:scatter`** (count + radius + min-spacing rejection sampling),
+  **`fluid_edge`** (distance-to-fluid filter, near/far), **`slope_filter`** (heightmap
+  slope min/max), **`surface_relative`** / **`fluid_relative`** (offset from surface or
+  fluid level), **`in_block_context`** (place only in a matching block context).
+
+### Atmosphere
+- `AtmosphereOverride` gains an `effects_extras` sub-record (grass-colour modifier,
+  ambient particle, ambient/mood/additions sounds, music) to express full biome effects.
+- **Client-side fog** via `ClientAtmosphereOverride` (`fog_color`, `fog_near_distance`,
+  `fog_far_distance`) applied through `ViewportEvent` on `Dist.CLIENT`.
+
+### Layered worldshapes (runtime)
+- `LayeredDescriptor` is now resolved per-Y at runtime: surface rules, structure
+  placement, and the biome/structure modifiers pick the layer that owns each block via
+  `getDescriptorAt(dim, y)` — so a stacked worldshape applies the correct layer's content
+  instead of silently using only the first.
+
+### Validation & diagnostics
+- World-preset structural check: warns when an authored
+  `data/minecraft/worldgen/world_preset/normal.json` omits the overworld/nether/end
+  dimensions (a silent break of the untouched dimensions).
+- Server-start log lists every structure in the world that uses an Isekai structure type,
+  confirming a consumer's `worldgen/structure/*.json` decoded and is in the live registry.
+
+### Templates & docs
+- `examples/templates/` ships annotated copy-paste starters: world-preset override,
+  overworld-like biome, overworld-like dimension type, noise-settings skeleton.
+- `docs/DATAPACK_REFERENCE.md` documents the set-piece path (jigsaw+NBT and
+  `grounded_template`), the new primitives, and the NBT authoring/Y conventions.
+
+### Tests
+- First regression suite (JUnit 5 under moddev `unitTest`): density-function math, codec
+  round-trips against bootstrapped registries, remap-strategy math, spatial-predicate
+  logic, and registration coverage.
+
 ## [1.0.0] — 2026-05-29
 
 First public release. A universal worldgen library for NeoForge 1.21.1: a small,
