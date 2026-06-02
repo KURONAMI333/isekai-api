@@ -138,11 +138,14 @@ Two `Feature<?>` types for the patterns consumers hit constantly:
 - **`isekai_api:cluster`** — random-walk BFS blob of N connected blocks. Use for moss patches, dirt veins, fungus spreads, ore clusters.
 - **`isekai_api:pool`** — carves a disc into terrain, lines floor + outer rim with `rim_block`, fills with `fluid`. Dodges the `waterlogged_vegetation_patch` grass→dirt drowning trap.
 
-### Composite landmarks — `isekai_api:assembled` Structure
+### Structures — set-pieces
 
-For locatable landmarks that are made of several Features placed at a common origin (a pool plus a rim plus some trees, an arrangement of clusters around a centre block, etc.). Declare them as `Structure` JSON whose `features` field lists `configured_feature` ids — Isekai handles `/locate` support, biome filtering, generation-step ordering, and `structure_set` spacing; the Features do the block placement.
+Two Structure types, both datapack-only (zero Java), both getting `/locate`, biome filtering, generation-step ordering, and `structure_set` spacing for free:
 
-Datapack-only on-ramp: zero Java required. This is the gap every existing worldgen MOD currently leaves open — they either hand-write a Structure subclass per landmark, or skip `/locate` and spawn the landmark as a rare Feature.
+- **`isekai_api:grounded_template`** — places a hand-authored NBT template on flat, dry ground. Vanilla `minecraft:jigsaw` gates placement on biome alone, so a biome assigned by climate doesn't track the waterline or terrain steepness and an NBT set-piece spawns half-submerged in shallow sea or tilted across a cliff. This adds the two gates vanilla can't express in a datapack — `clearance_above_fluid` (every footprint column must clear sea level) and `max_slope` (the footprint must be level enough) — while reusing vanilla template machinery (correct per-chunk placement) and honouring `terrain_adaptation: beard_thin`. The right tool for a coordinated landmark whose blocks must line up — an oasis (pool + beach + clustered trees), a ruin, a well.
+- **`isekai_api:assembled`** — places a list of `PlacedFeature`s at one origin (Y snapped to the live surface). For a *loose scatter* of independent features near a point (a few boulders and bushes) — **not** coordinated set-pieces, since each feature re-decides its own placement. Reach for `grounded_template` (above) or vanilla `minecraft:jigsaw` for those.
+
+For the canonical coordinated-set-piece workflow (hand-authored NBT + `minecraft:jigsaw` with `beard_thin`), see [docs/DATAPACK_REFERENCE.md](docs/DATAPACK_REFERENCE.md) → "set-pieces".
 
 ### Per-biome atmosphere overrides
 
