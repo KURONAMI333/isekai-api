@@ -24,6 +24,9 @@ import org.jetbrains.annotations.ApiStatus;
  *   <li>{@code isekai_api:strata} — ordered (block, thickness) bands measured downward from
  *       the floor surface. Collapses N-layer nested {@code stone_depth} sequences into one
  *       flat list.</li>
+ *   <li>{@code isekai_api:vanilla_overworld_surface} — the full vanilla overworld surface tree,
+ *       so a consumer's noise_settings can reference it in one line instead of copying the
+ *       expanded ~30&nbsp;KB {@code surface_rule} JSON.</li>
  * </ul>
  */
 @ApiStatus.Internal
@@ -41,10 +44,13 @@ public final class IsekaiSurfaceRules {
     public static final Supplier<MapCodec<? extends SurfaceRules.RuleSource>> STRATA =
             CODECS.register("strata", () -> StrataRule.CODEC);
 
+    public static final Supplier<MapCodec<? extends SurfaceRules.RuleSource>> VANILLA_OVERWORLD_SURFACE =
+            CODECS.register("vanilla_overworld_surface", () -> VanillaOverworldSurfaceRule.CODEC);
+
     private IsekaiSurfaceRules() {}
 
     public static void register(IEventBus modBus) {
         CODECS.register(modBus);
-        IsekaiApi.LOGGER.info("[Isekai] surface rule sources registered: worldshape_surface_top, worldshape_default_block, strata");
+        IsekaiApi.LOGGER.info("[Isekai] surface rule sources registered: worldshape_surface_top, worldshape_default_block, strata, vanilla_overworld_surface");
     }
 }
