@@ -191,8 +191,9 @@ public final class IsekaiValidator {
      */
     private static void verifyStructureStrategyMeaningful(com.kuronami.isekaiapi.api.remap.RemapStrategy s) {
         if (s instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.Identity) return;
-        if (s instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.Pipe p) {
-            for (var child : p.chain()) verifyStructureStrategyMeaningful(child);
+        // Composite strategies (Pipe) recurse via children(); a Pipe-of-Identity is meaningful.
+        if (!s.children().isEmpty()) {
+            for (var child : s.children()) verifyStructureStrategyMeaningful(child);
             return;
         }
         throw new IllegalArgumentException(
@@ -255,10 +256,10 @@ public final class IsekaiValidator {
                 throw new IllegalArgumentException(
                         fieldLabel + ".BandSplit.bands target_ratio sum=" + sum + " (must be 1.0 ± 0.01)");
             }
-        } else if (s instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.Pipe p) {
-            for (var child : p.chain()) {
-                crossCheckStrategy(fieldLabel + ".pipe", child);
-            }
+        }
+        // Recurse into composite strategies (Pipe) via children().
+        for (var child : s.children()) {
+            crossCheckStrategy(fieldLabel + ".pipe", child);
         }
     }
 

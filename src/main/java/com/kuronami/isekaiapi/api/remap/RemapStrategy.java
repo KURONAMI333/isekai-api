@@ -2,38 +2,62 @@ package com.kuronami.isekaiapi.api.remap;
 
 import com.kuronami.isekaiapi.api.query.HeightDistribution;
 import com.kuronami.isekaiapi.api.query.VerticalRange;
+import com.kuronami.isekaiapi.registry.IsekaiDispatch;
+import com.kuronami.isekaiapi.registry.IsekaiSpiTypes;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
- * Maps a vanilla {@link VerticalRange} into the consumer's playable range.
- * Composable via {@link Pipe}. Sealed; new neutral variants land in v1.x.
+ * Maps a vanilla {@link VerticalRange} into the consumer's playable range, and/or scales the
+ * count/density of generated features. Composable via {@link Pipe}.
  *
- * <p>JSON form: {@code {"type": "isekai:linear"}} / {@code {"type": "isekai:count_scale", "factor": 0.5}}.
+ * <p><b>Extensible.</b> Built-in variants are registered in
+ * {@link com.kuronami.isekaiapi.api.registry.IsekaiRegistries#REMAP_STRATEGY_TYPE}; third parties
+ * add their own by registering a {@link MapCodec} under that key. The {@link #CODEC} dispatches on
+ * a {@code "type"} field, e.g. {@code {"type": "isekai_api:linear"}} /
+ * {@code {"type": "isekai_api:count_scale", "factor": 0.5}}. The legacy {@code isekai:} prefix is
+ * accepted as a deprecated alias.
  *
- * <p>Every variant is JSON-encodable. Non-linear mappings are expressed via
- * {@link BandSplit} (per-band proportional mapping) or {@link Pipe} (compositional
- * chains); both cover the use cases that historically required raw function references.
+ * <p><b>Implementing a variant.</b> Implementations must be immutable, return their registered
+ * codec from {@link #codec()}, project a range via {@link #remap(VerticalRange, RemapContext)},
+ * report any density multiplier via {@link #countFactor()} (default 1.0), and expose nested
+ * strategies via {@link #children()} (default empty).
+ *
+ * @since 2.0.0 open for third-party extension via the registry (was a sealed interface before).
  */
-public sealed interface RemapStrategy {
+public interface RemapStrategy {
 
-    String typeId();
+    /** This variant's payload codec (no {@code "type"} field); must be the registered instance. */
     MapCodec<? extends RemapStrategy> codec();
 
-    Codec<RemapStrategy> CODEC = Codec.lazyInitialized(RemapStrategy::buildDispatchCodec);
+    /**
+     * Project {@code original} into the context's playable envelope. Strategies whose semantics
+     * don't affect Y placement (e.g. {@code CountScale}) return {@code original} unchanged. @since 2.0.0
+     */
+    VerticalRange remap(VerticalRange original, RemapContext ctx);
+
+    /** Feature/mob density multiplier contributed by this strategy (1.0 = unchanged). @since 2.0.0 */
+    default double countFactor() { return 1.0; }
+
+    /** Nested strategies, for tree-walking. Empty for non-composite variants. @since 2.0.0 */
+    default List<RemapStrategy> children() { return List.of(); }
+
+    /** Dispatching codec keyed on a {@code "type"} field, backed by the RemapStrategy registry. */
+    Codec<RemapStrategy> CODEC = IsekaiDispatch.dispatchCodec(
+            IsekaiSpiTypes.REMAP_STRATEGY_REGISTRY, RemapStrategy::codec, "RemapStrategy");
 
     /** Proportional linear scale from vanilla [a,b] into target [a',b']. */
     record Linear() implements RemapStrategy {
         public static final Linear INSTANCE = new Linear();
         public static final MapCodec<Linear> MAP_CODEC = MapCodec.unit(INSTANCE);
 
-        @Override public String typeId() { return "isekai:linear"; }
         @Override public MapCodec<? extends RemapStrategy> codec() { return MAP_CODEC; }
+        @Override public VerticalRange remap(VerticalRange original, RemapContext ctx) {
+            return ctx.linearScale(original);
+        }
     }
 
     /**
@@ -43,14 +67,14 @@ public sealed interface RemapStrategy {
      * cross-field checks); their {@code vanillaSource} ranges should be ordered
      * low-to-high and non-overlapping (validator enforces).
      *
-     * <p>RemapEngine dispatches: for a feature with original Y range, find the band whose
-     * {@code vanillaSource} contains the feature's midpoint, then map proportionally into
-     * the playable range slice corresponding to that band's cumulative ratio offset.
+     * <p>Dispatches per feature: find the band whose {@code vanillaSource} contains the feature's
+     * midpoint, then map proportionally into the playable range slice corresponding to that band's
+     * cumulative ratio offset.
      *
      * <p>JSON:
      * <pre>{@code
      * {
-     *   "type": "isekai:band_split",
+     *   "type": "isekai_api:band_split",
      *   "bands": [
      *     { "vanilla_source": { "min_y": -64, "max_y": 0,   "distribution": "uniform" }, "target_ratio": 0.5 },
      *     { "vanilla_source": { "min_y": 0,   "max_y": 320, "distribution": "uniform" }, "target_ratio": 0.5 }
@@ -69,8 +93,54 @@ public sealed interface RemapStrategy {
                 Band.CODEC.listOf().fieldOf("bands").forGetter(BandSplit::bands)
         ).apply(i, BandSplit::new));
 
-        @Override public String typeId() { return "isekai:band_split"; }
         @Override public MapCodec<? extends RemapStrategy> codec() { return MAP_CODEC; }
+
+        /**
+         * Dispatch {@code original} to the matching band, then project it proportionally into that
+         * band's slice of the playable range. The matching band is the one whose
+         * {@code vanillaSource} contains the feature's midpoint; ties resolve to the lower-Y band.
+         * If no band matches, fall back to {@link RemapContext#linearScale}.
+         */
+        @Override public VerticalRange remap(VerticalRange original, RemapContext ctx) {
+            VerticalRange playable = ctx.playable();
+            double midpoint = (original.minY() + original.maxY()) / 2.0;
+            int matchIndex = -1;
+            for (int i = 0; i < bands.size(); i++) {
+                var band = bands.get(i);
+                if (midpoint >= band.vanillaSource().minY() && midpoint <= band.vanillaSource().maxY()) {
+                    matchIndex = i;
+                    break;
+                }
+            }
+            if (matchIndex < 0) {
+                // Feature lies outside every declared band; degrade gracefully to full-range linear.
+                int playSpan = playable.maxY() - playable.minY();
+                return new VerticalRange(playable.minY(), playable.minY() + playSpan, original.distribution());
+            }
+            // Compute this band's slice [sliceMin, sliceMax] in the playable range.
+            float cumulativeBefore = 0f;
+            for (int i = 0; i < matchIndex; i++) {
+                cumulativeBefore += bands.get(i).targetRatio();
+            }
+            var matched = bands.get(matchIndex);
+            int playSpan = playable.maxY() - playable.minY();
+            int sliceMin = playable.minY() + Math.round(cumulativeBefore * playSpan);
+            int sliceMax = playable.minY() + Math.round((cumulativeBefore + matched.targetRatio()) * playSpan);
+            // Now scale the feature's range proportionally within this slice.
+            var source = matched.vanillaSource();
+            int sourceSpan = source.maxY() - source.minY();
+            if (sourceSpan <= 0) {
+                return new VerticalRange(sliceMin, sliceMax, original.distribution());
+            }
+            double tMin = (original.minY() - source.minY()) / (double) sourceSpan;
+            double tMax = (original.maxY() - source.minY()) / (double) sourceSpan;
+            int sliceSpan = sliceMax - sliceMin;
+            int newMin = sliceMin + (int) Math.round(tMin * sliceSpan);
+            int newMax = sliceMin + (int) Math.round(tMax * sliceSpan);
+            newMin = Math.max(sliceMin, Math.min(newMin, sliceMax));
+            newMax = Math.max(newMin, Math.min(newMax, sliceMax));
+            return new VerticalRange(newMin, newMax, original.distribution());
+        }
 
         /** One band in a {@link BandSplit}: a vanilla source range + its target ratio. */
         public record Band(com.kuronami.isekaiapi.api.query.VerticalRange vanillaSource, float targetRatio) {
@@ -97,8 +167,10 @@ public sealed interface RemapStrategy {
                 HeightDistribution.CODEC.fieldOf("dist").forGetter(FixedRange::dist)
         ).apply(i, FixedRange::new));
 
-        @Override public String typeId() { return "isekai:fixed_range"; }
         @Override public MapCodec<? extends RemapStrategy> codec() { return MAP_CODEC; }
+        @Override public VerticalRange remap(VerticalRange original, RemapContext ctx) {
+            return new VerticalRange(min, max, dist);
+        }
     }
 
     /** Axis flip: vanilla low maps to target high and vice versa. */
@@ -106,8 +178,14 @@ public sealed interface RemapStrategy {
         public static final Inverted INSTANCE = new Inverted();
         public static final MapCodec<Inverted> MAP_CODEC = MapCodec.unit(INSTANCE);
 
-        @Override public String typeId() { return "isekai:inverted"; }
         @Override public MapCodec<? extends RemapStrategy> codec() { return MAP_CODEC; }
+        @Override public VerticalRange remap(VerticalRange original, RemapContext ctx) {
+            VerticalRange linear = ctx.linearScale(original);
+            VerticalRange playable = ctx.playable();
+            int newMin = playable.minY() + (playable.maxY() - linear.maxY());
+            int newMax = playable.minY() + (playable.maxY() - linear.minY());
+            return new VerticalRange(newMin, newMax, linear.distribution());
+        }
     }
 
     /** Scale the count/density of generated features by {@code factor} (1.0 = unchanged). */
@@ -119,8 +197,10 @@ public sealed interface RemapStrategy {
                 Codec.doubleRange(0.0, Double.MAX_VALUE).fieldOf("factor").forGetter(CountScale::factor)
         ).apply(i, CountScale::new));
 
-        @Override public String typeId() { return "isekai:count_scale"; }
         @Override public MapCodec<? extends RemapStrategy> codec() { return MAP_CODEC; }
+        // Count strategy affects feature density (via countFactor), not Y placement.
+        @Override public VerticalRange remap(VerticalRange original, RemapContext ctx) { return original; }
+        @Override public double countFactor() { return factor; }
     }
 
     /** Identity mapping: pass through vanilla unchanged. */
@@ -128,8 +208,8 @@ public sealed interface RemapStrategy {
         public static final Identity INSTANCE = new Identity();
         public static final MapCodec<Identity> MAP_CODEC = MapCodec.unit(INSTANCE);
 
-        @Override public String typeId() { return "isekai:identity"; }
         @Override public MapCodec<? extends RemapStrategy> codec() { return MAP_CODEC; }
+        @Override public VerticalRange remap(VerticalRange original, RemapContext ctx) { return original; }
     }
 
     /** Apply chain in order, each operating on the previous result. Must be non-empty. */
@@ -144,32 +224,19 @@ public sealed interface RemapStrategy {
                 Codec.lazyInitialized(() -> CODEC).listOf().fieldOf("chain").forGetter(Pipe::chain)
         ).apply(i, Pipe::new));
 
-        @Override public String typeId() { return "isekai:pipe"; }
         @Override public MapCodec<? extends RemapStrategy> codec() { return MAP_CODEC; }
-    }
-
-    private static Codec<RemapStrategy> buildDispatchCodec() {
-        Map<String, MapCodec<? extends RemapStrategy>> registry = new LinkedHashMap<>();
-        registry.put("isekai:linear",      Linear.MAP_CODEC);
-        registry.put("isekai:band_split",  BandSplit.MAP_CODEC);
-        registry.put("isekai:fixed_range", FixedRange.MAP_CODEC);
-        registry.put("isekai:inverted",    Inverted.MAP_CODEC);
-        registry.put("isekai:count_scale", CountScale.MAP_CODEC);
-        registry.put("isekai:identity",    Identity.MAP_CODEC);
-        registry.put("isekai:pipe",        Pipe.MAP_CODEC);
-        Map<String, MapCodec<? extends RemapStrategy>> frozen = Map.copyOf(registry);
-
-        return Codec.STRING.dispatch(
-                "type",
-                RemapStrategy::typeId,
-                typeId -> {
-                    MapCodec<? extends RemapStrategy> mc = frozen.get(typeId);
-                    if (mc == null) {
-                        throw new IllegalArgumentException(
-                                "Unknown RemapStrategy type: '" + typeId
-                                        + "'. Known types: " + frozen.keySet());
-                    }
-                    return mc;
-                });
+        @Override public VerticalRange remap(VerticalRange original, RemapContext ctx) {
+            VerticalRange acc = original;
+            for (RemapStrategy child : chain) {
+                acc = child.remap(acc, ctx);
+            }
+            return acc;
+        }
+        @Override public double countFactor() {
+            double product = 1.0;
+            for (RemapStrategy child : chain) product *= child.countFactor();
+            return product;
+        }
+        @Override public List<RemapStrategy> children() { return chain; }
     }
 }

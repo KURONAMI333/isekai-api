@@ -16,8 +16,8 @@ class RemapStrategyTest {
 
     // ===== Linear =====
 
-    @Test void linear_typeId() {
-        assertEquals("isekai:linear", RemapStrategy.Linear.INSTANCE.typeId());
+    @Test void linear_codecIsRegistered() {
+        assertSame(RemapStrategy.Linear.MAP_CODEC, RemapStrategy.Linear.INSTANCE.codec());
     }
 
     @Test void linear_instanceEquals() {
@@ -27,8 +27,8 @@ class RemapStrategyTest {
 
     // ===== Inverted =====
 
-    @Test void inverted_typeId() {
-        assertEquals("isekai:inverted", RemapStrategy.Inverted.INSTANCE.typeId());
+    @Test void inverted_codecIsRegistered() {
+        assertSame(RemapStrategy.Inverted.MAP_CODEC, RemapStrategy.Inverted.INSTANCE.codec());
     }
 
     @Test void inverted_instanceEquals() {
@@ -37,8 +37,13 @@ class RemapStrategyTest {
 
     // ===== Identity =====
 
-    @Test void identity_typeId() {
-        assertEquals("isekai:identity", RemapStrategy.Identity.INSTANCE.typeId());
+    @Test void identity_codecIsRegistered() {
+        assertSame(RemapStrategy.Identity.MAP_CODEC, RemapStrategy.Identity.INSTANCE.codec());
+    }
+
+    @Test void identity_countFactorIsOne_andNoChildren() {
+        assertEquals(1.0, RemapStrategy.Identity.INSTANCE.countFactor(), 1e-9);
+        assertTrue(RemapStrategy.Identity.INSTANCE.children().isEmpty());
     }
 
     @Test void identity_instanceEquals() {
@@ -47,8 +52,12 @@ class RemapStrategyTest {
 
     // ===== CountScale =====
 
-    @Test void countScale_typeId() {
-        assertEquals("isekai:count_scale", new RemapStrategy.CountScale(1.0).typeId());
+    @Test void countScale_codecIsRegistered() {
+        assertSame(RemapStrategy.CountScale.MAP_CODEC, new RemapStrategy.CountScale(1.0).codec());
+    }
+
+    @Test void countScale_reportsFactorAsCountFactor() {
+        assertEquals(0.5, new RemapStrategy.CountScale(0.5).countFactor(), 1e-9);
     }
 
     @Test void countScale_storesFactor() {
@@ -68,9 +77,9 @@ class RemapStrategyTest {
 
     // ===== FixedRange =====
 
-    @Test void fixedRange_typeId() {
-        assertEquals("isekai:fixed_range",
-                new RemapStrategy.FixedRange(0, 100, HeightDistribution.UNIFORM).typeId());
+    @Test void fixedRange_codecIsRegistered() {
+        assertSame(RemapStrategy.FixedRange.MAP_CODEC,
+                new RemapStrategy.FixedRange(0, 100, HeightDistribution.UNIFORM).codec());
     }
 
     @Test void fixedRange_storesFields() {
@@ -92,11 +101,11 @@ class RemapStrategyTest {
 
     // ===== BandSplit =====
 
-    @Test void bandSplit_typeId() {
+    @Test void bandSplit_codecIsRegistered() {
         var vr = new VerticalRange(-64, 320, HeightDistribution.UNIFORM);
         var band = new RemapStrategy.BandSplit.Band(vr, 1.0f);
         var bs = new RemapStrategy.BandSplit(List.of(band));
-        assertEquals("isekai:band_split", bs.typeId());
+        assertSame(RemapStrategy.BandSplit.MAP_CODEC, bs.codec());
     }
 
     @Test void bandSplit_emptyBands_throws() {
@@ -121,9 +130,16 @@ class RemapStrategyTest {
 
     // ===== Pipe =====
 
-    @Test void pipe_typeId() {
-        assertEquals("isekai:pipe",
-                new RemapStrategy.Pipe(List.of(RemapStrategy.Identity.INSTANCE)).typeId());
+    @Test void pipe_codecIsRegistered() {
+        assertSame(RemapStrategy.Pipe.MAP_CODEC,
+                new RemapStrategy.Pipe(List.of(RemapStrategy.Identity.INSTANCE)).codec());
+    }
+
+    @Test void pipe_countFactorFoldsMultiplicatively_andChildrenAreChain() {
+        var pipe = new RemapStrategy.Pipe(List.of(
+                new RemapStrategy.CountScale(2.0), new RemapStrategy.CountScale(1.5), RemapStrategy.Identity.INSTANCE));
+        assertEquals(3.0, pipe.countFactor(), 1e-9);   // 2.0 * 1.5 * 1.0
+        assertEquals(pipe.chain(), pipe.children());
     }
 
     @Test void pipe_emptyChain_throws() {
