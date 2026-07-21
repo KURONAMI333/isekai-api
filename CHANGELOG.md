@@ -58,6 +58,13 @@ Datapack authors and consumers who only use the built-in variants from JSON are 
 - Inline `apply_worldshape` / `apply_worldshape_structures` modifier forms are superseded by
   the `_ref` forms.
 
+### Fixed
+
+- **`isekai_api:worldshape_surface_top` self-gates to the surface layer.** Prepended bare into a
+  `surface_rule` sequence it replaces only the topmost surface block; the blocks beneath keep the
+  underlying surface rule's output. No `minecraft:stone_depth` wrapper is required, and wrapping it
+  in one is harmless.
+
 ### Deprecated
 
 - The bare `isekai:` dispatch prefix — accepted with a one-time warning, **removed in the

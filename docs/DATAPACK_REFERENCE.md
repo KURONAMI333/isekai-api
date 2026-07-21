@@ -149,7 +149,7 @@ Go in `noise_settings.surface_rule` (inside a `minecraft:sequence`). Both read p
 
 | Type | Fields | Effect |
 |---|---|---|
-| `isekai_api:worldshape_surface_top` | `dimension` (dimension key) | replaces the top block of matched biomes (`block_overrides.surface_top`). Put it **first** in the sequence. |
+| `isekai_api:worldshape_surface_top` | `dimension` (dimension key) | replaces the top block of matched biomes (`block_overrides.surface_top`). Self-gates to the topmost surface block, so prepend it **bare and first** — no `stone_depth` wrapper needed. |
 | `isekai_api:worldshape_default_block` | `dimension` (dimension key) | replaces the default (stone) fill of matched biomes (`block_overrides.default_block`). Put it **last** (after vanilla rules). |
 | `isekai_api:strata` | `bands` (list of `{ block: BlockState, thickness: int ≥ 1 }`) | ordered downward stack — band 1 covers depths 0…t1−1, band 2 covers t1…t1+t2−1, etc. Emits null below the last band so the surrounding sequence handles deeper fill. Collapses an N-layer nested `stone_depth` sequence into one flat list. |
 | `isekai_api:vanilla_overworld_surface` | — | the entire vanilla overworld surface (grass/dirt/sand/badlands bands/snow caps/…), so a noise_settings can write `{ "type": "isekai_api:vanilla_overworld_surface" }` instead of copying the expanded ~30 KB `surface_rule`. Reconstructed from runtime worldgen factories, so it is safe even inside a replaced `minecraft:overworld`. Wrap it in a `minecraft:sequence` with `worldshape_surface_top` first and `worldshape_default_block` last to layer worldshape block overrides on top. |
