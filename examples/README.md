@@ -47,9 +47,9 @@ sets / `priority=100`).
 ## underground_only/
 
 Registry-only example showing what the JSON for an underground worldshape
-*would* contain — `isekai:pipe` of `inverted` + `linear` for ore remapping
+*would* contain — `isekai_api:pipe` of `inverted` + `linear` for ore remapping
 (deepslate-band ores would get pulled toward the surface relative to the
-playable range), `isekai:and`-composed default structure predicate
+playable range), `isekai_api:and`-composed default structure predicate
 (`y_in_range` + `solid_ceiling`, so structures only spawn in roofed
 chambers), `count_scale` 1.5× for mob density, `priority=110` so it wins
 ties against the default-priority skyland_minimal pack.
@@ -64,7 +64,7 @@ Demonstrates `mob_spawn_strategy_by_category`. In `minecraft:plains`,
 passive creatures spawn 1.5× more often and hostile monsters spawn at 25%.
 Other categories (water creatures, ambient, etc.) keep vanilla weights.
 
-The global `mob_spawn_strategy` is `isekai:identity` (no-op) — the
+The global `mob_spawn_strategy` is `isekai_api:identity` (no-op) — the
 per-category overrides do all the work. This is the pattern for "scale
 some categories but leave others alone."
 
@@ -98,8 +98,8 @@ documented below for `WorldshapeDescriptor`.
 Multi-layer worldshape: a vanilla-like terrain layer at y=-64..70 plus a
 floating-island layer at y=120..200, with a 4-block `blend` transition
 between them. The top layer requires `solid_floor` with 4-block clearance
-so structures only place on viable platforms. Demonstrates `isekai:and`,
-`isekai:blend`, and the layered file format (`{dimension, layers,
+so structures only place on viable platforms. Demonstrates `isekai_api:and`,
+`isekai_api:blend`, and the layered file format (`{dimension, layers,
 transition}`).
 
 ## JSON schema reference
@@ -157,7 +157,12 @@ transition}`).
 }
 ```
 
-### Sealed-interface payloads
+### Extension-point payloads
+
+Every `"type"` dispatch below resolves through an Isekai custom registry, so third-party mods can
+register their own variants (see `IsekaiRegistries`). Use the canonical `isekai_api:` prefix. The
+legacy `isekai:` prefix is still accepted as a deprecated alias and logs a one-time warning per id
+— `moon_world/worldshape.json` deliberately keeps the legacy prefix to exercise that alias.
 
 `VerticalRange`:
 ```json
@@ -165,34 +170,34 @@ transition}`).
 ```
 
 `SurfaceAnchor` dispatch on `"type"`:
-- `isekai:world_surface` — vanilla heightmap
-- `isekai:below_fluid` — `{ "fluid": "<fluid key>" }`
-- `isekai:fixed_y` — `{ "y": <int> }`
+- `isekai_api:world_surface` — vanilla heightmap
+- `isekai_api:below_fluid` — `{ "fluid": "<fluid key>" }`
+- `isekai_api:fixed_y` — `{ "y": <int> }`
 
 `RemapStrategy` dispatch on `"type"`:
-- `isekai:linear`, `isekai:inverted`, `isekai:identity` — no payload
-- `isekai:band_split` — `{ "bands": [{ "vanilla_source": VerticalRange, "target_ratio": <float> }, ...] }`
-- `isekai:fixed_range` — `{ "min": <int>, "max": <int>, "dist": "<distribution>" }`
-- `isekai:count_scale` — `{ "factor": <double>=0 }`
-- `isekai:pipe` — `{ "chain": [RemapStrategy, ...] }` (non-empty)
+- `isekai_api:linear`, `isekai_api:inverted`, `isekai_api:identity` — no payload
+- `isekai_api:band_split` — `{ "bands": [{ "vanilla_source": VerticalRange, "target_ratio": <float> }, ...] }`
+- `isekai_api:fixed_range` — `{ "min": <int>, "max": <int>, "dist": "<distribution>" }`
+- `isekai_api:count_scale` — `{ "factor": <double>=0 }`
+- `isekai_api:pipe` — `{ "chain": [RemapStrategy, ...] }` (non-empty)
 
 `SpatialPredicate` dispatch on `"type"`:
-- `isekai:y_in_range`     — `{ "min": <int>, "max": <int> }`
-- `isekai:solid_floor`    — `{ "min_clearance": <int> }`
-- `isekai:solid_ceiling`  — `{ "min_clearance": <int> }`
-- `isekai:terrain_slope`  — `{ "min_slope": <dbl>, "max_slope": <dbl> }`
-- `isekai:near_block`     — `{ "targets": "<block key>" | ["<block key>", ...] | "#<block tag>", "max_distance": <int> }`
-- `isekai:near_biome`     — `{ "biome": "<biome key>", "max_distance": <int> }`
-- `isekai:in_fluid`       — `{ "fluid": "<fluid key>" }`
-- `isekai:always` / `isekai:never` — no payload
-- `isekai:and` — `{ "all": [SpatialPredicate, ...] }`
-- `isekai:or`  — `{ "any": [SpatialPredicate, ...] }`
-- `isekai:not` — `{ "inner": SpatialPredicate }`
+- `isekai_api:y_in_range`     — `{ "min": <int>, "max": <int> }`
+- `isekai_api:solid_floor`    — `{ "min_clearance": <int> }`
+- `isekai_api:solid_ceiling`  — `{ "min_clearance": <int> }`
+- `isekai_api:terrain_slope`  — `{ "min_slope": <dbl>, "max_slope": <dbl> }`
+- `isekai_api:near_block`     — `{ "targets": "<block key>" | ["<block key>", ...] | "#<block tag>", "max_distance": <int> }`
+- `isekai_api:near_biome`     — `{ "biome": "<biome key>", "max_distance": <int> }`
+- `isekai_api:in_fluid`       — `{ "fluid": "<fluid key>" }`
+- `isekai_api:always` / `isekai_api:never` — no payload
+- `isekai_api:and` — `{ "all": [SpatialPredicate, ...] }`
+- `isekai_api:or`  — `{ "any": [SpatialPredicate, ...] }`
+- `isekai_api:not` — `{ "inner": SpatialPredicate }`
 
 `TransitionRule` dispatch on `"type"`:
-- `isekai:hard` — no payload
-- `isekai:blend` — `{ "blend_height": <int>>=0 }`
-- `isekai:gap`   — `{ "gap_height": <int>>=0 }`
+- `isekai_api:hard` — no payload
+- `isekai_api:blend` — `{ "blend_height": <int>>=0 }`
+- `isekai_api:gap`   — `{ "gap_height": <int>>=0 }`
 
 ### Layered file (`isekai/layered_worldshape/*.json`)
 
@@ -206,6 +211,6 @@ transition}`).
       "transition": TransitionRule
     }, ...
   ],
-  "transition": TransitionRule    // optional, default {"type":"isekai:hard"} — top-level seam rule
+  "transition": TransitionRule    // optional, default {"type":"isekai_api:hard"} — top-level seam rule
 }
 ```

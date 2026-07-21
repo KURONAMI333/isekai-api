@@ -7,11 +7,11 @@
       "max_y": 320,
       "distribution": "uniform"
     },
-    "surface_anchor": { "type": "isekai:world_surface" },
-    "ore_strategy":       { "type": "isekai:identity" },
-    "structure_strategy": { "type": "isekai:identity" },
-    "mob_spawn_strategy": { "type": "isekai:identity" },
-    "default_structure_predicate": { "type": "isekai:always" },
+    "surface_anchor": { "type": "isekai_api:world_surface" },
+    "ore_strategy":       { "type": "isekai_api:identity" },
+    "structure_strategy": { "type": "isekai_api:identity" },
+    "mob_spawn_strategy": { "type": "isekai_api:identity" },
+    "default_structure_predicate": { "type": "isekai_api:always" },
     "exclusions": {
       "structures": [
         "minecraft:village_plains",

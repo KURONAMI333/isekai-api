@@ -104,15 +104,15 @@
       "type": "object",
       "required": ["type"],
       "properties": {
-        "type": { "enum": ["isekai:world_surface", "isekai:below_fluid", "isekai:fixed_y"] }
+        "type": { "enum": ["isekai_api:world_surface", "isekai_api:below_fluid", "isekai_api:fixed_y"] }
       },
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "isekai:below_fluid" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:below_fluid" } } },
           "then": { "required": ["fluid"], "properties": { "fluid": { "$ref": "#/$defs/resourceKey" } } }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai:fixed_y" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:fixed_y" } } },
           "then": { "required": ["y"], "properties": { "y": { "type": "integer" } } }
         }
       ]
@@ -123,14 +123,14 @@
       "properties": {
         "type": {
           "enum": [
-            "isekai:identity", "isekai:linear", "isekai:inverted",
-            "isekai:fixed_range", "isekai:count_scale", "isekai:band_split", "isekai:pipe"
+            "isekai_api:identity", "isekai_api:linear", "isekai_api:inverted",
+            "isekai_api:fixed_range", "isekai_api:count_scale", "isekai_api:band_split", "isekai_api:pipe"
           ]
         }
       },
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "isekai:fixed_range" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:fixed_range" } } },
           "then": {
             "required": ["min", "max"],
             "properties": {
@@ -141,15 +141,15 @@
           }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai:count_scale" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:count_scale" } } },
           "then": { "required": ["factor"], "properties": { "factor": { "type": "number", "minimum": 0 } } }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai:band_split" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:band_split" } } },
           "then": { "required": ["bands"], "properties": { "bands": { "type": "array" } } }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai:pipe" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:pipe" } } },
           "then": {
             "required": ["chain"],
             "properties": { "chain": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/remapStrategy" } } }
@@ -163,52 +163,52 @@
       "properties": {
         "type": {
           "enum": [
-            "isekai:y_in_range", "isekai:solid_floor", "isekai:solid_ceiling",
-            "isekai:terrain_slope", "isekai:near_block", "isekai:near_biome",
-            "isekai:in_fluid", "isekai:always", "isekai:never",
-            "isekai:and", "isekai:or", "isekai:not"
+            "isekai_api:y_in_range", "isekai_api:solid_floor", "isekai_api:solid_ceiling",
+            "isekai_api:terrain_slope", "isekai_api:near_block", "isekai_api:near_biome",
+            "isekai_api:in_fluid", "isekai_api:always", "isekai_api:never",
+            "isekai_api:and", "isekai_api:or", "isekai_api:not"
           ]
         }
       },
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "isekai:y_in_range" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:y_in_range" } } },
           "then": { "properties": { "min": { "type": "integer" }, "max": { "type": "integer" } } }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai:solid_floor" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:solid_floor" } } },
           "then": { "properties": { "min_clearance": { "type": "integer" } } }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai:solid_ceiling" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:solid_ceiling" } } },
           "then": { "properties": { "min_clearance": { "type": "integer" } } }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai:terrain_slope" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:terrain_slope" } } },
           "then": { "properties": { "min_slope": { "type": "number" }, "max_slope": { "type": "number" } } }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai:near_block" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:near_block" } } },
           "then": { "required": ["max_distance"], "properties": { "targets": {}, "max_distance": { "type": "integer" } } }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai:near_biome" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:near_biome" } } },
           "then": { "required": ["biome", "max_distance"], "properties": { "biome": { "$ref": "#/$defs/resourceKey" }, "max_distance": { "type": "integer" } } }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai:in_fluid" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:in_fluid" } } },
           "then": { "required": ["fluid"], "properties": { "fluid": { "$ref": "#/$defs/resourceKey" } } }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai:and" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:and" } } },
           "then": { "required": ["all"], "properties": { "all": { "type": "array", "items": { "$ref": "#/$defs/spatialPredicate" } } } }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai:or" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:or" } } },
           "then": { "required": ["any"], "properties": { "any": { "type": "array", "items": { "$ref": "#/$defs/spatialPredicate" } } } }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai:not" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:not" } } },
           "then": { "required": ["inner"], "properties": { "inner": { "$ref": "#/$defs/spatialPredicate" } } }
         }
       ]
