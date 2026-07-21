@@ -1,10 +1,12 @@
 package com.kuronami.isekaiapi.api.remap;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.biome.Biome;
 
@@ -62,13 +64,29 @@ public record BiomeSelection(Set<ResourceKey<Biome>> keys, Set<TagKey<Biome>> ta
         return false;
     }
 
+    /**
+     * Biome-tag codec that accepts both the vanilla HolderSet-style {@code "#minecraft:is_overworld"}
+     * (leading {@code #}) and the bare {@code "minecraft:is_overworld"} form. Encodes canonically
+     * with the {@code #} so re-serialized JSON matches the documented convention. {@link TagKey#codec}
+     * alone rejects the {@code #} form, which is what most authors (and vanilla `biomes:` fields) write.
+     */
+    private static final Codec<TagKey<Biome>> LENIENT_TAG_CODEC = Codec.STRING.comapFlatMap(
+            s -> {
+                String body = s.startsWith("#") ? s.substring(1) : s;
+                ResourceLocation rl = ResourceLocation.tryParse(body);
+                return rl == null
+                        ? DataResult.error(() -> "Not a valid biome tag id: '" + s + "'")
+                        : DataResult.success(TagKey.create(Registries.BIOME, rl));
+            },
+            tag -> "#" + tag.location());
+
     /** Object-form codec: explicit {@code keys} and {@code tags} fields. */
     private static final Codec<BiomeSelection> OBJECT_CODEC = RecordCodecBuilder.create(i -> i.group(
             ResourceKey.codec(Registries.BIOME).listOf().optionalFieldOf("keys", java.util.List.of())
                     .forGetter(s -> s.keys().stream()
                             .sorted(Comparator.comparing(k -> k.location().toString()))
                             .toList()),
-            TagKey.codec(Registries.BIOME).listOf().optionalFieldOf("tags", java.util.List.of())
+            LENIENT_TAG_CODEC.listOf().optionalFieldOf("tags", java.util.List.of())
                     .forGetter(s -> s.tags().stream()
                             .sorted(Comparator.comparing(t -> t.location().toString()))
                             .toList())

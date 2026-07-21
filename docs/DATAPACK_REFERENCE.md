@@ -333,23 +333,25 @@ Minimal palm example:
 
 ## Biome / structure modifiers (`isekai_api:`)
 
+Declare the worldshape **once** under `data/<ns>/isekai/worldshape/<name>.json`, then point the `_ref` modifiers at it by dimension. The `_ref` forms are the recommended path (no descriptor duplication, 4-line modifier files).
+
 ### Biome modifiers — `data/<ns>/neoforge/biome_modifier/*.json`
 
 ```jsonc
-// inline form
-{ "type": "isekai_api:apply_worldshape", "worldshape": { …descriptor… } }
-// reference form (descriptor lives in isekai/worldshape/<name>.json)
+// reference form (recommended) — descriptor lives in isekai/worldshape/<name>.json
 { "type": "isekai_api:apply_worldshape_ref", "dimension": "minecraft:overworld" }
 ```
 
 ### Structure modifiers — `data/<ns>/neoforge/structure_modifier/*.json`
 
 ```jsonc
-{ "type": "isekai_api:apply_worldshape_structures", "worldshape": { …descriptor… } }
 { "type": "isekai_api:apply_worldshape_structures_ref", "dimension": "minecraft:overworld" }
 ```
 
-The `_ref` forms look the descriptor up by dimension at apply-time, so the worldshape is declared once (in `isekai/worldshape/<name>.json`) and the modifier files stay 4 lines.
+> **Deprecated (still accepted, logs a one-time warning):** the inline forms
+> `{ "type": "isekai_api:apply_worldshape", "worldshape": { …descriptor… } }` and
+> `isekai_api:apply_worldshape_structures` embed the whole descriptor in the modifier file,
+> duplicating it across the biome and structure modifiers. Migrate to the `_ref` forms.
 
 ---
 
