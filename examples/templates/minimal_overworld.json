@@ -1,0 +1,43 @@
+// Minimal overworld replacement — copy to data/minecraft/worldgen/noise_settings/overworld.json
+//
+// Replacing the overworld's noise_settings requires a FULL document (the registry overrides
+// whole entries, not fields), but "full" need not mean copying vanilla's ~2500 lines. Every
+// router axis here is a one-line reference or a neutral zero, the terrain shape is the
+// isekai_api hook (override data/isekai_api/worldgen/density_function/hook/final_density.json
+// in your datapack to reshape it), and the surface is the one-line vanilla delegate.
+//
+// This template is aquifer- and ore-vein-free (clean island/void coasts, no perched water).
+// It pairs with a spatial biome_source (isekai_api:rule / climate_zones) or a fixed biome:
+// temperature/vegetation are zeroed, so vanilla multi_noise biome selection would collapse to
+// one biome. Want vanilla climate biomes + water? Set aquifers_enabled/ore_veins_enabled true
+// and inline vanilla's temperature/vegetation/vein/fluid router axes (they have no standalone
+// density_function file to reference).
+{
+  "sea_level": 63,
+  "disable_mob_generation": false,
+  "aquifers_enabled": false,
+  "ore_veins_enabled": false,
+  "legacy_random_source": false,
+  "default_block": { "Name": "minecraft:stone" },
+  "default_fluid": { "Name": "minecraft:water", "Properties": { "level": "0" } },
+  "noise": { "min_y": -64, "height": 384, "size_horizontal": 1, "size_vertical": 2 },
+  "spawn_target": [],
+  "surface_rule": { "type": "isekai_api:vanilla_overworld_surface" },
+  "noise_router": {
+    "barrier": "minecraft:zero",
+    "fluid_level_floodedness": "minecraft:zero",
+    "fluid_level_spread": "minecraft:zero",
+    "lava": "minecraft:zero",
+    "temperature": "minecraft:zero",
+    "vegetation": "minecraft:zero",
+    "continents": "minecraft:overworld/continents",
+    "erosion": "minecraft:overworld/erosion",
+    "depth": "minecraft:overworld/depth",
+    "ridges": "minecraft:overworld/ridges",
+    "initial_density_without_jaggedness": "isekai_api:hook/final_density",
+    "final_density": "isekai_api:hook/final_density",
+    "vein_toggle": "minecraft:zero",
+    "vein_ridged": "minecraft:zero",
+    "vein_gap": "minecraft:zero"
+  }
+}

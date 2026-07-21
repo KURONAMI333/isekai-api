@@ -2,6 +2,14 @@
 
 Copyable starting points for the boilerplate-heavy parts of worldgen authoring. Each template is annotated with `//` keys (treated as comments by Minecraft's lenient JSON parser) explaining what to swap and what to keep verbatim.
 
+## `minimal_overworld.json` — replace the overworld without copying it
+
+Replacing `data/minecraft/worldgen/noise_settings/overworld.json` needs a *full* document (the registry overrides whole entries, not fields), but "full" here is **~30 lines instead of vanilla's ~2500**. Every noise_router axis is a one-line vanilla density-function reference (`minecraft:overworld/continents`, …) or a neutral `minecraft:zero`; the terrain shape is the `isekai_api:hook/final_density` hook (override it in your datapack to reshape); and the surface is the one-line `isekai_api:vanilla_overworld_surface` delegate instead of the expanded ~30 KB surface_rule.
+
+Aquifers and ore-veins are off (clean coasts). It pairs with a spatial biome source (`isekai_api:rule` / `climate_zones`) or a fixed biome — `temperature`/`vegetation` are zeroed, so vanilla multi_noise biome selection collapses to one biome. Want vanilla climate biomes + water? Turn `aquifers_enabled`/`ore_veins_enabled` on and inline vanilla's `temperature`/`vegetation`/`vein_*`/`fluid_level_*` axes (those have no standalone `density_function` file to reference).
+
+Copy to `data/minecraft/worldgen/noise_settings/overworld.json`. For a **new dimension** (not overriding the overworld), prefer the shipped `isekai_api:hooked_overworld` preset instead — see [`../1_shape/floating_island/`](../1_shape/floating_island/).
+
 ## `world_preset_normal_override.json`
 
 Overrides vanilla's `minecraft:normal` world preset to customise the overworld. **The Nether and End stanzas MUST be re-declared verbatim** — overriding the preset replaces it entirely, and leaving either out silently breaks that dimension. The `IsekaiValidator` world-preset check fires a warning on server start when this happens.

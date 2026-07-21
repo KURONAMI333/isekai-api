@@ -16,16 +16,50 @@ Think of it the way HTML's `div`/`span` are primitives for any web page, not a t
 
 It ships no biomes, structures, or themes of its own. **Built to be built on — however you want to use it, you're welcome:** datapack worldshapes, full Java mods, modpack glue, quick experiments, total conversions. The same primitives power everything; there's no privileged "first-party" path.
 
-## Quick start
+## Quick start — a floating-island world in 2 files
 
-Pick your path — most worldgen work needs no Java at all.
+No Java, no `noise_settings` copy. Reference the shipped `isekai_api:hooked_overworld` preset for a
+new dimension, then override just its terrain-shape hook:
 
-**Datapack author (no Java).** Your whole vocabulary is the set of `isekai_api:` / `isekai:` keys, fully listed in **[docs/DATAPACK_REFERENCE.md](docs/DATAPACK_REFERENCE.md)**. The fastest start is to copy a skeleton from [`examples/`](examples/):
+```jsonc
+// data/<modid>/dimension/skyland.json  — the dimension
+{
+  "type": "minecraft:overworld",
+  "generator": {
+    "type": "minecraft:noise",
+    "settings": "isekai_api:hooked_overworld",
+    "biome_source": { "type": "minecraft:fixed", "biome": "minecraft:plains" }
+  }
+}
+```
+```jsonc
+// data/isekai_api/worldgen/density_function/hook/final_density.json  — the shape (overrides the preset default)
+{
+  "type": "isekai_api:squeeze",
+  "argument": { "type": "minecraft:interpolated", "argument": {
+    "type": "minecraft:blend_density", "argument": {
+      "type": "isekai_api:band_density",
+      "active_min_y": 50, "active_max_y": 200, "gradient_width": 30,
+      "noise": { "type": "isekai_api:blended_noise", "size_xz": 320, "size_y": 240 }
+    }}}
+}
+```
 
-1. Copy `examples/sky_archipelago/` (floating islands), `flipped/` (hanging continent), or `moon_world/` (re-skinned blocks + tag biome selection) into your mod's `src/main/resources/data/<modid>/`.
-2. Rename the placeholder paths to your mod id.
-3. Add `isekai_api` as a dependency in your `neoforge.mods.toml`.
-4. Launch — the worldshape applies on world create.
+Add `isekai_api` to your `neoforge.mods.toml` deps, launch, create a world, and travel to the
+`skyland` dimension. Change only the hook to change the world — `band_density.invert: true` hangs
+the terrain from the top; `solidity_bias` shifts islands ↔ continents. The full example (with a
+README) is [`examples/1_shape/floating_island/`](examples/1_shape/floating_island/).
+
+> The hook override sits in the `isekai_api` namespace because that is how a **datapack** replaces
+> the mod's default hook (datapack resources load above mod-jar resources — deterministic). Ship
+> shape overrides as a datapack, not a second mod jar, and treat a preset as single-owner per world.
+
+**Other entry points.** Three steps, mapped to examples: **shape** → [`1_shape/`](examples/1_shape/)
+· **biome/block placement** → [`2_placement/`](examples/2_placement/) · **adaptation** (ore Y-remap,
+structure gating, atmosphere) → [`3_adaptation/`](examples/3_adaptation/). Replacing the overworld
+itself (not adding a dimension)? [`templates/minimal_overworld.json`](examples/templates/minimal_overworld.json)
+is the whole `minecraft:overworld` noise_settings in ~30 lines. Every datapack key is in
+**[docs/DATAPACK_REFERENCE.md](docs/DATAPACK_REFERENCE.md)**.
 
 **Java modder.** Add `isekai_api` as a `compileOnly` dependency, then use the facade — `Isekai.query()` to read vanilla worldgen rules and `Isekai.remap()` to declare a worldshape (see [Java facade](#java-facade)). Everything outside the `com.kuronami.isekaiapi.api` package is marked `@ApiStatus.Internal`; you only ever touch the `api` package.
 
