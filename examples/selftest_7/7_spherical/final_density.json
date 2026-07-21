@@ -1,0 +1,14 @@
+{
+  "type": "isekai_api:add",
+  "a": { "type": "isekai_api:constant", "value": 60.0 },
+  "b": {
+    "type": "isekai_api:negate",
+    "f": {
+      "type": "isekai_api:distance",
+      "ref_x": 0.0,
+      "ref_y": 80.0,
+      "ref_z": 0.0,
+      "mode": "xyz"
+    }
+  }
+}

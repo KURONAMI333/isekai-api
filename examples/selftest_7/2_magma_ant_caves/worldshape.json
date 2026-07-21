@@ -1,0 +1,20 @@
+{
+  "dimension": "minecraft:overworld",
+  "playable_range": { "min_y": -64, "max_y": 200, "distribution": "uniform" },
+  "surface_anchor": { "type": "isekai_api:world_surface" },
+  "ore_strategy": {
+    "type": "isekai_api:pipe",
+    "chain": [
+      { "type": "isekai_api:linear" },
+      { "type": "isekai_api:count_scale", "factor": 0.7 }
+    ]
+  },
+  "structure_strategy": { "type": "isekai_api:identity" },
+  "mob_spawn_strategy": { "type": "isekai_api:identity" },
+  "default_structure_predicate": { "type": "isekai_api:always" },
+  "additions": {
+    "carvers": [
+      { "carver": "minecraft:cave", "step": "air" }
+    ]
+  }
+}

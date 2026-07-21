@@ -1,0 +1,15 @@
+{
+  "dimension": "minecraft:overworld",
+  "playable_range": { "min_y": -64, "max_y": 320, "distribution": "uniform" },
+  "surface_anchor": { "type": "isekai_api:world_surface" },
+  "ore_strategy": { "type": "isekai_api:identity" },
+  "structure_strategy": { "type": "isekai_api:identity" },
+  "mob_spawn_strategy": { "type": "isekai_api:identity" },
+  "default_structure_predicate": { "type": "isekai_api:always" },
+  "applies_to": { "keys": ["minecraft:desert"] },
+  "additions": {
+    "features": [
+      { "feature": "minecraft:spring_water", "step": "vegetal_decoration" }
+    ]
+  }
+}
