@@ -47,7 +47,7 @@ public final class DumpCommand {
         Path dumpFile = dumpDir.resolve("worldgen.txt");
 
         StringBuilder sb = new StringBuilder();
-        sb.append("=== Isekai API worldgen dump (v").append(IsekaiApi.VERSION).append(") ===\n");
+        sb.append("=== Isekai API worldgen dump (v").append(IsekaiApi.version()).append(") ===\n");
         sb.append("PlacedFeatures: ").append(features.size()).append("\n");
         sb.append("Structure placements: ").append(structures.size()).append("\n\n");
         sb.append("-- PlacedFeatures --\n");

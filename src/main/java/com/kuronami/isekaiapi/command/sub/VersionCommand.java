@@ -16,7 +16,7 @@ public final class VersionCommand {
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("version").executes(ctx -> {
             ctx.getSource().sendSuccess(() ->
-                    Component.literal("Isekai API v" + IsekaiApi.VERSION), false);
+                    Component.literal("Isekai API v" + IsekaiApi.version()), false);
             return 1;
         });
     }
