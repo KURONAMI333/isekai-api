@@ -66,8 +66,14 @@ public final class IsekaiInternal {
      *
      * <p>Safety: read-only registry walk (reads {@code getOriginalBiomeInfo}, immutable), so
      * the nested iteration inside the outer modifier-application loop is benign. A reentrancy
-     * guard returns EMPTY if the scan itself somehow re-enters; any scan exception is
-     * swallowed (returns EMPTY) so worldgen never crashes on our account.
+     * guard returns EMPTY if the scan itself somehow re-enters.
+     *
+     * <p>Failure handling: a scan exception is no longer silently swallowed. It logs at ERROR
+     * with the full stack, flips {@link IsekaiHealth#markDegraded} (so {@code /isekai stats}
+     * shows DEGRADED and consumers can tell remap is inactive), and — under
+     * {@code -Disekai.strict=true} — rethrows so the failure is impossible to miss. In lenient
+     * mode it still returns EMPTY so worldgen doesn't crash on our account, but the degradation
+     * is now observable instead of invisible.
      */
     public static VanillaRuleSnapshot currentSnapshot() {
         VanillaRuleSnapshot s = QUERY.getSnapshot();
@@ -85,12 +91,26 @@ public final class IsekaiInternal {
                 IsekaiApi.LOGGER.debug("[Isekai] lazy snapshot scan completed (empty={})", scanned.isEmpty());
                 return scanned;
             } catch (RuntimeException e) {
-                IsekaiApi.LOGGER.error("[Isekai] lazy snapshot scan failed; ore/feature remap "
-                        + "inactive this session: {}", e.toString());
+                IsekaiApi.LOGGER.error("[Isekai] snapshot scan failed; ore/feature remap "
+                        + "inactive this session", e);
+                IsekaiHealth.markDegraded("snapshot scan failed: " + e);
+                if (IsekaiHealth.STRICT_MODE) throw e;
                 return VanillaRuleSnapshot.EMPTY;
             } finally {
                 SCANNING.set(false);
             }
         }
+    }
+
+    /**
+     * Clear consumer-declared worldshapes on world shutdown. Responsibility boundary:
+     * <b>Java-side</b> declarations (direct {@code Isekai.remap().declareWorldshape} calls)
+     * would otherwise leak across worlds, so they are cleared here; <b>JSON-sourced</b>
+     * declarations are re-applied by {@link com.kuronami.isekaiapi.lifecycle.IsekaiReloadListener}
+     * on the next world's datapack load, so clearing them here is safe and keeps the two
+     * maps from carrying one world's state into another.
+     */
+    public static void clearDeclarations() {
+        REMAP.clearAll();
     }
 }

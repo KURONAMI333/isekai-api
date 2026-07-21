@@ -110,4 +110,19 @@ public final class IsekaiRemapImpl implements IsekaiRemap {
         all.addAll(multiLayer.keySet());
         return Set.copyOf(all);
     }
+
+    /**
+     * Drop every declaration (single-layer and layered). Called at server stop via
+     * {@link IsekaiInternal#clearDeclarations()} so Java-side declarations don't bleed into
+     * the next world. JSON-sourced declarations are re-applied on the next reload, so this
+     * is a full reset of the in-memory registry rather than a selective purge.
+     */
+    public void clearAll() {
+        int cleared = singleLayer.size() + multiLayer.size();
+        singleLayer.clear();
+        multiLayer.clear();
+        if (cleared > 0) {
+            IsekaiApi.LOGGER.debug("[Isekai] cleared {} worldshape declaration(s) on shutdown", cleared);
+        }
+    }
 }

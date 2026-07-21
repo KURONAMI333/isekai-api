@@ -29,6 +29,22 @@ public final class StatsCommand {
             ctx.getSource().sendSuccess(() -> Component.literal("  Structure placements: " + structures.size()), false);
             ctx.getSource().sendSuccess(() -> Component.literal("  Mob spawn entries: " + totalMobsFinal), false);
             ctx.getSource().sendSuccess(() -> Component.literal("  Declared worldshape dimensions: " + dimsDeclared), false);
+
+            // Health: surface the two previously-silent failure modes.
+            if (com.kuronami.isekaiapi.impl.IsekaiHealth.isDegraded()) {
+                String reason = com.kuronami.isekaiapi.impl.IsekaiHealth.degradedReason();
+                ctx.getSource().sendSuccess(() -> Component.literal(
+                        "  DEGRADED: snapshot scan failed — ore/feature remap inactive"
+                                + (reason != null ? " (" + reason + ")" : "")), false);
+            }
+            var dropped = com.kuronami.isekaiapi.impl.IsekaiHealth.droppedEntries();
+            if (!dropped.isEmpty()) {
+                ctx.getSource().sendSuccess(() -> Component.literal(
+                        "  Lenient-dropped datapack entries: " + dropped.size()), false);
+                for (String id : dropped) {
+                    ctx.getSource().sendSuccess(() -> Component.literal("    - " + id), false);
+                }
+            }
             return 1;
         });
     }

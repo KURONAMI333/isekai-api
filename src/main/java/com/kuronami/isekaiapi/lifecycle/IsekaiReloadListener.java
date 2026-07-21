@@ -51,13 +51,14 @@ public final class IsekaiReloadListener extends SimpleJsonResourceReloadListener
     public static final String LAYERED_DIR = "isekai/layered_worldshape";
 
     /**
-     * Strict validation mode toggle. Read once at class load from
-     * {@code -Disekai.strict=true}; flipping at runtime is not supported. When enabled,
-     * any decode/declare failure during reload throws and aborts the whole reload —
-     * Minecraft falls back to the previously-good pack state, surfacing the underlying
-     * exception in the server log instead of letting a half-applied pack go live.
+     * Strict validation mode toggle (single canonical source:
+     * {@link com.kuronami.isekaiapi.impl.IsekaiHealth#STRICT_MODE}, read once from
+     * {@code -Disekai.strict=true}). When enabled, any decode/declare failure during reload
+     * throws and aborts the whole reload — Minecraft falls back to the previously-good pack
+     * state, surfacing the underlying exception in the server log instead of letting a
+     * half-applied pack go live.
      */
-    public static final boolean STRICT_MODE = Boolean.getBoolean("isekai.strict");
+    public static final boolean STRICT_MODE = com.kuronami.isekaiapi.impl.IsekaiHealth.STRICT_MODE;
 
     /**
      * Per-dimension keys most recently loaded from JSON. We retain this so a subsequent
@@ -104,13 +105,22 @@ public final class IsekaiReloadListener extends SimpleJsonResourceReloadListener
             }
         }
 
+        String dir = mode == Mode.SINGLE ? WORLDSHAPE_DIR : LAYERED_DIR;
         if (STRICT_MODE && !failedIds.isEmpty()) {
             // Throwing here aborts the entire reload; Minecraft restores the previous pack
             // state and logs the failure. Lenient mode just continues with whatever succeeded.
             throw new IllegalStateException(
                     "Isekai strict mode: aborting reload — " + failedIds.size()
-                            + " " + (mode == Mode.SINGLE ? WORLDSHAPE_DIR : LAYERED_DIR)
-                            + " entries failed: " + failedIds);
+                            + " " + dir + " entries failed: " + failedIds);
+        }
+
+        // Lenient mode: surface the drops so they aren't silent. Per-entry errors were already
+        // logged above; record the set (replacing this directory's prior list) for /isekai stats
+        // and emit one aggregate WARN so a skimmed log still shows something went wrong.
+        com.kuronami.isekaiapi.impl.IsekaiHealth.setDroppedForDirectory(dir, failedIds);
+        if (!failedIds.isEmpty()) {
+            IsekaiApi.LOGGER.warn("[Isekai] reload: {} {} entr(ies) skipped (lenient): {}",
+                    failedIds.size(), dir, failedIds);
         }
 
         // Remove dimensions that were in JSON before but not in the new pack.
