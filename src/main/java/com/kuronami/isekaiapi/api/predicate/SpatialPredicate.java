@@ -1,5 +1,7 @@
 package com.kuronami.isekaiapi.api.predicate;
 
+import com.kuronami.isekaiapi.registry.IsekaiDispatch;
+import com.kuronami.isekaiapi.registry.IsekaiSpiTypes;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -12,32 +14,42 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Neutral spatial conditions for placement filtering. Combine via {@link And} / {@link Or} /
  * {@link Not} to express arbitrary placement constraints without committing to any specific
  * worldshape's vocabulary.
  *
- * <p>Each variant carries a stable {@link #typeId()} used as the discriminator in the JSON
- * representation, e.g. {@code {"type": "isekai:y_in_range", "min": 60, "max": 200}}.
+ * <p><b>Extensible.</b> The built-in variants below are registered in the
+ * {@link com.kuronami.isekaiapi.api.registry.IsekaiRegistries#SPATIAL_PREDICATE_TYPE} registry;
+ * third parties add their own by registering a {@link MapCodec} under that key (see
+ * {@link com.kuronami.isekaiapi.api.registry.IsekaiRegistries}). The {@link #CODEC} dispatches on
+ * a {@code "type"} field, e.g. {@code {"type": "isekai_api:y_in_range", "min": 60, "max": 200}}.
+ * The legacy {@code isekai:} prefix is accepted as a deprecated alias.
  *
- * <p>The {@link #CODEC} field dispatches on the {@code "type"} key; consumers serialize
- * descriptors via {@code SpatialPredicate.CODEC.encodeStart(...)} or decode from datapack JSON
- * via {@code SpatialPredicate.CODEC.parse(...)}.
+ * <p><b>Implementing a variant.</b> Implementations must be immutable (records are recommended),
+ * return their registered codec from {@link #codec()}, evaluate themselves against a world via
+ * {@link #test(EvaluationContext)}, and expose any nested predicates via {@link #children()} so
+ * validators can walk the tree.
+ *
+ * @since 2.0.0 open for third-party extension via the registry (was a sealed interface before).
  */
-public sealed interface SpatialPredicate {
+public interface SpatialPredicate {
 
-    /** Stable type-id for dispatch. Namespaced under {@code isekai:}. */
-    String typeId();
-
-    /** This variant's payload codec (no {@code "type"} field). */
+    /** This variant's payload codec (no {@code "type"} field); must be the instance registered
+     *  under {@link com.kuronami.isekaiapi.api.registry.IsekaiRegistries#SPATIAL_PREDICATE_TYPE}. */
     MapCodec<? extends SpatialPredicate> codec();
 
-    /** Dispatching codec keyed on a {@code "type"} field. */
-    Codec<SpatialPredicate> CODEC = Codec.lazyInitialized(SpatialPredicate::buildDispatchCodec);
+    /** Evaluate this predicate against a world context. @since 2.0.0 */
+    boolean test(EvaluationContext ctx);
+
+    /** Nested predicates, for tree-walking validators. Empty for leaf variants. @since 2.0.0 */
+    default List<SpatialPredicate> children() { return List.of(); }
+
+    /** Dispatching codec keyed on a {@code "type"} field, backed by the SpatialPredicate registry. */
+    Codec<SpatialPredicate> CODEC = IsekaiDispatch.dispatchCodec(
+            IsekaiSpiTypes.SPATIAL_PREDICATE_REGISTRY, SpatialPredicate::codec, "SpatialPredicate");
 
     // ---------------------------------------------------------------------
     // Leaf variants
@@ -50,8 +62,11 @@ public sealed interface SpatialPredicate {
                 Codec.INT.fieldOf("max").forGetter(YInRange::max)
         ).apply(i, YInRange::new));
 
-        @Override public String typeId() { return "isekai:y_in_range"; }
         @Override public MapCodec<? extends SpatialPredicate> codec() { return MAP_CODEC; }
+        @Override public boolean test(EvaluationContext ctx) {
+            int y = ctx.pos().getY();
+            return y >= min && y <= max;
+        }
     }
 
     /** Block has solid ground beneath and at least {@code minClearance} blocks of empty space above. */
@@ -60,8 +75,8 @@ public sealed interface SpatialPredicate {
                 Codec.INT.fieldOf("min_clearance").forGetter(SolidFloor::minClearance)
         ).apply(i, SolidFloor::new));
 
-        @Override public String typeId() { return "isekai:solid_floor"; }
         @Override public MapCodec<? extends SpatialPredicate> codec() { return MAP_CODEC; }
+        @Override public boolean test(EvaluationContext ctx) { return ctx.solidFloor(minClearance); }
     }
 
     /** Block has solid ceiling above and at least {@code minClearance} blocks of empty space below. */
@@ -70,8 +85,8 @@ public sealed interface SpatialPredicate {
                 Codec.INT.fieldOf("min_clearance").forGetter(SolidCeiling::minClearance)
         ).apply(i, SolidCeiling::new));
 
-        @Override public String typeId() { return "isekai:solid_ceiling"; }
         @Override public MapCodec<? extends SpatialPredicate> codec() { return MAP_CODEC; }
+        @Override public boolean test(EvaluationContext ctx) { return ctx.solidCeiling(minClearance); }
     }
 
     /** Local terrain slope falls within [minSlope, maxSlope]. 0 = flat, 1 = 45deg. */
@@ -81,8 +96,8 @@ public sealed interface SpatialPredicate {
                 Codec.DOUBLE.fieldOf("max_slope").forGetter(TerrainSlope::maxSlope)
         ).apply(i, TerrainSlope::new));
 
-        @Override public String typeId() { return "isekai:terrain_slope"; }
         @Override public MapCodec<? extends SpatialPredicate> codec() { return MAP_CODEC; }
+        @Override public boolean test(EvaluationContext ctx) { return ctx.terrainSlope(minSlope, maxSlope); }
     }
 
     /**
@@ -96,8 +111,8 @@ public sealed interface SpatialPredicate {
                 Codec.INT.fieldOf("max_distance").forGetter(NearBlock::maxDistance)
         ).apply(i, NearBlock::new));
 
-        @Override public String typeId() { return "isekai:near_block"; }
         @Override public MapCodec<? extends SpatialPredicate> codec() { return MAP_CODEC; }
+        @Override public boolean test(EvaluationContext ctx) { return ctx.nearBlock(targets, maxDistance); }
     }
 
     /** Position is within {@code maxDistance} of a chunk whose biome key matches. */
@@ -107,8 +122,8 @@ public sealed interface SpatialPredicate {
                 Codec.INT.fieldOf("max_distance").forGetter(NearBiome::maxDistance)
         ).apply(i, NearBiome::new));
 
-        @Override public String typeId() { return "isekai:near_biome"; }
         @Override public MapCodec<? extends SpatialPredicate> codec() { return MAP_CODEC; }
+        @Override public boolean test(EvaluationContext ctx) { return ctx.nearBiome(biome, maxDistance); }
     }
 
     /** Position is inside the specified fluid. */
@@ -117,8 +132,8 @@ public sealed interface SpatialPredicate {
                 BuiltInRegistries.FLUID.byNameCodec().fieldOf("fluid").forGetter(InFluid::fluid)
         ).apply(i, InFluid::new));
 
-        @Override public String typeId() { return "isekai:in_fluid"; }
         @Override public MapCodec<? extends SpatialPredicate> codec() { return MAP_CODEC; }
+        @Override public boolean test(EvaluationContext ctx) { return ctx.inFluid(fluid); }
     }
 
     /** Always true. */
@@ -126,8 +141,8 @@ public sealed interface SpatialPredicate {
         public static final Always INSTANCE = new Always();
         public static final MapCodec<Always> MAP_CODEC = MapCodec.unit(INSTANCE);
 
-        @Override public String typeId() { return "isekai:always"; }
         @Override public MapCodec<? extends SpatialPredicate> codec() { return MAP_CODEC; }
+        @Override public boolean test(EvaluationContext ctx) { return true; }
     }
 
     /** Always false. */
@@ -135,8 +150,8 @@ public sealed interface SpatialPredicate {
         public static final Never INSTANCE = new Never();
         public static final MapCodec<Never> MAP_CODEC = MapCodec.unit(INSTANCE);
 
-        @Override public String typeId() { return "isekai:never"; }
         @Override public MapCodec<? extends SpatialPredicate> codec() { return MAP_CODEC; }
+        @Override public boolean test(EvaluationContext ctx) { return false; }
     }
 
     // ---------------------------------------------------------------------
@@ -150,8 +165,12 @@ public sealed interface SpatialPredicate {
                 Codec.lazyInitialized(() -> CODEC).listOf().fieldOf("all").forGetter(And::all)
         ).apply(i, And::new));
 
-        @Override public String typeId() { return "isekai:and"; }
         @Override public MapCodec<? extends SpatialPredicate> codec() { return MAP_CODEC; }
+        @Override public boolean test(EvaluationContext ctx) {
+            for (SpatialPredicate child : all) if (!child.test(ctx)) return false;
+            return true;
+        }
+        @Override public List<SpatialPredicate> children() { return all; }
     }
 
     /** Any sub-predicate holds. */
@@ -161,8 +180,12 @@ public sealed interface SpatialPredicate {
                 Codec.lazyInitialized(() -> CODEC).listOf().fieldOf("any").forGetter(Or::any)
         ).apply(i, Or::new));
 
-        @Override public String typeId() { return "isekai:or"; }
         @Override public MapCodec<? extends SpatialPredicate> codec() { return MAP_CODEC; }
+        @Override public boolean test(EvaluationContext ctx) {
+            for (SpatialPredicate child : any) if (child.test(ctx)) return true;
+            return false;
+        }
+        @Override public List<SpatialPredicate> children() { return any; }
     }
 
     /** Negation of inner predicate. */
@@ -171,45 +194,8 @@ public sealed interface SpatialPredicate {
                 Codec.lazyInitialized(() -> CODEC).fieldOf("inner").forGetter(Not::inner)
         ).apply(i, Not::new));
 
-        @Override public String typeId() { return "isekai:not"; }
         @Override public MapCodec<? extends SpatialPredicate> codec() { return MAP_CODEC; }
-    }
-
-    // ---------------------------------------------------------------------
-    // Dispatch wiring
-    // ---------------------------------------------------------------------
-
-    /**
-     * Build the dispatch codec lazily on first access. Registry insertion order is preserved
-     * (LinkedHashMap) so error messages and tooling enumerate variants in declaration order.
-     */
-    private static Codec<SpatialPredicate> buildDispatchCodec() {
-        Map<String, MapCodec<? extends SpatialPredicate>> registry = new LinkedHashMap<>();
-        registry.put("isekai:y_in_range",    YInRange.MAP_CODEC);
-        registry.put("isekai:solid_floor",   SolidFloor.MAP_CODEC);
-        registry.put("isekai:solid_ceiling", SolidCeiling.MAP_CODEC);
-        registry.put("isekai:terrain_slope", TerrainSlope.MAP_CODEC);
-        registry.put("isekai:near_block",    NearBlock.MAP_CODEC);
-        registry.put("isekai:near_biome",    NearBiome.MAP_CODEC);
-        registry.put("isekai:in_fluid",      InFluid.MAP_CODEC);
-        registry.put("isekai:always",        Always.MAP_CODEC);
-        registry.put("isekai:never",         Never.MAP_CODEC);
-        registry.put("isekai:and",           And.MAP_CODEC);
-        registry.put("isekai:or",            Or.MAP_CODEC);
-        registry.put("isekai:not",           Not.MAP_CODEC);
-        Map<String, MapCodec<? extends SpatialPredicate>> frozen = Map.copyOf(registry);
-
-        return Codec.STRING.dispatch(
-                "type",
-                SpatialPredicate::typeId,
-                typeId -> {
-                    MapCodec<? extends SpatialPredicate> mc = frozen.get(typeId);
-                    if (mc == null) {
-                        throw new IllegalArgumentException(
-                                "Unknown SpatialPredicate type: '" + typeId
-                                        + "'. Known types: " + frozen.keySet());
-                    }
-                    return mc;
-                });
+        @Override public boolean test(EvaluationContext ctx) { return !inner.test(ctx); }
+        @Override public List<SpatialPredicate> children() { return List.of(inner); }
     }
 }

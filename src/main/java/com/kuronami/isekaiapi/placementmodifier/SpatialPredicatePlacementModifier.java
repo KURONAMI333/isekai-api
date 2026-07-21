@@ -1,17 +1,23 @@
 package com.kuronami.isekaiapi.placementmodifier;
 
 import com.kuronami.isekaiapi.IsekaiApi;
+import com.kuronami.isekaiapi.api.predicate.EvaluationContext;
 import com.kuronami.isekaiapi.api.predicate.SpatialPredicate;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.HolderSet;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.placement.PlacementContext;
 import net.minecraft.world.level.levelgen.placement.PlacementModifier;
 import net.minecraft.world.level.levelgen.placement.PlacementModifierType;
+import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
 
 import java.util.stream.Stream;
@@ -48,7 +54,7 @@ public class SpatialPredicatePlacementModifier extends PlacementModifier {
 
     @Override
     public Stream<BlockPos> getPositions(PlacementContext ctx, RandomSource rand, BlockPos pos) {
-        return evaluate(predicate, pos, ctx.getLevel()) ? Stream.of(pos) : Stream.empty();
+        return predicate.test(new FeatureContext(pos, ctx.getLevel())) ? Stream.of(pos) : Stream.empty();
     }
 
     @Override
@@ -56,41 +62,53 @@ public class SpatialPredicatePlacementModifier extends PlacementModifier {
         return IsekaiPlacementModifiers.SPATIAL_PREDICATE.get();
     }
 
-    private static boolean evaluate(SpatialPredicate p, BlockPos pos, WorldGenLevel level) {
-        if (p instanceof SpatialPredicate.Always) return true;
-        if (p instanceof SpatialPredicate.Never) return false;
-        if (p instanceof SpatialPredicate.YInRange y) {
-            return pos.getY() >= y.min() && pos.getY() <= y.max();
+    /**
+     * Feature-decoration {@link EvaluationContext}: base terrain blocks are already placed, so
+     * clearance / fluid queries read the {@link WorldGenLevel} directly. The multi-column scans
+     * ({@code nearBlock} / {@code nearBiome} / {@code terrainSlope}) need ChunkGenerator /
+     * BiomeSource samples that aren't cleanly available here, so they stay permissive (allow) —
+     * exactly the historical behavior; those predicates remain enforced at structure-placement time.
+     */
+    private record FeatureContext(BlockPos pos, WorldGenLevel level) implements EvaluationContext {
+
+        @Override
+        public boolean solidFloor(int minClearance) {
+            return checkSolidFloor(pos, level, minClearance);
         }
-        if (p instanceof SpatialPredicate.And and) {
-            for (var c : and.all()) if (!evaluate(c, pos, level)) return false;
+
+        @Override
+        public boolean solidCeiling(int minClearance) {
+            return checkSolidCeiling(pos, level, minClearance);
+        }
+
+        @Override
+        public boolean inFluid(Fluid fluid) {
+            FluidState fs = level.getFluidState(pos);
+            // "is this position inside the named fluid". Empty fluid matches "no fluid" intent
+            // if the consumer set fluid = empty registry key.
+            return fs.is(fluid);
+        }
+
+        @Override
+        public boolean nearBlock(HolderSet<Block> targets, int maxDistance) {
+            return unsupported("near_block");
+        }
+
+        @Override
+        public boolean nearBiome(ResourceKey<Biome> biome, int maxDistance) {
+            return unsupported("near_biome");
+        }
+
+        @Override
+        public boolean terrainSlope(double minSlope, double maxSlope) {
+            return unsupported("terrain_slope");
+        }
+
+        private static boolean unsupported(String what) {
+            IsekaiApi.LOGGER.debug("[Isekai] SpatialPredicatePlacementModifier: {} unsupported at "
+                    + "placement-time, allowing", what);
             return true;
         }
-        if (p instanceof SpatialPredicate.Or or) {
-            for (var c : or.any()) if (evaluate(c, pos, level)) return true;
-            return false;
-        }
-        if (p instanceof SpatialPredicate.Not not) {
-            return !evaluate(not.inner(), pos, level);
-        }
-        if (p instanceof SpatialPredicate.SolidFloor sf) {
-            return checkSolidFloor(pos, level, sf.minClearance());
-        }
-        if (p instanceof SpatialPredicate.SolidCeiling sc) {
-            return checkSolidCeiling(pos, level, sc.minClearance());
-        }
-        if (p instanceof SpatialPredicate.InFluid in) {
-            FluidState fs = level.getFluidState(pos);
-            // InFluid checks "is at this position inside the named fluid". Empty fluid
-            // matches "no fluid" intent if consumer set fluid = empty registry key.
-            return fs.is(in.fluid());
-        }
-        // NearBlock / NearBiome / TerrainSlope: these are structure-time predicates that
-        // require ChunkGenerator / BiomeSource samples not cleanly available at placement
-        // decoration. Treat as allow at placement-time; structures still gate them.
-        IsekaiApi.LOGGER.debug("[Isekai] SpatialPredicatePlacementModifier: {} unsupported at " +
-                "placement-time, allowing", p.getClass().getSimpleName());
-        return true;
     }
 
     /**
