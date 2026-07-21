@@ -1,0 +1,43 @@
+{
+  "sea_level": -64,
+  "disable_mob_generation": false,
+  "aquifers_enabled": false,
+  "ore_veins_enabled": false,
+  "legacy_random_source": false,
+  "default_block": { "Name": "minecraft:stone" },
+  "default_fluid": { "Name": "minecraft:water", "Properties": { "level": "0" } },
+  "noise": { "min_y": -64, "height": 384, "size_horizontal": 1, "size_vertical": 2 },
+  "spawn_target": [],
+  "surface_rule": { "type": "isekai_api:vanilla_overworld_surface" },
+  "noise_router": {
+    "barrier": "minecraft:zero",
+    "fluid_level_floodedness": "minecraft:zero",
+    "fluid_level_spread": "minecraft:zero",
+    "lava": "minecraft:zero",
+    "temperature": "minecraft:zero",
+    "vegetation": "minecraft:zero",
+    "continents": "minecraft:overworld/continents",
+    "erosion": "minecraft:overworld/erosion",
+    "depth": "minecraft:overworld/depth",
+    "ridges": "minecraft:overworld/ridges",
+    "initial_density_without_jaggedness": {
+      "type": "isekai_api:squeeze",
+      "argument": { "type": "minecraft:interpolated", "argument": { "type": "minecraft:blend_density", "argument": {
+        "type": "isekai_api:band_density",
+        "active_min_y": 50, "active_max_y": 200, "gradient_width": 30,
+        "noise": { "type": "isekai_api:blended_noise", "size_xz": 320, "size_y": 240 }
+      } } }
+    },
+    "final_density": {
+      "type": "isekai_api:squeeze",
+      "argument": { "type": "minecraft:interpolated", "argument": { "type": "minecraft:blend_density", "argument": {
+        "type": "isekai_api:band_density",
+        "active_min_y": 50, "active_max_y": 200, "gradient_width": 30,
+        "noise": { "type": "isekai_api:blended_noise", "size_xz": 320, "size_y": 240 }
+      } } }
+    },
+    "vein_toggle": "minecraft:zero",
+    "vein_ridged": "minecraft:zero",
+    "vein_gap": "minecraft:zero"
+  }
+}

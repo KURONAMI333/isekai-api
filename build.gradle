@@ -123,6 +123,10 @@ neoForge.ideSyncTask generateModMetadata
 def testPayloadExcludes = { CopySpec spec ->
     spec.exclude 'com/kuronami/isekaiapi/gametest/**'
     spec.exclude 'data/isekai_api/structure/**'
+    // Verification worldgen (new dimensions used only for runClient acceptance shots).
+    // Dev-loaded from build/resources; must never ship — a neutral library must not carry
+    // a consumer-flavoured world (the v0.1 preset-library sin).
+    spec.exclude 'data/isekai_verify/**'
 }
 tasks.named('jar', Jar) { testPayloadExcludes(it) }
 tasks.named('sourcesJar', Jar) { testPayloadExcludes(it) }
