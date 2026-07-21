@@ -100,6 +100,11 @@ public final class IsekaiLifecycle {
         // Drop the snapshot so the next world re-scans via the lazy path instead of
         // reusing this world's registry-derived data (datapacks may differ).
         IsekaiInternal.invalidateSnapshot();
+        // Clear consumer-declared worldshapes so a Java-side declaration from this world
+        // doesn't leak into the next one (JSON declarations re-apply on the next reload).
+        IsekaiInternal.clearDeclarations();
+        // Reset degraded flag + lenient-drop tally so the next world starts with a clean bill.
+        com.kuronami.isekaiapi.impl.IsekaiHealth.reset();
     }
 
     /**
