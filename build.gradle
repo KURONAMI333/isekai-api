@@ -143,15 +143,44 @@ tasks.named('javadoc', Javadoc) {
     options.addStringOption('Xdoclint:all,-missing', '-quiet')
 }
 
+// Distribution as a GitHub raw-URL maven repo: `./gradlew publish` writes the standard
+// maven layout into `maven/` (git-ignored here; W5 commits it to the repo's `maven` branch,
+// which consumers reference by raw URL — public, no auth, no account setup). Consumers add
+// isekai_api as a compileOnly dependency and bring their own NeoForge, so the published pom
+// must carry no dependencies: NeoForge/Minecraft are provided by the consumer's own toolchain,
+// never resolved transitively from ours. Gradle module metadata is disabled for the same
+// reason — it would re-introduce the moddev-managed neoforge coordinate that consumers can't
+// resolve from a plain maven repo.
+tasks.withType(GenerateModuleMetadata).configureEach {
+    enabled = false
+}
+
 publishing {
     publications {
         register('mavenJava', MavenPublication) {
+            artifactId = mod_id
             from components.java
+            pom.withXml {
+                def deps = asNode().dependencies
+                if (deps) { deps.replaceNode {} }
+            }
+            pom {
+                name = mod_name
+                description = mod_description
+                url = 'https://github.com/KURONAMI333/isekai-api'
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://github.com/KURONAMI333/isekai-api/blob/main/LICENSE'
+                    }
+                }
+            }
         }
     }
     repositories {
         maven {
-            url "file://${project.projectDir}/repo"
+            name = 'localRaw'
+            url = uri(layout.projectDirectory.dir('maven'))
         }
     }
 }
