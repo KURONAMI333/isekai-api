@@ -140,7 +140,7 @@ Two `SurfaceRules.RuleSource` types let you re-skin per-biome blocks without wri
 - **`isekai_api:worldshape_surface_top`** — overrides the top block of matched biomes (e.g. "in moon biomes, top with moon_regolith instead of grass") from the worldshape's `block_overrides.surface_top` map.
 - **`isekai_api:worldshape_default_block`** — overrides the default block (the stone-equivalent bulk fill) from `block_overrides.default_block`.
 
-Wire either rule into your dimension's `surface_rule` sequence — surface_top should come first, default_block should come last (after vanilla rules) so the surface band stays intact and only sub-surface stone gets remapped.
+Wire either rule into your dimension's `surface_rule` sequence — prepend `worldshape_surface_top` **bare and first** (it self-gates to the topmost surface block, so no `stone_depth` wrapper is needed) and put `worldshape_default_block` last, after the vanilla rules, so the surface band stays intact and only sub-surface stone gets remapped.
 
 A third rule, **`isekai_api:strata`**, takes an ordered list of `{block, thickness}` bands measured downward from the floor surface — collapses an N-layer nested `stone_depth` sequence (e.g. sand → sandstone → stone) into one flat list.
 
