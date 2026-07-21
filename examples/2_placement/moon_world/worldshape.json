@@ -7,7 +7,7 @@
   "mob_spawn_strategy": { "type": "isekai:identity" },
   "default_structure_predicate": { "type": "isekai:always" },
   "applies_to": {
-    "tags": ["minecraft:is_overworld"]
+    "tags": ["#minecraft:is_overworld"]
   },
   "atmosphere": {
     "sky_color": 3486504,

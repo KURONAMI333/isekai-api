@@ -5,6 +5,7 @@ import com.kuronami.isekaiapi.biomemodifier.phase.AddPhase;
 import com.kuronami.isekaiapi.biomemodifier.phase.BiomeMatcher;
 import com.kuronami.isekaiapi.biomemodifier.phase.ModifyPhase;
 import com.kuronami.isekaiapi.biomemodifier.phase.RemovePhase;
+import com.kuronami.isekaiapi.registry.DeprecatedInlineCodec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.Holder;
@@ -40,9 +41,13 @@ import org.jetbrains.annotations.ApiStatus;
 @ApiStatus.Internal
 public record ApplyWorldshapeBiomeModifier(WorldshapeDescriptor worldshape) implements BiomeModifier {
 
-    public static final MapCodec<ApplyWorldshapeBiomeModifier> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
-            WorldshapeDescriptor.CODEC.fieldOf("worldshape").forGetter(ApplyWorldshapeBiomeModifier::worldshape)
-    ).apply(i, ApplyWorldshapeBiomeModifier::new));
+    public static final MapCodec<ApplyWorldshapeBiomeModifier> MAP_CODEC = DeprecatedInlineCodec.warnOnDecode(
+            RecordCodecBuilder.mapCodec(i -> i.group(
+                    WorldshapeDescriptor.CODEC.fieldOf("worldshape").forGetter(ApplyWorldshapeBiomeModifier::worldshape)
+            ).apply(i, ApplyWorldshapeBiomeModifier::new)),
+            "isekai_api:apply_worldshape (inline) is deprecated — declare the worldshape once under "
+            + "data/<ns>/isekai/worldshape/<name>.json and use isekai_api:apply_worldshape_ref instead. "
+            + "The inline form keeps working for now.");
 
     @Override
     public void modify(Holder<Biome> biome, Phase phase, ModifiableBiomeInfo.BiomeInfo.Builder builder) {

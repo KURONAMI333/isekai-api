@@ -2,6 +2,7 @@ package com.kuronami.isekaiapi.structuremodifier;
 
 import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
+import com.kuronami.isekaiapi.registry.DeprecatedInlineCodec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.Holder;
@@ -40,9 +41,13 @@ import org.jetbrains.annotations.ApiStatus;
 @ApiStatus.Internal
 public record ApplyWorldshapeStructureModifier(WorldshapeDescriptor worldshape) implements StructureModifier {
 
-    public static final MapCodec<ApplyWorldshapeStructureModifier> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
-            WorldshapeDescriptor.CODEC.fieldOf("worldshape").forGetter(ApplyWorldshapeStructureModifier::worldshape)
-    ).apply(i, ApplyWorldshapeStructureModifier::new));
+    public static final MapCodec<ApplyWorldshapeStructureModifier> MAP_CODEC = DeprecatedInlineCodec.warnOnDecode(
+            RecordCodecBuilder.mapCodec(i -> i.group(
+                    WorldshapeDescriptor.CODEC.fieldOf("worldshape").forGetter(ApplyWorldshapeStructureModifier::worldshape)
+            ).apply(i, ApplyWorldshapeStructureModifier::new)),
+            "isekai_api:apply_worldshape_structures (inline) is deprecated — declare the worldshape once "
+            + "under data/<ns>/isekai/worldshape/<name>.json and use isekai_api:apply_worldshape_structures_ref "
+            + "instead. The inline form keeps working for now.");
 
     @Override
     public void modify(Holder<Structure> structure, Phase phase, ModifiableStructureInfo.StructureInfo.Builder builder) {
