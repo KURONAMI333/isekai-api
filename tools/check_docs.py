@@ -59,11 +59,12 @@ def main():
                     violations.append(
                         f"{where}  BARE-PREFIX  '{block[start:start+18].strip()}...'"
                     )
-            # 2. well-formedness
-            if SCHEMA_TOKEN_RE.search(block):
+            # 2. well-formedness — classify on the JSON itself, not on `// path` comments
+            # (a `<ns>` placeholder inside a path comment is not schema content)
+            cleaned = strip_comments(block).strip()
+            if SCHEMA_TOKEN_RE.search(cleaned):
                 schema += 1
                 continue
-            cleaned = strip_comments(block).strip()
             try:
                 json.loads(cleaned)
                 literal_ok += 1

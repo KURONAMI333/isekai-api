@@ -221,48 +221,44 @@ Five composable interfaces let you adapt vanilla / modded rules to your worldsha
 
 ### Biome / Structure modifier integration
 
-Datapack consumers don't need to write any Java. Drop a worldshape descriptor inside a NeoForge biome modifier and it takes effect at chunk gen:
+Datapack consumers don't need to write any Java. Author the worldshape descriptor as its own
+file, then bind it to a dimension with a small biome modifier that references it — it takes
+effect at chunk gen:
 
 ```jsonc
-// data/<ns>/neoforge/biome_modifier/my_world.json
+// data/<ns>/isekai/worldshape/my_world.json — the worldshape descriptor
 {
-  "type": "isekai_api:apply_worldshape",
-  "worldshape": {
-    "dimension": "minecraft:overworld",
-    "playable_range": { "min_y": 80, "max_y": 200, "distribution": "uniform" },
-    "surface_anchor": { "type": "isekai_api:fixed_y", "y": 150 },
-    "ore_strategy": { "type": "isekai_api:linear" },
-    "structure_strategy": { "type": "isekai_api:identity" },
-    "mob_spawn_strategy": { "type": "isekai_api:identity" },
-    "mob_spawn_strategy_by_category": {
-      "creature": { "type": "isekai_api:count_scale", "factor": 1.5 },
-      "monster":  { "type": "isekai_api:count_scale", "factor": 0.25 }
-    },
-    "default_structure_predicate": {
-      "type": "isekai_api:y_in_range", "min": 80, "max": 200
-    },
-    "applies_to": ["minecraft:plains"],
-    "exclusions": {
-      "features": [],
-      "structures": [],
-      "carvers": [],
-      "mob_spawns": []
-    },
-    "additions": {
-      "features": [],
-      "carvers": [],
-      "mob_spawns": []
-    }
-  }
+  "dimension": "minecraft:overworld",
+  "playable_range": { "min_y": 80, "max_y": 200, "distribution": "uniform" },
+  "surface_anchor": { "type": "isekai_api:fixed_y", "y": 150 },
+  "ore_strategy": { "type": "isekai_api:linear" },
+  "structure_strategy": { "type": "isekai_api:identity" },
+  "mob_spawn_strategy": { "type": "isekai_api:identity" },
+  "mob_spawn_strategy_by_category": {
+    "creature": { "type": "isekai_api:count_scale", "factor": 1.5 },
+    "monster":  { "type": "isekai_api:count_scale", "factor": 0.25 }
+  },
+  "default_structure_predicate": { "type": "isekai_api:y_in_range", "min": 80, "max": 200 },
+  "applies_to": ["minecraft:plains"]
 }
 ```
+```jsonc
+// data/<ns>/neoforge/biome_modifier/my_world.json — bind the descriptor to its dimension
+{ "type": "isekai_api:apply_worldshape_ref", "dimension": "minecraft:overworld" }
+```
+```jsonc
+// data/<ns>/neoforge/structure_modifier/my_world.json — the structure side (same pattern)
+{ "type": "isekai_api:apply_worldshape_structures_ref", "dimension": "minecraft:overworld" }
+```
 
-This causes the biome modifier's three phases to:
-- **REMOVE** features in `exclusions.features` (plus carvers / structures / mob_spawns in the corresponding sub-fields) plus the original strategy-targeted features pending remap.
-- **ADD** features in `additions.features` (plus carvers / mob_spawns) plus remap-derived variants of the original placed features (with new Y ranges per `ore_strategy`).
+The biome modifier's three phases then:
+- **REMOVE** the descriptor's `exclusions` (features / structures / carvers / mob_spawns) plus the original strategy-targeted features pending remap.
+- **ADD** the descriptor's `additions` plus remap-derived variants of the original placed features (with new Y ranges per `ore_strategy`).
 - **MODIFY** mob spawn weights per the (optionally per-category) strategy, and apply any `atmosphere` overrides (temperature, downfall, colors, etc.).
 
-Structure removal goes through a parallel `isekai_api:apply_worldshape_structures` modifier under `data/<ns>/neoforge/structure_modifier/`.
+Optional descriptor fields (`exclusions`, `additions`, `atmosphere`, …) default to empty. The
+older inline form — `isekai_api:apply_worldshape` with the descriptor embedded in the biome
+modifier — still loads but warns; use the `_ref` form above.
 
 See `examples/` for six runnable example datapacks and full JSON schema documentation.
 
@@ -326,8 +322,11 @@ All subcommands require permission level 2 (operators).
 ```
 
 Produces `build/libs/isekai_api-2.0.0.jar` plus matching `-sources` and `-javadoc` jars.
-For consuming the library in another mod, see
-[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md#depending-on-isekai-api).
+
+To depend on Isekai from another mod, add it as a `compileOnly` dependency. It is already on
+[Cursemaven](https://cursemaven.com) (the CurseForge file is approved), and also served as a
+raw-URL maven from this repo's `maven` branch. Full coordinates and the compatibility contract
+are in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md#depending-on-isekai-api).
 
 ## Examples
 
