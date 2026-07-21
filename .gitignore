@@ -51,3 +51,7 @@ fabric-1.20.1/
 
 ### Branding / publish tooling (icon ships via src/main/resources/isekai_api.png) ###
 branding/
+
+### Internal handoff / gap tracking — never published ###
+GAP_LOG.md
+_handoff/

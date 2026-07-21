@@ -41,6 +41,16 @@ neoForge {
             programArgument '--nogui'
         }
 
+        // Headless GameTest harness. `./gradlew runGameTestServer` boots a minimal server,
+        // runs every @GameTest in this mod's namespace, and exits 0 on all-pass / non-zero
+        // on any failure. The gametest classes + their structure template live in src/main
+        // (so this run picks them up from build/classes) but are excluded from the published
+        // jar (see the `jar` task below) — the shipped library carries no test payload.
+        gameTestServer {
+            type = "gameTestServer"
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
         configureEach {
             systemProperty 'forge.logging.markers', 'REGISTRIES'
             logLevel = org.slf4j.event.Level.DEBUG
@@ -99,6 +109,14 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
 }
 sourceSets.main.resources.srcDir generateModMetadata
 neoForge.ideSyncTask generateModMetadata
+
+// Keep the GameTest harness out of the published library. The tests run from
+// build/classes during `runGameTestServer`, but the shipped jar must stay a pure
+// worldgen library — no test classes, no test structure template.
+tasks.named('jar', Jar) {
+    exclude 'com/kuronami/isekaiapi/gametest/**'
+    exclude 'data/isekai_api/structure/**'
+}
 
 publishing {
     publications {
