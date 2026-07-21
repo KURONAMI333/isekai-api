@@ -5,10 +5,12 @@ Every Isekai key you can write in datapack JSON, in one place. No Java required.
 > Editing `isekai/worldshape/*.json` or `isekai/layered_worldshape/*.json`? Wire up the
 > [JSON Schemas](schema/README.md) for completion and edit-time validation.
 
-There are two kinds of identifier:
+Every Isekai identifier uses the **`isekai_api:`** namespace and names a registry-backed *type*:
 
-- **`isekai_api:<name>`** — a registered worldgen *type*, used as a `"type"` value where Minecraft expects a density function, biome source, surface rule, placement modifier, biome modifier, or structure modifier.
-- **`isekai:<name>`** — an in-house *dispatch tag*, used as the `"type"` value inside Isekai's own sealed payloads (`SpatialPredicate`, `RemapStrategy`, `SurfaceAnchor`, `TransitionRule`, `BiomeZone`). These are not registry entries; they only appear nested inside a worldshape descriptor or a rule biome source.
+- **Worldgen types** — used as a `"type"` value where Minecraft expects a density function, biome source, surface rule, placement modifier, biome modifier, or structure modifier.
+- **Extension-point types** (`SpatialPredicate`, `RemapStrategy`, `SurfaceAnchor`, `TransitionRule`, `BiomeZone`) — used as the `"type"` value nested inside a worldshape descriptor or a rule biome source. Each dispatches through its own Isekai custom registry (`IsekaiRegistries`), so third-party mods can register additional variants.
+
+> The legacy `isekai:` prefix (used by older packs for the extension-point types) is accepted as a deprecated alias and logs a one-time warning per id. Use `isekai_api:` in new packs.
 
 Where each goes:
 
@@ -20,7 +22,7 @@ Where each goes:
 | `data/<ns>/worldgen/placed_feature/*.json` → placement list | placement modifiers |
 | `data/<ns>/neoforge/biome_modifier/*.json` | biome modifiers |
 | `data/<ns>/neoforge/structure_modifier/*.json` | structure modifiers |
-| `data/<ns>/isekai/worldshape/*.json` | the worldshape descriptor (uses the `isekai:` dispatch payloads) |
+| `data/<ns>/isekai/worldshape/*.json` | the worldshape descriptor (uses the `isekai_api:` dispatch payloads) |
 
 ---
 
@@ -96,8 +98,8 @@ Places biomes by `BiomeZone` rules evaluated in declaration order; first match w
   "type": "isekai_api:rule",
   "fallback": "minecraft:plains",
   "rules": [
-    { "zone": { "type": "isekai:y_below", "y": 20 }, "biome": "minecraft:deep_dark" },
-    { "zone": { "type": "isekai:within_distance", "radius": 1000 }, "biome": "minecraft:desert" }
+    { "zone": { "type": "isekai_api:y_below", "y": 20 }, "biome": "minecraft:deep_dark" },
+    { "zone": { "type": "isekai_api:within_distance", "radius": 1000 }, "biome": "minecraft:desert" }
   ]
 }
 ```
@@ -121,23 +123,23 @@ Places biomes by matching the vanilla climate axes (temperature / humidity / con
 
 Ranges use the vanilla `Climate.Parameter` codec — `[min, max]` or a single value (treated as a point on that axis).
 
-### BiomeZone (`isekai:`) — used inside `rule.zone`
+### BiomeZone (`isekai_api:`) — used inside `rule.zone`
 
 Coordinates are authored in **block** space. Evaluated at biome-grid resolution (one sample per 4 blocks), coordinates only — no terrain context.
 
 | Type | Fields | Matches |
 |---|---|---|
-| `isekai:always` | — | everywhere (catch-all) |
-| `isekai:y_above` | `y` (int) | block Y ≥ y |
-| `isekai:y_below` | `y` (int) | block Y < y |
-| `isekai:y_between` | `min`, `max` (int, min < max) | min ≤ block Y < max |
-| `isekai:within_distance` | `radius` (double ≥ 0), `center_x`, `center_z` (int, default 0) | XZ distance from center ≤ radius |
-| `isekai:beyond_distance` | `radius` (double ≥ 0), `center_x`, `center_z` (int, default 0) | XZ distance > radius |
-| `isekai:and` | `all` (list of zones) | all match |
-| `isekai:or` | `any` (list of zones) | any match |
-| `isekai:not` | `inner` (zone) | inner does not match |
-| `isekai:noise_threshold` | `noise` (noise key/inline), `seed` (long, default 0), `threshold` (double, default 0), `size_xz` / `size_y` (double, default 64) | true where a deterministic noise sample exceeds `threshold` — organic biome masks |
-| `isekai:edge_jitter` | `inner` (zone), `noise` (noise key/inline), `seed` (long, default 0), `strength` (double 0–32, default 4), `size_xz` (double, default 32) | wraps `inner`, perturbs the test coordinate by a small noise offset before delegating — turns geometric borders into wavy organic ones |
+| `isekai_api:always` | — | everywhere (catch-all) |
+| `isekai_api:y_above` | `y` (int) | block Y ≥ y |
+| `isekai_api:y_below` | `y` (int) | block Y < y |
+| `isekai_api:y_between` | `min`, `max` (int, min < max) | min ≤ block Y < max |
+| `isekai_api:within_distance` | `radius` (double ≥ 0), `center_x`, `center_z` (int, default 0) | XZ distance from center ≤ radius |
+| `isekai_api:beyond_distance` | `radius` (double ≥ 0), `center_x`, `center_z` (int, default 0) | XZ distance > radius |
+| `isekai_api:and` | `all` (list of zones) | all match |
+| `isekai_api:or` | `any` (list of zones) | any match |
+| `isekai_api:not` | `inner` (zone) | inner does not match |
+| `isekai_api:noise_threshold` | `noise` (noise key/inline), `seed` (long, default 0), `threshold` (double, default 0), `size_xz` / `size_y` (double, default 64) | true where a deterministic noise sample exceeds `threshold` — organic biome masks |
+| `isekai_api:edge_jitter` | `inner` (zone), `noise` (noise key/inline), `seed` (long, default 0), `strength` (double 0–32, default 4), `size_xz` (double, default 32) | wraps `inner`, perturbs the test coordinate by a small noise offset before delegating — turns geometric borders into wavy organic ones |
 
 ---
 
@@ -350,35 +352,37 @@ The `_ref` forms look the descriptor up by dimension at apply-time, so the world
 
 ---
 
-## In-house dispatch payloads (`isekai:`)
+## Extension-point payloads (`isekai_api:`)
 
-Used inside the worldshape descriptor fields. Each dispatches on a `"type"` value.
+Used inside the worldshape descriptor fields. Each dispatches on a `"type"` value through an
+Isekai custom registry, so third parties can register additional variants (see `IsekaiRegistries`).
+The legacy `isekai:` prefix is accepted as a deprecated alias.
 
 ### SpatialPredicate (`structure_predicates`, `default_structure_predicate`, `content_overrides.feature_predicates`, `isekai_api:spatial_predicate`)
 
 | Type | Fields |
 |---|---|
-| `isekai:y_in_range` | `min`, `max` (int) |
-| `isekai:solid_floor` | `min_clearance` (int) |
-| `isekai:solid_ceiling` | `min_clearance` (int) |
-| `isekai:terrain_slope` | `min_slope`, `max_slope` (double) |
-| `isekai:near_block` | `targets` (block id / list / `#tag`), `max_distance` (int) |
-| `isekai:near_biome` | `biome` (biome key), `max_distance` (int) |
-| `isekai:in_fluid` | `fluid` (fluid key) |
-| `isekai:always` / `isekai:never` | — |
-| `isekai:and` | `all` (list) |
-| `isekai:or` | `any` (list) |
-| `isekai:not` | `inner` (predicate) |
+| `isekai_api:y_in_range` | `min`, `max` (int) |
+| `isekai_api:solid_floor` | `min_clearance` (int) |
+| `isekai_api:solid_ceiling` | `min_clearance` (int) |
+| `isekai_api:terrain_slope` | `min_slope`, `max_slope` (double) |
+| `isekai_api:near_block` | `targets` (block id / list / `#tag`), `max_distance` (int) |
+| `isekai_api:near_biome` | `biome` (biome key), `max_distance` (int) |
+| `isekai_api:in_fluid` | `fluid` (fluid key) |
+| `isekai_api:always` / `isekai_api:never` | — |
+| `isekai_api:and` | `all` (list) |
+| `isekai_api:or` | `any` (list) |
+| `isekai_api:not` | `inner` (predicate) |
 
 ### RemapStrategy (`ore_strategy`, `structure_strategy`, `mob_spawn_strategy`, `mob_spawn_strategy_by_category`)
 
 | Type | Fields |
 |---|---|
-| `isekai:identity` / `isekai:linear` / `isekai:inverted` | — |
-| `isekai:fixed_range` | `min`, `max` (int), `dist` (HeightDistribution) |
-| `isekai:count_scale` | `factor` (double ≥ 0) |
-| `isekai:band_split` | `bands` (list of `{ vanilla_source: VerticalRange, target_ratio: float }`) |
-| `isekai:pipe` | `chain` (non-empty list of strategies) |
+| `isekai_api:identity` / `isekai_api:linear` / `isekai_api:inverted` | — |
+| `isekai_api:fixed_range` | `min`, `max` (int), `dist` (HeightDistribution) |
+| `isekai_api:count_scale` | `factor` (double ≥ 0) |
+| `isekai_api:band_split` | `bands` (list of `{ vanilla_source: VerticalRange, target_ratio: float }`) |
+| `isekai_api:pipe` | `chain` (non-empty list of strategies) |
 
 `structure_strategy` only acts through the `count_scale` factor (it scales RandomSpread spacing); other variants are no-ops there.
 
@@ -386,17 +390,17 @@ Used inside the worldshape descriptor fields. Each dispatches on a `"type"` valu
 
 | Type | Fields |
 |---|---|
-| `isekai:world_surface` | — |
-| `isekai:below_fluid` | `fluid` (fluid key) |
-| `isekai:fixed_y` | `y` (int) |
+| `isekai_api:world_surface` | — |
+| `isekai_api:below_fluid` | `fluid` (fluid key) |
+| `isekai_api:fixed_y` | `y` (int) |
 
 ### TransitionRule (layered worldshapes)
 
 | Type | Fields |
 |---|---|
-| `isekai:hard` | — |
-| `isekai:blend` | `blend_height` (int ≥ 0) |
-| `isekai:gap` | `gap_height` (int ≥ 0) |
+| `isekai_api:hard` | — |
+| `isekai_api:blend` | `blend_height` (int ≥ 0) |
+| `isekai_api:gap` | `gap_height` (int ≥ 0) |
 
 ### HeightDistribution (used by `playable_range.distribution`, `fixed_range.dist`)
 

@@ -6,20 +6,20 @@
     "distribution": "uniform"
   },
   "surface_anchor": {
-    "type": "isekai:fixed_y",
+    "type": "isekai_api:fixed_y",
     "y": 150
   },
   "ore_strategy": {
-    "type": "isekai:linear"
+    "type": "isekai_api:linear"
   },
   "structure_strategy": {
-    "type": "isekai:linear"
+    "type": "isekai_api:linear"
   },
   "mob_spawn_strategy": {
-    "type": "isekai:linear"
+    "type": "isekai_api:linear"
   },
   "default_structure_predicate": {
-    "type": "isekai:y_in_range",
+    "type": "isekai_api:y_in_range",
     "min": 100,
     "max": 200
   }

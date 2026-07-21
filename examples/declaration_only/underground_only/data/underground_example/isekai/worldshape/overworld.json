@@ -6,28 +6,28 @@
     "distribution": "biased_low"
   },
   "surface_anchor": {
-    "type": "isekai:fixed_y",
+    "type": "isekai_api:fixed_y",
     "y": 30
   },
   "ore_strategy": {
-    "type": "isekai:pipe",
+    "type": "isekai_api:pipe",
     "chain": [
-      { "type": "isekai:inverted" },
-      { "type": "isekai:linear" }
+      { "type": "isekai_api:inverted" },
+      { "type": "isekai_api:linear" }
     ]
   },
   "structure_strategy": {
-    "type": "isekai:linear"
+    "type": "isekai_api:linear"
   },
   "mob_spawn_strategy": {
-    "type": "isekai:count_scale",
+    "type": "isekai_api:count_scale",
     "factor": 1.5
   },
   "default_structure_predicate": {
-    "type": "isekai:and",
+    "type": "isekai_api:and",
     "all": [
-      { "type": "isekai:y_in_range", "min": -64, "max": 40 },
-      { "type": "isekai:solid_ceiling", "min_clearance": 3 }
+      { "type": "isekai_api:y_in_range", "min": -64, "max": 40 },
+      { "type": "isekai_api:solid_ceiling", "min_clearance": 3 }
     ]
   },
   "priority": 110

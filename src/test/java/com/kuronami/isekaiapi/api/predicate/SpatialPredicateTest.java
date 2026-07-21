@@ -105,6 +105,26 @@ class SpatialPredicateTest {
         assertEquals(0.8, ts.maxSlope(), 1e-9);
     }
 
+    @Test void inFluid_delegatesToContext() {
+        var in = new SpatialPredicate.InFluid(null);   // stub ignores the fluid arg
+        assertTrue(in.test(new StubContext(0, 64, 0, false, false, true, false, false, false)));
+        assertFalse(in.test(new StubContext(0, 64, 0, false, false, false, false, false, false)));
+    }
+
+    @Test void nearBlock_delegatesToContext() {
+        var nb = new SpatialPredicate.NearBlock(HolderSet.direct(), 4);
+        assertTrue(nb.test(new StubContext(0, 64, 0, false, false, false, true, false, false)));
+        assertFalse(nb.test(new StubContext(0, 64, 0, false, false, false, false, false, false)));
+    }
+
+    @Test void nearBiome_delegatesToContext() {
+        var key = ResourceKey.create(net.minecraft.core.registries.Registries.BIOME,
+                net.minecraft.resources.ResourceLocation.parse("minecraft:plains"));
+        var nb = new SpatialPredicate.NearBiome(key, 8);
+        assertTrue(nb.test(new StubContext(0, 64, 0, false, false, false, false, true, false)));
+        assertFalse(nb.test(new StubContext(0, 64, 0, false, false, false, false, false, false)));
+    }
+
     // ===== And / Or / Not composition + children() =====
 
     @Test void and_allChildrenMustHold() {

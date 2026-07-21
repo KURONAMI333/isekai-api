@@ -14,15 +14,15 @@
           "max_y": 70,
           "distribution": "uniform"
         },
-        "surface_anchor": { "type": "isekai:world_surface" },
-        "ore_strategy":      { "type": "isekai:linear" },
-        "structure_strategy":{ "type": "isekai:linear" },
-        "mob_spawn_strategy":{ "type": "isekai:linear" },
+        "surface_anchor": { "type": "isekai_api:world_surface" },
+        "ore_strategy":      { "type": "isekai_api:linear" },
+        "structure_strategy":{ "type": "isekai_api:linear" },
+        "mob_spawn_strategy":{ "type": "isekai_api:linear" },
         "default_structure_predicate": {
-          "type": "isekai:y_in_range", "min": -64, "max": 70
+          "type": "isekai_api:y_in_range", "min": -64, "max": 70
         }
       },
-      "transition": { "type": "isekai:hard" }
+      "transition": { "type": "isekai_api:hard" }
     },
     {
       "y_range": {
@@ -37,21 +37,21 @@
           "max_y": 200,
           "distribution": "uniform"
         },
-        "surface_anchor": { "type": "isekai:fixed_y", "y": 160 },
-        "ore_strategy":      { "type": "isekai:linear" },
-        "structure_strategy":{ "type": "isekai:linear" },
-        "mob_spawn_strategy":{ "type": "isekai:count_scale", "factor": 0.4 },
+        "surface_anchor": { "type": "isekai_api:fixed_y", "y": 160 },
+        "ore_strategy":      { "type": "isekai_api:linear" },
+        "structure_strategy":{ "type": "isekai_api:linear" },
+        "mob_spawn_strategy":{ "type": "isekai_api:count_scale", "factor": 0.4 },
         "default_structure_predicate": {
-          "type": "isekai:and",
+          "type": "isekai_api:and",
           "all": [
-            { "type": "isekai:y_in_range", "min": 120, "max": 200 },
-            { "type": "isekai:solid_floor", "min_clearance": 4 }
+            { "type": "isekai_api:y_in_range", "min": 120, "max": 200 },
+            { "type": "isekai_api:solid_floor", "min_clearance": 4 }
           ]
         },
         "priority": 120
       },
-      "transition": { "type": "isekai:blend", "blend_height": 4 }
+      "transition": { "type": "isekai_api:blend", "blend_height": 4 }
     }
   ],
-  "transition": { "type": "isekai:blend", "blend_height": 4 }
+  "transition": { "type": "isekai_api:blend", "blend_height": 4 }
 }

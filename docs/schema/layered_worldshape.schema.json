@@ -45,15 +45,15 @@
       "type": "object",
       "required": ["type"],
       "properties": {
-        "type": { "enum": ["isekai:hard", "isekai:blend", "isekai:gap"] }
+        "type": { "enum": ["isekai_api:hard", "isekai_api:blend", "isekai_api:gap"] }
       },
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "isekai:blend" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:blend" } } },
           "then": { "required": ["blend_height"], "properties": { "blend_height": { "type": "integer", "minimum": 0 } } }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai:gap" } } },
+          "if": { "properties": { "type": { "const": "isekai_api:gap" } } },
           "then": { "required": ["gap_height"], "properties": { "gap_height": { "type": "integer", "minimum": 0 } } }
         }
       ]
