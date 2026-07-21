@@ -52,7 +52,6 @@ import java.util.List;
  *   <li>{@code edge_jitter} — perturbs the test coordinate by a small noise offset before delegating to {@code inner}.</li>
  * </ul>
  *
- * @since 2.0.0 open for third-party extension via the registry (was a sealed interface before).
  */
 public interface BiomeZone {
 

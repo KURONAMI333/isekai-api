@@ -6,9 +6,6 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.valueproviders.IntProvider;
-import net.minecraft.world.level.WorldGenLevel;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.placement.PlacementContext;
 import net.minecraft.world.level.levelgen.placement.PlacementModifier;
 import net.minecraft.world.level.levelgen.placement.PlacementModifierType;
@@ -54,40 +51,12 @@ public class SurfaceRelativeModifier extends PlacementModifier {
 
     @Override
     public Stream<BlockPos> getPositions(PlacementContext ctx, RandomSource rand, BlockPos pos) {
-        Integer anchorY = resolveAnchorY(ctx, pos);
+        Integer anchorY = anchor.resolveY(ctx, pos);
         if (anchorY == null) {
             return Stream.empty();
         }
         int y = anchorY + offset.sample(rand);
         return Stream.of(new BlockPos(pos.getX(), y, pos.getZ()));
-    }
-
-    /**
-     * Resolve the anchor's Y for this column. Returns {@code null} when the anchor
-     * can't be resolved (e.g. {@link SurfaceAnchor.BelowFluid} in a column without that
-     * fluid), in which case the feature is skipped.
-     */
-    private Integer resolveAnchorY(PlacementContext ctx, BlockPos pos) {
-        if (anchor instanceof SurfaceAnchor.WorldSurface) {
-            return ctx.getHeight(Heightmap.Types.WORLD_SURFACE_WG, pos.getX(), pos.getZ());
-        }
-        if (anchor instanceof SurfaceAnchor.FixedY fy) {
-            return fy.y();
-        }
-        if (anchor instanceof SurfaceAnchor.BelowFluid bf) {
-            WorldGenLevel level = ctx.getLevel();
-            int top = level.getMaxBuildHeight() - 1;
-            int bottom = level.getMinBuildHeight();
-            for (int y = top; y >= bottom; y--) {
-                BlockPos p = new BlockPos(pos.getX(), y, pos.getZ());
-                BlockState state = level.getBlockState(p);
-                if (state.getFluidState().getType() == bf.fluid()) {
-                    return y;
-                }
-            }
-            return null;  // no matching fluid in column
-        }
-        return null;
     }
 
     @Override

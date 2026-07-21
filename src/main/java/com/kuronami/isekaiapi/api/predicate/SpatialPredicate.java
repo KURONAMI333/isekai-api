@@ -33,7 +33,6 @@ import java.util.List;
  * {@link #test(EvaluationContext)}, and expose any nested predicates via {@link #children()} so
  * validators can walk the tree.
  *
- * @since 2.0.0 open for third-party extension via the registry (was a sealed interface before).
  */
 public interface SpatialPredicate {
 

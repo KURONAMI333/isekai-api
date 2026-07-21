@@ -1,32 +1,37 @@
 package com.kuronami.isekaiapi.api.remap;
 
+import com.kuronami.isekaiapi.registry.IsekaiDispatch;
+import com.kuronami.isekaiapi.registry.IsekaiSpiTypes;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * How adjacent layers in a {@link LayeredDescriptor} relate at their boundary.
  * v1.0 default: {@link Hard}. {@link Blend} smooths the seam. {@link Gap} inserts
  * empty space between layers.
  *
- * <p>JSON form: {@code {"type": "isekai:hard"}} / {@code {"type": "isekai:blend", "blend_height": 4}}.
+ * <p><b>Extensible.</b> Built-in variants are registered in
+ * {@link com.kuronami.isekaiapi.api.registry.IsekaiRegistries#TRANSITION_RULE_TYPE}; third parties
+ * add their own by registering a {@link MapCodec} under that key. The {@link #CODEC} dispatches on
+ * a {@code "type"} field, e.g. {@code {"type": "isekai_api:blend", "blend_height": 4}}. The legacy
+ * {@code isekai:} prefix is accepted as a deprecated alias.
+ *
  */
-public sealed interface TransitionRule {
+public interface TransitionRule {
 
-    String typeId();
+    /** This variant's payload codec (no {@code "type"} field); must be the registered instance. */
     MapCodec<? extends TransitionRule> codec();
 
-    Codec<TransitionRule> CODEC = Codec.lazyInitialized(TransitionRule::buildDispatchCodec);
+    /** Dispatching codec keyed on a {@code "type"} field, backed by the TransitionRule registry. */
+    Codec<TransitionRule> CODEC = IsekaiDispatch.dispatchCodec(
+            IsekaiSpiTypes.TRANSITION_RULE_REGISTRY, TransitionRule::codec, "TransitionRule");
 
     /** Adjacent layers butt-join at the boundary Y. */
     record Hard() implements TransitionRule {
         public static final Hard INSTANCE = new Hard();
         public static final MapCodec<Hard> MAP_CODEC = MapCodec.unit(INSTANCE);
 
-        @Override public String typeId() { return "isekai:hard"; }
         @Override public MapCodec<? extends TransitionRule> codec() { return MAP_CODEC; }
     }
 
@@ -39,7 +44,6 @@ public sealed interface TransitionRule {
                 Codec.intRange(0, Integer.MAX_VALUE).fieldOf("blend_height").forGetter(Blend::blendHeight)
         ).apply(i, Blend::new));
 
-        @Override public String typeId() { return "isekai:blend"; }
         @Override public MapCodec<? extends TransitionRule> codec() { return MAP_CODEC; }
     }
 
@@ -52,28 +56,6 @@ public sealed interface TransitionRule {
                 Codec.intRange(0, Integer.MAX_VALUE).fieldOf("gap_height").forGetter(Gap::gapHeight)
         ).apply(i, Gap::new));
 
-        @Override public String typeId() { return "isekai:gap"; }
         @Override public MapCodec<? extends TransitionRule> codec() { return MAP_CODEC; }
-    }
-
-    private static Codec<TransitionRule> buildDispatchCodec() {
-        Map<String, MapCodec<? extends TransitionRule>> registry = new LinkedHashMap<>();
-        registry.put("isekai:hard",  Hard.MAP_CODEC);
-        registry.put("isekai:blend", Blend.MAP_CODEC);
-        registry.put("isekai:gap",   Gap.MAP_CODEC);
-        Map<String, MapCodec<? extends TransitionRule>> frozen = Map.copyOf(registry);
-
-        return Codec.STRING.dispatch(
-                "type",
-                TransitionRule::typeId,
-                typeId -> {
-                    MapCodec<? extends TransitionRule> mc = frozen.get(typeId);
-                    if (mc == null) {
-                        throw new IllegalArgumentException(
-                                "Unknown TransitionRule type: '" + typeId
-                                        + "'. Known types: " + frozen.keySet());
-                    }
-                    return mc;
-                });
     }
 }
