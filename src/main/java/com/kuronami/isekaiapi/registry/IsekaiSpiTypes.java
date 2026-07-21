@@ -3,6 +3,7 @@ package com.kuronami.isekaiapi.registry;
 import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.api.predicate.SpatialPredicate;
 import com.kuronami.isekaiapi.api.registry.IsekaiRegistries;
+import com.kuronami.isekaiapi.api.remap.RemapStrategy;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.Registry;
 import net.neoforged.bus.api.IEventBus;
@@ -49,6 +50,24 @@ public final class IsekaiSpiTypes {
         SPATIAL_PREDICATE_TYPES.register("not",           () -> SpatialPredicate.Not.MAP_CODEC);
     }
 
+    // ---- RemapStrategy ---------------------------------------------------
+
+    public static final DeferredRegister<MapCodec<? extends RemapStrategy>> REMAP_STRATEGY_TYPES =
+            DeferredRegister.create(IsekaiRegistries.REMAP_STRATEGY_TYPE, IsekaiApi.MODID);
+
+    public static final Supplier<Registry<MapCodec<? extends RemapStrategy>>> REMAP_STRATEGY_REGISTRY =
+            REMAP_STRATEGY_TYPES.getRegistry();
+
+    static {
+        REMAP_STRATEGY_TYPES.register("linear",      () -> RemapStrategy.Linear.MAP_CODEC);
+        REMAP_STRATEGY_TYPES.register("band_split",  () -> RemapStrategy.BandSplit.MAP_CODEC);
+        REMAP_STRATEGY_TYPES.register("fixed_range", () -> RemapStrategy.FixedRange.MAP_CODEC);
+        REMAP_STRATEGY_TYPES.register("inverted",    () -> RemapStrategy.Inverted.MAP_CODEC);
+        REMAP_STRATEGY_TYPES.register("count_scale", () -> RemapStrategy.CountScale.MAP_CODEC);
+        REMAP_STRATEGY_TYPES.register("identity",    () -> RemapStrategy.Identity.MAP_CODEC);
+        REMAP_STRATEGY_TYPES.register("pipe",        () -> RemapStrategy.Pipe.MAP_CODEC);
+    }
+
     /**
      * Create all five custom registries and wire their population onto the mod event bus.
      * {@code makeRegistry} must run before {@code NewRegistryEvent}; calling it here (from the
@@ -58,6 +77,9 @@ public final class IsekaiSpiTypes {
         SPATIAL_PREDICATE_TYPES.makeRegistry(b -> b.sync(false));
         SPATIAL_PREDICATE_TYPES.register(modBus);
 
-        IsekaiApi.LOGGER.info("[Isekai] SPI type registries created (spatial_predicate)");
+        REMAP_STRATEGY_TYPES.makeRegistry(b -> b.sync(false));
+        REMAP_STRATEGY_TYPES.register(modBus);
+
+        IsekaiApi.LOGGER.info("[Isekai] SPI type registries created (spatial_predicate, remap_strategy)");
     }
 }
