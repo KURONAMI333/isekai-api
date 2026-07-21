@@ -3,6 +3,7 @@ package com.kuronami.isekaiapi;
 import com.kuronami.isekaiapi.biomemodifier.IsekaiBiomeModifiers;
 import com.kuronami.isekaiapi.structuremodifier.IsekaiStructureModifiers;
 import com.kuronami.isekaiapi.densityfunction.IsekaiDensityFunctions;
+import com.kuronami.isekaiapi.registry.IsekaiSpiTypes;
 import com.kuronami.isekaiapi.feature.IsekaiFeatures;
 import com.kuronami.isekaiapi.placementmodifier.IsekaiPlacementModifiers;
 import com.kuronami.isekaiapi.structure.IsekaiStructures;
@@ -36,6 +37,7 @@ public final class IsekaiApi {
     public IsekaiApi(IEventBus modBus, ModContainer container) {
         version = container.getModInfo().getVersion().toString();
         LOGGER.info("[Isekai] loading v{}", version);
+        IsekaiSpiTypes.register(modBus);
         IsekaiDensityFunctions.register(modBus);
         IsekaiPlacementModifiers.register(modBus);
         IsekaiBiomeModifiers.register(modBus);
