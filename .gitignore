@@ -38,6 +38,9 @@ run/
 **/src/generated/**/.cache/
 repo/
 !**/src/**/repo/
+# Local maven publish output (`./gradlew publish`). W5 commits this to the repo's
+# `maven` branch for raw-URL distribution; on main it stays out of history.
+maven/
 
 ### 3rd-party jars (NOT redistributable) ###
 libs-local/
