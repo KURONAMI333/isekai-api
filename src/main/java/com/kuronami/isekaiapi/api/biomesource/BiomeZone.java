@@ -1,5 +1,7 @@
 package com.kuronami.isekaiapi.api.biomesource;
 
+import com.kuronami.isekaiapi.registry.IsekaiDispatch;
+import com.kuronami.isekaiapi.registry.IsekaiSpiTypes;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -8,9 +10,7 @@ import net.minecraft.core.QuartPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * A neutral spatial condition for biome placement, mirroring the philosophy of
@@ -22,9 +22,13 @@ import java.util.Map;
  * by necessity: {@code SpatialPredicate}'s terrain-probing variants ({@code SolidFloor},
  * {@code NearBlock}, {@code TerrainSlope}, {@code InFluid}) are meaningless before terrain
  * exists, so they cannot be reused here. {@code BiomeZone} exposes only the conditions that
- * are well-defined at biome-assignment time (pure coordinate geometry). It deliberately
- * matches {@code SpatialPredicate}'s dispatch idiom ({@link #typeId()} + {@code "type"}-keyed
- * {@link #CODEC}) so there is one dispatch convention across the library.
+ * are well-defined at biome-assignment time (pure coordinate geometry).
+ *
+ * <p><b>Extensible.</b> Built-in variants are registered in
+ * {@link com.kuronami.isekaiapi.api.registry.IsekaiRegistries#BIOME_ZONE_TYPE}; third parties add
+ * their own by registering a {@link MapCodec} under that key. The {@link #CODEC} dispatches on a
+ * {@code "type"} field, e.g. {@code {"type": "isekai_api:y_above", "y": 64}}. The legacy
+ * {@code isekai:} prefix is accepted as a deprecated alias.
  *
  * <p>Used by {@code isekai_api:rule} (see
  * {@link com.kuronami.isekaiapi.biomesource.RuleBiomeSource}) to decide which biome a
@@ -35,28 +39,22 @@ import java.util.Map;
  * <p>Coordinates in the JSON are <b>block coordinates</b> for author convenience; the
  * evaluator converts the quart coordinates it receives to blocks before testing.
  *
- * <p>Dispatch by {@code "type"}:
+ * <p>Built-in variants dispatched by {@code "type"}:
  * <ul>
- *   <li>{@code isekai:always} — matches everywhere (use as the catch-all last entry).</li>
- *   <li>{@code isekai:y_above} {@code {y}} — block Y &ge; y.</li>
- *   <li>{@code isekai:y_below} {@code {y}} — block Y &lt; y.</li>
- *   <li>{@code isekai:y_between} {@code {min, max}} — min &le; block Y &lt; max.</li>
- *   <li>{@code isekai:within_distance} {@code {radius, [center_x], [center_z]}} — XZ
- *       distance from center (default origin) &le; radius.</li>
- *   <li>{@code isekai:beyond_distance} {@code {radius, [center_x], [center_z]}} — XZ
- *       distance &gt; radius.</li>
- *   <li>{@code isekai:and} {@code {all: [...]}} / {@code isekai:or} {@code {any: [...]}} /
- *       {@code isekai:not} {@code {inner}} — combinators.</li>
- *   <li>{@code isekai:noise_threshold} {@code {noise, seed?, threshold?, size_xz?, size_y?}}
- *       — true where a deterministic noise sample exceeds {@code threshold}; lets datapack
- *       authors lay biomes by an organic noise mask rather than geometric shape.</li>
- *   <li>{@code isekai:edge_jitter} {@code {inner, noise, seed?, strength?, size_xz?}} —
- *       perturbs the test coordinate by a small noise offset before delegating to {@code inner},
- *       so geometric borders (cylinders, half-planes, y-bands) get wavy, natural-looking
- *       boundaries without changing the inner zone's intent.</li>
+ *   <li>{@code always} — matches everywhere (use as the catch-all last entry).</li>
+ *   <li>{@code y_above} {@code {y}} — block Y &ge; y.</li>
+ *   <li>{@code y_below} {@code {y}} — block Y &lt; y.</li>
+ *   <li>{@code y_between} {@code {min, max}} — min &le; block Y &lt; max.</li>
+ *   <li>{@code within_distance} {@code {radius, [center_x], [center_z]}} — XZ distance &le; radius.</li>
+ *   <li>{@code beyond_distance} {@code {radius, [center_x], [center_z]}} — XZ distance &gt; radius.</li>
+ *   <li>{@code and} {@code {all: [...]}} / {@code or} {@code {any: [...]}} / {@code not} {@code {inner}} — combinators.</li>
+ *   <li>{@code noise_threshold} — true where a deterministic noise sample exceeds {@code threshold}.</li>
+ *   <li>{@code edge_jitter} — perturbs the test coordinate by a small noise offset before delegating to {@code inner}.</li>
  * </ul>
+ *
+ * @since 2.0.0 open for third-party extension via the registry (was a sealed interface before).
  */
-public sealed interface BiomeZone {
+public interface BiomeZone {
 
     /**
      * Test this zone at a biome-grid position. {@code quartX/Y/Z} are quart coordinates
@@ -64,21 +62,21 @@ public sealed interface BiomeZone {
      */
     boolean test(int quartX, int quartY, int quartZ);
 
-    /** Stable type-id for dispatch. Namespaced under {@code isekai:}. */
-    String typeId();
-
-    /** This variant's payload codec (no {@code "type"} field). */
+    /** This variant's payload codec (no {@code "type"} field); must be the registered instance. */
     MapCodec<? extends BiomeZone> codec();
 
-    /** Polymorphic codec for any zone, dispatched by the {@code "type"} field. */
-    Codec<BiomeZone> CODEC = Codec.lazyInitialized(BiomeZone::buildDispatchCodec);
+    /** Nested zones, for tree-walking. Empty for leaf variants. @since 2.0.0 */
+    default List<BiomeZone> children() { return List.of(); }
+
+    /** Dispatching codec keyed on a {@code "type"} field, backed by the BiomeZone registry. */
+    Codec<BiomeZone> CODEC = IsekaiDispatch.dispatchCodec(
+            IsekaiSpiTypes.BIOME_ZONE_REGISTRY, BiomeZone::codec, "BiomeZone");
 
     // --- variants ---
 
     record Always() implements BiomeZone {
         public static final MapCodec<Always> MAP_CODEC = MapCodec.unit(Always::new);
         @Override public boolean test(int x, int y, int z) { return true; }
-        @Override public String typeId() { return "isekai:always"; }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
     }
 
@@ -86,7 +84,6 @@ public sealed interface BiomeZone {
         public static final MapCodec<YAbove> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 Codec.INT.fieldOf("y").forGetter(YAbove::y)).apply(i, YAbove::new));
         @Override public boolean test(int x, int qy, int z) { return QuartPos.toBlock(qy) >= y; }
-        @Override public String typeId() { return "isekai:y_above"; }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
     }
 
@@ -94,7 +91,6 @@ public sealed interface BiomeZone {
         public static final MapCodec<YBelow> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 Codec.INT.fieldOf("y").forGetter(YBelow::y)).apply(i, YBelow::new));
         @Override public boolean test(int x, int qy, int z) { return QuartPos.toBlock(qy) < y; }
-        @Override public String typeId() { return "isekai:y_below"; }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
     }
 
@@ -110,7 +106,6 @@ public sealed interface BiomeZone {
             int by = QuartPos.toBlock(qy);
             return by >= min && by < max;
         }
-        @Override public String typeId() { return "isekai:y_between"; }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
     }
 
@@ -129,7 +124,6 @@ public sealed interface BiomeZone {
             double dz = QuartPos.toBlock(qz) - centerZ;
             return Math.sqrt(dx * dx + dz * dz) <= radius;
         }
-        @Override public String typeId() { return "isekai:within_distance"; }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
     }
 
@@ -148,7 +142,6 @@ public sealed interface BiomeZone {
             double dz = QuartPos.toBlock(qz) - centerZ;
             return Math.sqrt(dx * dx + dz * dz) > radius;
         }
-        @Override public String typeId() { return "isekai:beyond_distance"; }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
     }
 
@@ -161,8 +154,8 @@ public sealed interface BiomeZone {
             for (var c : all) if (!c.test(x, y, z)) return false;
             return true;
         }
-        @Override public String typeId() { return "isekai:and"; }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
+        @Override public List<BiomeZone> children() { return all; }
     }
 
     record Or(List<BiomeZone> any) implements BiomeZone {
@@ -174,8 +167,8 @@ public sealed interface BiomeZone {
             for (var c : any) if (c.test(x, y, z)) return true;
             return false;
         }
-        @Override public String typeId() { return "isekai:or"; }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
+        @Override public List<BiomeZone> children() { return any; }
     }
 
     record Not(BiomeZone inner) implements BiomeZone {
@@ -183,8 +176,8 @@ public sealed interface BiomeZone {
                 Codec.lazyInitialized(() -> CODEC).fieldOf("inner").forGetter(Not::inner))
                 .apply(i, Not::new));
         @Override public boolean test(int x, int y, int z) { return !inner.test(x, y, z); }
-        @Override public String typeId() { return "isekai:not"; }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
+        @Override public List<BiomeZone> children() { return List.of(inner); }
     }
 
     /**
@@ -217,7 +210,6 @@ public sealed interface BiomeZone {
             double z = QuartPos.toBlock(qz) / sizeXz;
             return sampler.getValue(x, y, z) > threshold;
         }
-        @Override public String typeId() { return "isekai:noise_threshold"; }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
     }
 
@@ -258,44 +250,7 @@ public sealed interface BiomeZone {
             int jqz = QuartPos.fromBlock((int) Math.round(bz + oz));
             return inner.test(jqx, qy, jqz);
         }
-        @Override public String typeId() { return "isekai:edge_jitter"; }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
-    }
-
-    // ---------------------------------------------------------------------
-    // Dispatch wiring (matches SpatialPredicate's idiom exactly)
-    // ---------------------------------------------------------------------
-
-    /**
-     * Build the dispatch codec lazily on first access. Registry insertion order is preserved
-     * (LinkedHashMap) so error messages enumerate variants in declaration order.
-     */
-    private static Codec<BiomeZone> buildDispatchCodec() {
-        Map<String, MapCodec<? extends BiomeZone>> registry = new LinkedHashMap<>();
-        registry.put("isekai:always",          Always.MAP_CODEC);
-        registry.put("isekai:y_above",         YAbove.MAP_CODEC);
-        registry.put("isekai:y_below",         YBelow.MAP_CODEC);
-        registry.put("isekai:y_between",       YBetween.MAP_CODEC);
-        registry.put("isekai:within_distance", WithinDistance.MAP_CODEC);
-        registry.put("isekai:beyond_distance", BeyondDistance.MAP_CODEC);
-        registry.put("isekai:and",             And.MAP_CODEC);
-        registry.put("isekai:or",              Or.MAP_CODEC);
-        registry.put("isekai:not",             Not.MAP_CODEC);
-        registry.put("isekai:noise_threshold", NoiseThreshold.MAP_CODEC);
-        registry.put("isekai:edge_jitter",     EdgeJitter.MAP_CODEC);
-        Map<String, MapCodec<? extends BiomeZone>> frozen = Map.copyOf(registry);
-
-        return Codec.STRING.dispatch(
-                "type",
-                BiomeZone::typeId,
-                typeId -> {
-                    MapCodec<? extends BiomeZone> mc = frozen.get(typeId);
-                    if (mc == null) {
-                        throw new IllegalArgumentException(
-                                "Unknown BiomeZone type: '" + typeId
-                                        + "'. Known types: " + frozen.keySet());
-                    }
-                    return mc;
-                });
+        @Override public List<BiomeZone> children() { return List.of(inner); }
     }
 }

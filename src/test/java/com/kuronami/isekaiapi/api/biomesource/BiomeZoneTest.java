@@ -19,8 +19,8 @@ class BiomeZoneTest {
 
     // ===== Always =====
 
-    @Test void always_typeId() {
-        assertEquals("isekai:always", new BiomeZone.Always().typeId());
+    @Test void always_codecIsRegistered() {
+        assertSame(BiomeZone.Always.MAP_CODEC, new BiomeZone.Always().codec());
     }
 
     @Test void always_testReturnsTrue_everywhere() {
@@ -31,8 +31,8 @@ class BiomeZoneTest {
 
     // ===== YAbove =====
 
-    @Test void yAbove_typeId() {
-        assertEquals("isekai:y_above", new BiomeZone.YAbove(0).typeId());
+    @Test void yAbove_codecIsRegistered() {
+        assertSame(BiomeZone.YAbove.MAP_CODEC, new BiomeZone.YAbove(0).codec());
     }
 
     @Test void yAbove_blockYAboveThreshold_returnsTrue() {
@@ -54,8 +54,8 @@ class BiomeZoneTest {
 
     // ===== YBelow =====
 
-    @Test void yBelow_typeId() {
-        assertEquals("isekai:y_below", new BiomeZone.YBelow(0).typeId());
+    @Test void yBelow_codecIsRegistered() {
+        assertSame(BiomeZone.YBelow.MAP_CODEC, new BiomeZone.YBelow(0).codec());
     }
 
     @Test void yBelow_blockYBelowThreshold_returnsTrue() {
@@ -76,8 +76,8 @@ class BiomeZoneTest {
 
     // ===== YBetween =====
 
-    @Test void yBetween_typeId() {
-        assertEquals("isekai:y_between", new BiomeZone.YBetween(0, 100).typeId());
+    @Test void yBetween_codecIsRegistered() {
+        assertSame(BiomeZone.YBetween.MAP_CODEC, new BiomeZone.YBetween(0, 100).codec());
     }
 
     @Test void yBetween_insideRange_returnsTrue() {
@@ -105,8 +105,8 @@ class BiomeZoneTest {
 
     // ===== WithinDistance =====
 
-    @Test void withinDistance_typeId() {
-        assertEquals("isekai:within_distance", new BiomeZone.WithinDistance(100.0, 0, 0).typeId());
+    @Test void withinDistance_codecIsRegistered() {
+        assertSame(BiomeZone.WithinDistance.MAP_CODEC, new BiomeZone.WithinDistance(100.0, 0, 0).codec());
     }
 
     @Test void withinDistance_atOrigin_isWithin() {
@@ -133,8 +133,8 @@ class BiomeZoneTest {
 
     // ===== BeyondDistance =====
 
-    @Test void beyondDistance_typeId() {
-        assertEquals("isekai:beyond_distance", new BiomeZone.BeyondDistance(100.0, 0, 0).typeId());
+    @Test void beyondDistance_codecIsRegistered() {
+        assertSame(BiomeZone.BeyondDistance.MAP_CODEC, new BiomeZone.BeyondDistance(100.0, 0, 0).codec());
     }
 
     @Test void beyondDistance_beyondRadius_isTrue() {
@@ -154,8 +154,8 @@ class BiomeZoneTest {
 
     // ===== And =====
 
-    @Test void and_typeId() {
-        assertEquals("isekai:and", new BiomeZone.And(List.of()).typeId());
+    @Test void and_codecIsRegistered() {
+        assertSame(BiomeZone.And.MAP_CODEC, new BiomeZone.And(List.of()).codec());
     }
 
     @Test void and_emptyList_returnsTrue() {
@@ -185,8 +185,8 @@ class BiomeZoneTest {
 
     // ===== Or =====
 
-    @Test void or_typeId() {
-        assertEquals("isekai:or", new BiomeZone.Or(List.of()).typeId());
+    @Test void or_codecIsRegistered() {
+        assertSame(BiomeZone.Or.MAP_CODEC, new BiomeZone.Or(List.of()).codec());
     }
 
     @Test void or_emptyList_returnsFalse() {
@@ -209,8 +209,8 @@ class BiomeZoneTest {
 
     // ===== Not =====
 
-    @Test void not_typeId() {
-        assertEquals("isekai:not", new BiomeZone.Not(new BiomeZone.Always()).typeId());
+    @Test void not_codecIsRegistered() {
+        assertSame(BiomeZone.Not.MAP_CODEC, new BiomeZone.Not(new BiomeZone.Always()).codec());
     }
 
     @Test void not_invertsTrueToFalse() {
