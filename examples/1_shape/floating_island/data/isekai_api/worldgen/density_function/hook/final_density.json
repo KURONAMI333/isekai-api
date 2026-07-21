@@ -1,0 +1,16 @@
+{
+  "type": "isekai_api:squeeze",
+  "argument": {
+    "type": "minecraft:interpolated",
+    "argument": {
+      "type": "minecraft:blend_density",
+      "argument": {
+        "type": "isekai_api:band_density",
+        "active_min_y": 50,
+        "active_max_y": 200,
+        "gradient_width": 30,
+        "noise": { "type": "isekai_api:blended_noise", "size_xz": 320, "size_y": 240 }
+      }
+    }
+  }
+}

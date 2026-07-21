@@ -44,11 +44,12 @@ class ExamplesDecodeTest {
 
     private static Path examplesDir() {
         // The test run dir varies (moddev may run from a build subdir), so walk up from the
-        // working directory looking for the module's examples/ folder (identified by moon_world).
+        // working directory looking for the module's examples/ folder (identified by templates/,
+        // which is stable across the 1_shape / 2_placement / 3_adaptation reorg).
         Path dir = Path.of("").toAbsolutePath();
         for (Path p = dir; p != null; p = p.getParent()) {
             Path candidate = p.resolve("examples");
-            if (Files.isDirectory(candidate.resolve("moon_world"))) {
+            if (Files.isDirectory(candidate.resolve("templates"))) {
                 return candidate;
             }
         }

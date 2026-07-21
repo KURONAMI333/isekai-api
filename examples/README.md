@@ -1,216 +1,39 @@
 # Isekai API — example datapacks
 
-## Quick-start consumer mod skeletons
+Every Isekai world is three steps. The examples are organised by which step they show.
 
-`sky_archipelago/` and `flipped/` are minimal-config consumer mod skeletons that ship a working worldshape in **3 files of ~10 lines each**. They demonstrate:
+| Step | What it decides | Isekai tools | Examples |
+|---|---|---|---|
+| **1. Shape** | where terrain is solid vs. air | noise_settings + density functions (the `final_density` hook) | [`1_shape/`](1_shape/) |
+| **2. Placement** | which biome / blocks go where | biome sources (`isekai_api:rule`, `climate_zones`), surface & block overrides | [`2_placement/`](2_placement/) |
+| **3. Adaptation** | keep the game working after the shape changed | worldshape descriptors — ore Y-remap, structure gating, atmosphere, exclusions | [`3_adaptation/`](3_adaptation/) |
 
-- `isekai_api:apply_worldshape_ref` / `isekai_api:apply_worldshape_structures_ref` — the 4-line biome and structure modifier files that point at a worldshape declared once under `isekai/worldshape/<name>.json` (no duplication)
-- `isekai_api:band_density` + `isekai_api:blended_noise` + `isekai_api:squeeze` — drop-in `final_density` for `data/minecraft/worldgen/noise_settings/overworld.json` that produces floating-island terrain. `band_density.invert: true` for hanging/flipped terrain.
-- `content_overrides.feature_predicates` — gate lake placement on `solid_floor` clearance so water lakes don't spawn on cliff edges and leak waterfalls into the void
-- `content_overrides.block_overrides.surface_top` / `default_block` — per-biome surface or fill-block override via `isekai_api:worldshape_surface_top` and `isekai_api:worldshape_default_block` surface rules
+Reusable copy-paste starting points (not runnable packs) live in [`templates/`](templates/).
 
-For a new consumer mod, prefer the `*_ref` modifiers (worldshape declared once). The inline `apply_worldshape` modifier also works but duplicates the descriptor across files.
+---
 
-`moon_world/` uses biome-tag `applies_to` instead of a 35-entry list, plus `block_overrides.surface_top` and `default_block` to re-skin every overworld biome's surface and stone fill. It wires the two `isekai_api:worldshape_*` surface rules into the noise_settings surface_rule sequence.
+## 1. Shape — `1_shape/`
 
-## Detailed examples (also runtime modifiers + declaration-only descriptors)
+**`floating_island/`** — a whole floating-island dimension in **2 files, ~24 lines, zero copied worldgen**. It references the shipped `isekai_api:hooked_overworld` noise_settings preset (so no `noise_settings` copy at all) and overrides one file — the `isekai_api:hook/final_density` density function — with a `band_density` shape. Override that one hook and the terrain changes; everything else (surface, router) comes from the preset.
 
-Two categories, both as self-contained datapacks:
+> **Hook overrides are datapack-tier.** The override wins because a datapack sits above mod-jar resources in the load order (deterministic). Two mods overriding the same `isekai_api:hook/*` file is mod-vs-mod load order — undefined — so ship shape overrides as a datapack, and treat any preset as *single-owner per world*.
 
-- **`runtime_effects/`** — packs that go in `data/<ns>/neoforge/biome_modifier/` or
-  `data/<ns>/neoforge/structure_modifier/` and produce visible in-game changes via
-  NeoForge's modifier pipeline.
-- **`declaration_only/`** — packs that go in `data/<ns>/isekai/worldshape/` or
-  `data/<ns>/isekai/layered_worldshape/`. They populate Isekai's runtime registry
-  (queryable via `/isekai query worldshape`) but do not, by themselves, alter chunk
-  generation. Wrap the same descriptor in an `apply_worldshape` biome modifier to make
-  it take effect.
+For **replacing the overworld itself** (not adding a dimension), see [`templates/minimal_overworld.json`](templates/minimal_overworld.json) — the full `minecraft:overworld` noise_settings in ~30 lines instead of ~2500, via vanilla density-function references + the hook + the `isekai_api:vanilla_overworld_surface` one-line surface.
 
-To try one:
+## 2. Placement — `2_placement/`
 
-1. Copy the directory into your world's `datapacks/` folder.
-2. Run `/reload` (or restart the server).
-3. Confirm it loaded with `/isekai query dimensions` and
-   `/isekai query worldshape minecraft:overworld`.
-4. Validate the JSON without applying it with
-   `/isekai validate <pack-namespace>`, e.g.
-   `/isekai validate skyland_example`.
+**`moon_world/`** — selects biomes with a tag `applies_to` (`#minecraft:is_overworld`) instead of a 35-entry list, then re-skins every matched biome's surface and stone fill via `block_overrides.surface_top` / `default_block`, wired through the `isekai_api:worldshape_surface_top` / `worldshape_default_block` surface rules.
 
-## skyland_minimal/
+## 3. Adaptation — `3_adaptation/`
 
-Minimal valid single-layer descriptor: overworld restricted to y=100..200
-with a fixed surface at y=150 and linear remapping across all three
-strategies. Demonstrates the smallest possible JSON shape — every required
-field is present and every optional field is omitted (defaulting to empty
-sets / `priority=100`).
+Worldshape descriptors that re-place existing content so a reshaped world still plays.
 
-## underground_only/
+- **`sky_archipelago/`**, **`flipped/`** — 3-file consumer skeletons (`apply_worldshape_ref` + `apply_worldshape_structures_ref` pointing at a worldshape declared once under `isekai/worldshape/<name>.json`), with `content_overrides` gating lakes on solid ground so water doesn't leak into the void.
+- **`runtime_effects/`** — biome / structure modifier packs (`data/<ns>/neoforge/{biome,structure}_modifier/`) that produce visible in-game changes through NeoForge's modifier pipeline.
+- **`declaration_only/`** — worldshape / layered_worldshape descriptors that populate Isekai's runtime registry (queryable via `/isekai query worldshape`) without themselves altering chunk generation; wrap them in an `apply_worldshape` modifier to apply.
 
-Registry-only example showing what the JSON for an underground worldshape
-*would* contain — `isekai_api:pipe` of `inverted` + `linear` for ore remapping
-(deepslate-band ores would get pulled toward the surface relative to the
-playable range), `isekai_api:and`-composed default structure predicate
-(`y_in_range` + `solid_ceiling`, so structures only spawn in roofed
-chambers), `count_scale` 1.5× for mob density, `priority=110` so it wins
-ties against the default-priority skyland_minimal pack.
+## Trying a pack
 
-To turn this into an observable effect, copy the `worldshape` JSON content
-into a `neoforge/biome_modifier/` file under the `isekai_api:apply_worldshape`
-type (see `biome_modifier_demo/` for the wrapping pattern).
-
-## peaceful_plains/
-
-Demonstrates `mob_spawn_strategy_by_category`. In `minecraft:plains`,
-passive creatures spawn 1.5× more often and hostile monsters spawn at 25%.
-Other categories (water creatures, ambient, etc.) keep vanilla weights.
-
-The global `mob_spawn_strategy` is `isekai_api:identity` (no-op) — the
-per-category overrides do all the work. This is the pattern for "scale
-some categories but leave others alone."
-
-## no_villages/
-
-A NeoForge **structure** modifier (note: different registry path from biome
-modifier — `neoforge/structure_modifier/`) using
-`isekai_api:apply_worldshape_structures`. Removes all five village
-variants by clearing their biome filter to empty.
-
-This demonstrates the `exclusions.structures` field, the
-structure-side counterpart of `exclusions.features`. Use it for "I want a
-worldshape where this kind of structure shouldn't spawn at all."
-
-## biome_modifier_demo/
-
-A NeoForge biome modifier referencing Isekai's `isekai_api:apply_worldshape`
-type. Removes `minecraft:lake_lava_surface` from `minecraft:desert` biomes.
-
-When this pack is loaded, look for log lines like
-`[Isekai] removed N excluded placed features (descriptor dim=...)` at
-debug level.
-
-The JSON is wrapped in `{ "type": "isekai_api:apply_worldshape",
-"worldshape": { ... } }`. Inside `worldshape`, you write the same fields
-documented below for `WorldshapeDescriptor`.
-
-
-## layered_overworld/
-
-Multi-layer worldshape: a vanilla-like terrain layer at y=-64..70 plus a
-floating-island layer at y=120..200, with a 4-block `blend` transition
-between them. The top layer requires `solid_floor` with 4-block clearance
-so structures only place on viable platforms. Demonstrates `isekai_api:and`,
-`isekai_api:blend`, and the layered file format (`{dimension, layers,
-transition}`).
-
-## JSON schema reference
-
-### WorldshapeDescriptor (single-layer)
-
-```jsonc
-{
-  "dimension":              "<dimension key>",          // required
-  "playable_range":         VerticalRange,              // required
-  "surface_anchor":         SurfaceAnchor,              // required
-  "ore_strategy":           RemapStrategy,              // required
-  "structure_strategy":     RemapStrategy,              // required
-  "mob_spawn_strategy":     RemapStrategy,              // required
-  "structure_predicates":   { "<structure key>": SpatialPredicate, ... }, // optional, default {}
-  "default_structure_predicate": SpatialPredicate,      // required
-  "applies_to":             ["<biome key>", ...],       // optional, default [] — accepts a list of biome keys OR an object { "keys": ["<biome key>", ...], "tags": ["#<biome tag>", ...] }. Empty matches no biome; you MUST list at least one biome or tag for the descriptor to apply (BiomeModifier has no dimension scope, so "empty = all" would silently cross dimensions)
-                            // example object form: "applies_to": { "keys": [...], "tags": ["#minecraft:is_overworld"] }
-  "exclusions": {                                       // optional, default all-empty
-    "features":   ["<feature key>", ...],
-    "structures": ["<structure key>", ...],
-    "carvers":    ["<configured_carver key>", ...],
-    "mob_spawns": ["<entity_type key>", ...]            // mob entries with these types are dropped before re-scaling
-  },
-  "mob_spawn_strategy_by_category": { "monster": RemapStrategy, "creature": RemapStrategy, ... }, // optional, default {} — overrides per-category, falls back to mob_spawn_strategy
-  "additions": {                                        // optional, default all-empty
-    "features":   [{ "feature": "<feature key>", "step": "<decoration step>" }, ...],
-    "carvers":    [{ "carver": "<configured_carver key>", "step": "air|liquid" }, ...],
-    "mob_spawns": [{ "category": "<MobCategory>", "type": "<entity_type key>",
-                     "weight": <int>=1, "min_count": <int>=1, "max_count": <int>=1 }, ...]
-  },
-  "atmosphere": {                                       // optional, default {}; every sub-field is independently optional
-    "has_precipitation": <bool>, "temperature": <float>, "downfall": <float 0..1>,
-    "sky_color": <int>, "fog_color": <int>, "water_color": <int>, "water_fog_color": <int>,
-    "foliage_color": <int>, "grass_color": <int>,
-    "creature_generation_probability": <float 0..1>,    // per-biome scalar for passive-creature chunk population
-    "mob_spawn_costs": { "<entity_type key>": { "energy_budget": <double>, "charge": <double> }, ... }
-  },
-  "content_overrides": {                                 // optional, default all-empty
-    "feature_predicates": { "<placed_feature key>": SpatialPredicate, ... }, // optional, default {} — wrap a feature's placement so it only spawns where the predicate holds
-    "structure_spawn_overrides": [                       // optional, default []
-      { "structure": "<structure key>", "category": "<MobCategory>",
-        "bounding_box": "piece|full",
-        "spawns": [{ "category": "<MobCategory>", "type": "<entity_type key>",
-                     "weight": <int>=1, "min_count": <int>=1, "max_count": <int>=1 }, ...],
-        "replace": <bool>                                // optional, default true — clear existing override before injecting
-      }, ...
-    ],
-    "block_overrides": {                                 // optional, default {} — read by the isekai_api:worldshape_surface_top / worldshape_default_block surface rules
-      "surface_top":   { "<biome key>": "<block key>", ... },
-      "default_block": { "<biome key>": "<block key>", ... }
-    }
-  },
-  "priority": <int>                                      // optional, default 100
-}
-```
-
-### Extension-point payloads
-
-Every `"type"` dispatch below resolves through an Isekai custom registry, so third-party mods can
-register their own variants (see `IsekaiRegistries`). Use the canonical `isekai_api:` prefix. The
-legacy `isekai:` prefix is still accepted as a deprecated alias and logs a one-time warning per id
-— `moon_world/worldshape.json` deliberately keeps the legacy prefix to exercise that alias.
-
-`VerticalRange`:
-```json
-{ "min_y": <int>, "max_y": <int>, "distribution": "uniform|trapezoid|triangle|biased_low|biased_high" }
-```
-
-`SurfaceAnchor` dispatch on `"type"`:
-- `isekai_api:world_surface` — vanilla heightmap
-- `isekai_api:below_fluid` — `{ "fluid": "<fluid key>" }`
-- `isekai_api:fixed_y` — `{ "y": <int> }`
-
-`RemapStrategy` dispatch on `"type"`:
-- `isekai_api:linear`, `isekai_api:inverted`, `isekai_api:identity` — no payload
-- `isekai_api:band_split` — `{ "bands": [{ "vanilla_source": VerticalRange, "target_ratio": <float> }, ...] }`
-- `isekai_api:fixed_range` — `{ "min": <int>, "max": <int>, "dist": "<distribution>" }`
-- `isekai_api:count_scale` — `{ "factor": <double>=0 }`
-- `isekai_api:pipe` — `{ "chain": [RemapStrategy, ...] }` (non-empty)
-
-`SpatialPredicate` dispatch on `"type"`:
-- `isekai_api:y_in_range`     — `{ "min": <int>, "max": <int> }`
-- `isekai_api:solid_floor`    — `{ "min_clearance": <int> }`
-- `isekai_api:solid_ceiling`  — `{ "min_clearance": <int> }`
-- `isekai_api:terrain_slope`  — `{ "min_slope": <dbl>, "max_slope": <dbl> }`
-- `isekai_api:near_block`     — `{ "targets": "<block key>" | ["<block key>", ...] | "#<block tag>", "max_distance": <int> }`
-- `isekai_api:near_biome`     — `{ "biome": "<biome key>", "max_distance": <int> }`
-- `isekai_api:in_fluid`       — `{ "fluid": "<fluid key>" }`
-- `isekai_api:always` / `isekai_api:never` — no payload
-- `isekai_api:and` — `{ "all": [SpatialPredicate, ...] }`
-- `isekai_api:or`  — `{ "any": [SpatialPredicate, ...] }`
-- `isekai_api:not` — `{ "inner": SpatialPredicate }`
-
-`TransitionRule` dispatch on `"type"`:
-- `isekai_api:hard` — no payload
-- `isekai_api:blend` — `{ "blend_height": <int>>=0 }`
-- `isekai_api:gap`   — `{ "gap_height": <int>>=0 }`
-
-### Layered file (`isekai/layered_worldshape/*.json`)
-
-```jsonc
-{
-  "dimension":  "<dimension key>",
-  "layers": [
-    {
-      "y_range":    VerticalRange,
-      "descriptor": WorldshapeDescriptor,
-      "transition": TransitionRule
-    }, ...
-  ],
-  "transition": TransitionRule    // optional, default {"type":"isekai_api:hard"} — top-level seam rule
-}
-```
+1. Copy the pack directory into your world's `datapacks/` folder (or your mod's `src/main/resources/`).
+2. New dimensions and shape/overworld changes apply on **world create**; descriptor-only packs apply on `/reload`.
+3. Confirm with `/isekai query dimensions`, `/isekai query worldshape <dim>`, and validate JSON with `/isekai validate <pack-namespace>`.

@@ -152,6 +152,7 @@ Go in `noise_settings.surface_rule` (inside a `minecraft:sequence`). Both read p
 | `isekai_api:worldshape_surface_top` | `dimension` (dimension key) | replaces the top block of matched biomes (`block_overrides.surface_top`). Put it **first** in the sequence. |
 | `isekai_api:worldshape_default_block` | `dimension` (dimension key) | replaces the default (stone) fill of matched biomes (`block_overrides.default_block`). Put it **last** (after vanilla rules). |
 | `isekai_api:strata` | `bands` (list of `{ block: BlockState, thickness: int ≥ 1 }`) | ordered downward stack — band 1 covers depths 0…t1−1, band 2 covers t1…t1+t2−1, etc. Emits null below the last band so the surrounding sequence handles deeper fill. Collapses an N-layer nested `stone_depth` sequence into one flat list. |
+| `isekai_api:vanilla_overworld_surface` | — | the entire vanilla overworld surface (grass/dirt/sand/badlands bands/snow caps/…), so a noise_settings can write `{ "type": "isekai_api:vanilla_overworld_surface" }` instead of copying the expanded ~30 KB `surface_rule`. Reconstructed from runtime worldgen factories, so it is safe even inside a replaced `minecraft:overworld`. Wrap it in a `minecraft:sequence` with `worldshape_surface_top` first and `worldshape_default_block` last to layer worldshape block overrides on top. |
 
 ---
 
@@ -459,7 +460,22 @@ The legacy `isekai:` prefix is accepted as a deprecated alias.
 
 ---
 
-See [`examples/`](../examples/) for complete runnable datapacks (`sky_archipelago/`, `flipped/`, `moon_world/`), and [`examples/templates/`](../examples/templates/) for annotated copy-paste starting points (currently: a `world_preset` override template that re-declares Nether/End verbatim — see the section below).
+See [`examples/`](../examples/) for complete runnable datapacks, organised by the three worldgen steps: `1_shape/` (the terrain-shape hook), `2_placement/` (biome/block selection), `3_adaptation/` (`sky_archipelago/`, `flipped/`, `moon_world/`-style worldshape descriptors). [`examples/templates/`](../examples/templates/) holds annotated copy-paste starting points.
+
+---
+
+## Shipped presets — shape a world without copying 2500 lines
+
+Isekai ships two things so you never hand-copy vanilla's `noise_settings`:
+
+| Preset | What it is | Use |
+|---|---|---|
+| `isekai_api:hooked_overworld` | a complete `noise_settings` whose `final_density` is the `isekai_api:hook/final_density` hook and whose `surface_rule` is the `vanilla_overworld_surface` delegate (aquifers/veins off) | point a **new** dimension's `generator.settings` at it; override the hook to set your shape |
+| `isekai_api:hook/final_density` | a `density_function` — the hook. Default = vanilla terrain shape (`minecraft:overworld/sloped_cheese` reference) | **override** it at `data/isekai_api/worldgen/density_function/hook/final_density.json` in your **datapack** to reshape every world using the preset |
+
+**Override physics.** The hook wins because your datapack loads *above* the mod jar (`RegistryDataLoader` takes the highest-priority pack's copy of each id). This is deterministic for a datapack; a second *mod* shipping the same file is mod-vs-mod load order (undefined) — so ship shape overrides as a datapack, and treat a preset as **single-owner per world** (two packs overriding the same hook conflict, exactly like two mods replacing `minecraft:overworld`). Overriding the hook takes effect on **world create**, not `/reload` (the noise_settings resolves its density references once at world load).
+
+The 2-file floating-island world in [`examples/1_shape/floating_island/`](../examples/1_shape/floating_island/) is the whole pattern. To **replace the overworld itself** (not add a dimension), you still need a full `minecraft:overworld` noise_settings document — but [`examples/templates/minimal_overworld.json`](../examples/templates/minimal_overworld.json) is ~30 lines of vanilla density-function references + the hook + the delegate surface, not a 2500-line copy.
 
 ---
 

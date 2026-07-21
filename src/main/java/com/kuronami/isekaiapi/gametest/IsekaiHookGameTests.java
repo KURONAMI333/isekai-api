@@ -1,15 +1,19 @@
 package com.kuronami.isekaiapi.gametest;
 
+import com.google.gson.JsonParser;
 import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.surfacerule.VanillaOverworldSurfaceRule;
+import com.mojang.serialization.JsonOps;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
+import net.minecraft.world.level.levelgen.NoiseRouter;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -104,6 +108,74 @@ public final class IsekaiHookGameTests {
                 helper.fail("default hook not air at Y=250 for column " + c[0] + "," + c[1] + " (got " + high + ")");
                 return;
             }
+        }
+        helper.succeed();
+    }
+
+    // The "30 lines to floating islands" hook override (matches
+    // examples/1_shape/floating_island/.../hook/final_density.json).
+    private static final String BAND_HOOK_JSON =
+            "{\"type\":\"isekai_api:squeeze\",\"argument\":{\"type\":\"minecraft:interpolated\","
+            + "\"argument\":{\"type\":\"minecraft:blend_density\",\"argument\":{"
+            + "\"type\":\"isekai_api:band_density\",\"active_min_y\":50,\"active_max_y\":200,"
+            + "\"gradient_width\":30,\"noise\":{\"type\":\"isekai_api:blended_noise\","
+            + "\"size_xz\":320,\"size_y\":240}}}}}";
+
+    /**
+     * Gate 3 (value): overriding the hook with the floating-island band shape yields BOUNDED
+     * terrain — air below the band, air above it, solid inside — the opposite of the default
+     * hook's solid-to-bedrock ground. This is what the 30-line example produces at world-create.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void bandHookProducesFloatingIslandProfile(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var regs = level.registryAccess();
+        NoiseGeneratorSettings base = regs.lookupOrThrow(Registries.NOISE_SETTINGS)
+                .getOrThrow(HOOKED_OVERWORLD).value();
+
+        RegistryOps<com.google.gson.JsonElement> ops = RegistryOps.create(JsonOps.INSTANCE, regs);
+        DensityFunction band = DensityFunction.DIRECT_CODEC
+                .parse(ops, JsonParser.parseString(BAND_HOOK_JSON))
+                .getOrThrow(msg -> new AssertionError("band hook decode: " + msg));
+
+        // Splice the band shape in as final_density (and initial), map it through a RandomState.
+        NoiseRouter r = base.noiseRouter();
+        NoiseRouter banded = new NoiseRouter(
+                r.barrierNoise(), r.fluidLevelFloodednessNoise(), r.fluidLevelSpreadNoise(), r.lavaNoise(),
+                r.temperature(), r.vegetation(), r.continents(), r.erosion(), r.depth(), r.ridges(),
+                band, band, r.veinToggle(), r.veinRidged(), r.veinGap());
+        NoiseGeneratorSettings bandSettings = new NoiseGeneratorSettings(
+                base.noiseSettings(), base.defaultBlock(), base.defaultFluid(), banded, base.surfaceRule(),
+                base.spawnTarget(), base.seaLevel(), base.disableMobGeneration(),
+                base.isAquifersEnabled(), base.oreVeinsEnabled(), base.useLegacyRandomSource());
+        RandomState rs = RandomState.create(bandSettings, regs.lookupOrThrow(Registries.NOISE), level.getSeed());
+        DensityFunction fd = rs.router().finalDensity();
+
+        int[][] columns = { {0, 0}, {96, -32}, {-48, 64} };
+        boolean anySolidInBand = false;
+        for (int[] c : columns) {
+            // Below the band: void, unlike the default hook which is solid at Y=0.
+            double below = fd.compute(new DensityFunction.SinglePointContext(c[0], 0, c[1]));
+            if (!(below < 0.0)) {
+                helper.fail("band hook not void at Y=0 (below band) for " + c[0] + "," + c[1] + " (got " + below + ")");
+                return;
+            }
+            // Above the band: void.
+            double above = fd.compute(new DensityFunction.SinglePointContext(c[0], 300, c[1]));
+            if (!(above < 0.0)) {
+                helper.fail("band hook not void at Y=300 (above band) for " + c[0] + "," + c[1] + " (got " + above + ")");
+                return;
+            }
+            for (int y = 60; y <= 190 && !anySolidInBand; y += 10) {
+                if (fd.compute(new DensityFunction.SinglePointContext(c[0], y, c[1])) > 0.0) {
+                    anySolidInBand = true;
+                }
+            }
+        }
+        if (!anySolidInBand) {
+            helper.fail("band hook produced no solid terrain anywhere inside the Y=50..200 band — no islands");
+            return;
         }
         helper.succeed();
     }

@@ -1,0 +1,8 @@
+{
+  "type": "minecraft:overworld",
+  "generator": {
+    "type": "minecraft:noise",
+    "settings": "isekai_api:hooked_overworld",
+    "biome_source": { "type": "minecraft:fixed", "biome": "minecraft:plains" }
+  }
+}
