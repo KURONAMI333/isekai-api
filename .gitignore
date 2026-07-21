@@ -58,3 +58,7 @@ branding/
 ### Internal handoff / gap tracking — never published ###
 GAP_LOG.md
 _handoff/
+
+### Python (repo tooling) ###
+__pycache__/
+*.pyc
