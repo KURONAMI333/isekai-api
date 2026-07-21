@@ -29,9 +29,9 @@ import static org.junit.jupiter.api.Assertions.fail;
  * through the actual production codecs — not just "parses as JSON". This is what stops the docs
  * from drifting to non-decodable content while still reading plausibly.
  *
- * <p>Covers the two snippets that map onto Isekai codecs: the {@code isekai_api:apply_worldshape}
- * biome-modifier body (→ {@link WorldshapeDescriptor#CODEC}, which transitively drives
- * SurfaceAnchor / RemapStrategy / SpatialPredicate) and the terrain-shape hook density function
+ * <p>Covers the two snippets that map onto Isekai codecs: the worldshape descriptor body
+ * (→ {@link WorldshapeDescriptor#CODEC}, which transitively drives SurfaceAnchor / RemapStrategy /
+ * SpatialPredicate) and the terrain-shape hook density function
  * (→ {@link DensityFunction#DIRECT_CODEC}). The vocabulary + well-formedness of every other fence
  * is enforced by {@code tools/check_docs.py}; the {@code examples/**} datapacks by
  * {@link ExamplesDecodeTest}. Schema fences with {@code <int>} placeholders are illustrative and
@@ -95,10 +95,11 @@ class DocSnippetDecodeTest {
         for (JsonObject obj : literalObjects()) {
             String type = obj.has("type") ? obj.get("type").getAsString() : null;
 
-            if ("isekai_api:apply_worldshape".equals(type) && obj.has("worldshape")) {
-                WorldshapeDescriptor.CODEC.parse(registryOps, obj.get("worldshape"))
+            if (obj.has("dimension") && obj.has("playable_range")) {
+                // the canonical (ref-form) worldshape descriptor, authored as its own file
+                WorldshapeDescriptor.CODEC.parse(registryOps, obj)
                         .getOrThrow(err -> new AssertionError(
-                                "README apply_worldshape body did not decode: " + err));
+                                "README worldshape descriptor did not decode: " + err));
                 worldshapes++;
             } else if (isDensityFunctionType(type)) {
                 DensityFunction.DIRECT_CODEC.parse(JsonOps.INSTANCE, obj)
@@ -108,7 +109,7 @@ class DocSnippetDecodeTest {
             }
         }
         assertTrue(worldshapes >= 1,
-                "expected the apply_worldshape README example to be present and decode");
+                "expected the README worldshape descriptor example to be present and decode");
         assertTrue(densityFunctions >= 1,
                 "expected the terrain-shape hook density_function README example to decode");
     }
