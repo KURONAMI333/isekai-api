@@ -26,7 +26,6 @@ import java.util.List;
  * report any density multiplier via {@link #countFactor()} (default 1.0), and expose nested
  * strategies via {@link #children()} (default empty).
  *
- * @since 2.0.0 open for third-party extension via the registry (was a sealed interface before).
  */
 public interface RemapStrategy {
 

@@ -5,6 +5,8 @@ import com.kuronami.isekaiapi.api.biomesource.BiomeZone;
 import com.kuronami.isekaiapi.api.predicate.SpatialPredicate;
 import com.kuronami.isekaiapi.api.registry.IsekaiRegistries;
 import com.kuronami.isekaiapi.api.remap.RemapStrategy;
+import com.kuronami.isekaiapi.api.remap.SurfaceAnchor;
+import com.kuronami.isekaiapi.api.remap.TransitionRule;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.Registry;
 import net.neoforged.bus.api.IEventBus;
@@ -91,6 +93,34 @@ public final class IsekaiSpiTypes {
         BIOME_ZONE_TYPES.register("edge_jitter",     () -> BiomeZone.EdgeJitter.MAP_CODEC);
     }
 
+    // ---- SurfaceAnchor ---------------------------------------------------
+
+    public static final DeferredRegister<MapCodec<? extends SurfaceAnchor>> SURFACE_ANCHOR_TYPES =
+            DeferredRegister.create(IsekaiRegistries.SURFACE_ANCHOR_TYPE, IsekaiApi.MODID);
+
+    public static final Supplier<Registry<MapCodec<? extends SurfaceAnchor>>> SURFACE_ANCHOR_REGISTRY =
+            SURFACE_ANCHOR_TYPES.getRegistry();
+
+    static {
+        SURFACE_ANCHOR_TYPES.register("world_surface", () -> SurfaceAnchor.WorldSurface.MAP_CODEC);
+        SURFACE_ANCHOR_TYPES.register("below_fluid",   () -> SurfaceAnchor.BelowFluid.MAP_CODEC);
+        SURFACE_ANCHOR_TYPES.register("fixed_y",       () -> SurfaceAnchor.FixedY.MAP_CODEC);
+    }
+
+    // ---- TransitionRule --------------------------------------------------
+
+    public static final DeferredRegister<MapCodec<? extends TransitionRule>> TRANSITION_RULE_TYPES =
+            DeferredRegister.create(IsekaiRegistries.TRANSITION_RULE_TYPE, IsekaiApi.MODID);
+
+    public static final Supplier<Registry<MapCodec<? extends TransitionRule>>> TRANSITION_RULE_REGISTRY =
+            TRANSITION_RULE_TYPES.getRegistry();
+
+    static {
+        TRANSITION_RULE_TYPES.register("hard",  () -> TransitionRule.Hard.MAP_CODEC);
+        TRANSITION_RULE_TYPES.register("blend", () -> TransitionRule.Blend.MAP_CODEC);
+        TRANSITION_RULE_TYPES.register("gap",   () -> TransitionRule.Gap.MAP_CODEC);
+    }
+
     /**
      * Create all five custom registries and wire their population onto the mod event bus.
      * {@code makeRegistry} must run before {@code NewRegistryEvent}; calling it here (from the
@@ -106,6 +136,13 @@ public final class IsekaiSpiTypes {
         BIOME_ZONE_TYPES.makeRegistry(b -> b.sync(false));
         BIOME_ZONE_TYPES.register(modBus);
 
-        IsekaiApi.LOGGER.info("[Isekai] SPI type registries created (spatial_predicate, remap_strategy, biome_zone)");
+        SURFACE_ANCHOR_TYPES.makeRegistry(b -> b.sync(false));
+        SURFACE_ANCHOR_TYPES.register(modBus);
+
+        TRANSITION_RULE_TYPES.makeRegistry(b -> b.sync(false));
+        TRANSITION_RULE_TYPES.register(modBus);
+
+        IsekaiApi.LOGGER.info("[Isekai] SPI type registries created (spatial_predicate, remap_strategy, "
+                + "biome_zone, surface_anchor, transition_rule)");
     }
 }
