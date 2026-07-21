@@ -1,0 +1,10 @@
+{
+  "type": "isekai_api:rule",
+  "fallback": "minecraft:plains",
+  "rules": [
+    {
+      "zone": { "type": "isekai_api:within_distance", "radius": 500.0, "center_x": 0, "center_z": 0 },
+      "biome": "minecraft:desert"
+    }
+  ]
+}

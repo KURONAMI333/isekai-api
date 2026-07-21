@@ -1,0 +1,20 @@
+{
+  "type": "isekai_api:add",
+  "a": {
+    "type": "isekai_api:band_density",
+    "active_min_y": 0,
+    "active_max_y": 120,
+    "gradient_width": 8,
+    "noise": { "type": "isekai_api:constant", "value": 0.8 }
+  },
+  "b": {
+    "type": "isekai_api:negate",
+    "f": {
+      "type": "isekai_api:mask_y_range",
+      "ymin": 40,
+      "ymax": 70,
+      "inside": { "type": "isekai_api:constant", "value": 3.0 },
+      "outside": { "type": "isekai_api:constant", "value": 0.0 }
+    }
+  }
+}
