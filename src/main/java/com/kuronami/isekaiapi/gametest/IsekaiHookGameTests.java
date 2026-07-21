@@ -179,4 +179,58 @@ public final class IsekaiHookGameTests {
         }
         helper.succeed();
     }
+
+    /**
+     * The {@code minimal_overworld.json} template (手段B — full overworld replacement in ~30 lines)
+     * decodes as a complete {@link NoiseGeneratorSettings} against the live registry: every
+     * reference in it — {@code isekai_api:hook/final_density}, {@code minecraft:overworld/*}, the
+     * {@code isekai_api:vanilla_overworld_surface} surface rule — resolves. Verifies the two things
+     * that differ from the shipped {@code hooked_overworld} preset: {@code //}-comment stripping and
+     * targeting {@code minecraft:overworld}.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void minimalOverworldTemplateDecodes(GameTestHelper helper) {
+        java.nio.file.Path template = null;
+        for (java.nio.file.Path p = java.nio.file.Path.of("").toAbsolutePath(); p != null; p = p.getParent()) {
+            java.nio.file.Path c = p.resolve("examples/templates/minimal_overworld.json");
+            if (java.nio.file.Files.isRegularFile(c)) { template = c; break; }
+        }
+        if (template == null) {
+            helper.fail("examples/templates/minimal_overworld.json not found by walking up from "
+                    + java.nio.file.Path.of("").toAbsolutePath());
+            return;
+        }
+        String raw;
+        try {
+            raw = java.nio.file.Files.readString(template);
+        } catch (java.io.IOException e) {
+            helper.fail("could not read minimal_overworld.json: " + e);
+            return;
+        }
+        // Strip the // annotation lines (Minecraft's lenient parser tolerates them; Gson's strict
+        // parseString does not) so this test decodes exactly the JSON the game would.
+        StringBuilder sb = new StringBuilder();
+        for (String line : raw.split("\n")) {
+            if (!line.stripLeading().startsWith("//")) sb.append(line).append('\n');
+        }
+        RegistryOps<com.google.gson.JsonElement> ops =
+                RegistryOps.create(JsonOps.INSTANCE, helper.getLevel().registryAccess());
+        var result = NoiseGeneratorSettings.DIRECT_CODEC.parse(ops, JsonParser.parseString(sb.toString()));
+        if (result.error().isPresent()) {
+            helper.fail("minimal_overworld.json did not decode as NoiseGeneratorSettings: "
+                    + result.error().get().message());
+            return;
+        }
+        NoiseGeneratorSettings s = result.getOrThrow();
+        if (!(s.surfaceRule() instanceof VanillaOverworldSurfaceRule)) {
+            helper.fail("minimal_overworld surface_rule did not resolve to the delegate");
+            return;
+        }
+        if (s.noiseRouter().finalDensity() == null || s.noiseRouter().continents() == null) {
+            helper.fail("minimal_overworld router references did not resolve");
+            return;
+        }
+        helper.succeed();
+    }
 }

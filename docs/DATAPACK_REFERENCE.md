@@ -462,7 +462,7 @@ The legacy `isekai:` prefix is accepted as a deprecated alias.
 
 ---
 
-See [`examples/`](../examples/) for complete runnable datapacks, organised by the three worldgen steps: `1_shape/` (the terrain-shape hook), `2_placement/` (biome/block selection), `3_adaptation/` (`sky_archipelago/`, `flipped/`, `moon_world/`-style worldshape descriptors). [`examples/templates/`](../examples/templates/) holds annotated copy-paste starting points.
+See [`examples/`](../examples/) for complete runnable datapacks, organised by the three worldgen steps: `1_shape/` (the terrain-shape hook — `floating_island/`), `2_placement/` (biome/block selection — `moon_world/`), `3_adaptation/` (worldshape descriptors — `sky_archipelago/`, `flipped/`, `declaration_only/`, `runtime_effects/`). [`examples/templates/`](../examples/templates/) holds annotated copy-paste starting points.
 
 ---
 
