@@ -48,6 +48,7 @@ import java.util.Set;
  *
  * <p>If two consumers register a descriptor for the same dimension, the one with the
  * higher {@link #priority} wins. Ties replace.
+ * @since 1.0.0
  */
 public record WorldshapeDescriptor(
         ResourceKey<Level> dimension,
@@ -79,15 +80,15 @@ public record WorldshapeDescriptor(
     }
 
     // --- Convenience accessors so call sites keep a flat API ---
-    /** Shortcut for {@code contentOverrides().featurePredicates()}. */
+    /** Shortcut for {@code contentOverrides().featurePredicates()}. @since 1.0.0 */
     public Map<ResourceKey<PlacedFeature>, SpatialPredicate> featurePredicates() {
         return contentOverrides.featurePredicates();
     }
-    /** Shortcut for {@code contentOverrides().structureSpawnOverrides()}. */
+    /** Shortcut for {@code contentOverrides().structureSpawnOverrides()}. @since 1.0.0 */
     public List<StructureSpawnConfig> structureSpawnOverrides() {
         return contentOverrides.structureSpawnOverrides();
     }
-    /** Shortcut for {@code contentOverrides().blockOverrides()}. */
+    /** Shortcut for {@code contentOverrides().blockOverrides()}. @since 1.0.0 */
     public BlockOverrides blockOverrides() {
         return contentOverrides.blockOverrides();
     }
@@ -104,6 +105,7 @@ public record WorldshapeDescriptor(
      * {@code structure=pillager_outpost, category=monster, replace=true, spawns=[only the
      * mobs you want]}; or "pillager outposts also spawn extra mobs" — same but
      * {@code replace=false}.
+     * @since 1.0.0
      */
     public record StructureSpawnConfig(
             ResourceKey<Structure> structure,
@@ -128,7 +130,7 @@ public record WorldshapeDescriptor(
         ).apply(i, StructureSpawnConfig::new));
     }
 
-    /** Set of registry keys to drop from matched biomes during the REMOVE phase. */
+    /** Set of registry keys to drop from matched biomes during the REMOVE phase. @since 1.0.0 */
     public record Exclusions(
             Set<ResourceKey<PlacedFeature>> features,
             Set<ResourceKey<Structure>> structures,
@@ -152,7 +154,7 @@ public record WorldshapeDescriptor(
         ).apply(i, Exclusions::new));
     }
 
-    /** Lists of consumer-injected entries to add during the ADD / MODIFY phases. */
+    /** Lists of consumer-injected entries to add during the ADD / MODIFY phases. @since 1.0.0 */
     public record Additions(
             List<AdditionalFeature> features,
             List<AdditionalCarver> carvers,
@@ -180,6 +182,7 @@ public record WorldshapeDescriptor(
      * An extra mob spawn entry to add to matched biomes during the MODIFY phase. Mirrors
      * vanilla {@code MobSpawnSettings.SpawnerData}: a (type, weight, minCount, maxCount)
      * tuple plus the MobCategory bucket it lives in.
+     * @since 1.0.0
      */
     public record AdditionalMobSpawn(MobCategory category, EntityType<?> type,
                                       int weight, int minCount, int maxCount) {
@@ -198,7 +201,7 @@ public record WorldshapeDescriptor(
         ).apply(i, AdditionalMobSpawn::new));
     }
 
-    /** A ConfiguredWorldCarver the consumer wants injected at the named carving step. */
+    /** A ConfiguredWorldCarver the consumer wants injected at the named carving step. @since 1.0.0 */
     public record AdditionalCarver(ResourceKey<ConfiguredWorldCarver<?>> carver,
                                     GenerationStep.Carving step) {
         public static final Codec<AdditionalCarver> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -211,6 +214,7 @@ public record WorldshapeDescriptor(
     /**
      * A {@link PlacedFeature} the consumer wants injected into the matched biomes at the
      * given {@link GenerationStep.Decoration} step.
+     * @since 1.0.0
      */
     public record AdditionalFeature(ResourceKey<PlacedFeature> feature, GenerationStep.Decoration step) {
         public static final Codec<AdditionalFeature> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -224,6 +228,7 @@ public record WorldshapeDescriptor(
     /**
      * Resolve the strategy for the given {@link MobCategory}. Falls through to the global
      * {@link #mobSpawnStrategy} when no per-category override is present.
+     * @since 1.0.0
      */
     public RemapStrategy resolveMobSpawnStrategy(MobCategory category) {
         return mobSpawnStrategyByCategory.getOrDefault(category, mobSpawnStrategy);
@@ -251,12 +256,13 @@ public record WorldshapeDescriptor(
      *     .priority(110)
      *     .build();
      * }</pre>
+     * @since 1.0.0
      */
     public static Builder builder() {
         return new Builder();
     }
 
-    /** Fluent builder; see {@link WorldshapeDescriptor#builder()}. */
+    /** Fluent builder; see {@link WorldshapeDescriptor#builder()}. @since 1.0.0 */
     public static final class Builder {
         private ResourceKey<Level> dimension;
         private VerticalRange playableRange;
@@ -277,25 +283,42 @@ public record WorldshapeDescriptor(
 
         private Builder() {}
 
+        /** Target dimension (required). @since 1.0.0 */
         public Builder dimension(ResourceKey<Level> v) { this.dimension = v; return this; }
+        /** Playable Y band the worldshape remaps content into (required). @since 1.0.0 */
         public Builder playableRange(VerticalRange v) { this.playableRange = v; return this; }
+        /** What "the surface" means in this worldshape (required). @since 1.0.0 */
         public Builder surfaceAnchor(SurfaceAnchor v) { this.surfaceAnchor = v; return this; }
+        /** Y-remap for ore/feature placement (required). @since 1.0.0 */
         public Builder oreStrategy(RemapStrategy v) { this.oreStrategy = v; return this; }
+        /** Y-remap for surviving structures (required). @since 1.0.0 */
         public Builder structureStrategy(RemapStrategy v) { this.structureStrategy = v; return this; }
+        /** Weight remap for mob spawns (required). @since 1.0.0 */
         public Builder mobSpawnStrategy(RemapStrategy v) { this.mobSpawnStrategy = v; return this; }
+        /** Fallback spawn condition for structures not in {@link #structurePredicates} (required). @since 1.0.0 */
         public Builder defaultStructurePredicate(SpatialPredicate v) { this.defaultStructurePredicate = v; return this; }
+        /** Per-structure spawn conditions. Defaults to empty. @since 1.0.0 */
         public Builder structurePredicates(Map<ResourceKey<Structure>, SpatialPredicate> v) { this.structurePredicates = v; return this; }
+        /** Biomes this worldshape applies to. Defaults to empty (matches none). @since 1.0.0 */
         public Builder appliesTo(BiomeSelection v) { this.appliesTo = v; return this; }
-        /** Convenience: wrap a key set as a {@link BiomeSelection} with no tags. */
+        /** Convenience: wrap a key set as a {@link BiomeSelection} with no tags. @since 1.0.0 */
         public Builder appliesTo(Set<ResourceKey<Biome>> keys) { this.appliesTo = BiomeSelection.ofKeys(keys); return this; }
+        /** Content to remove from matched biomes. Defaults to empty. @since 1.0.0 */
         public Builder exclusions(Exclusions v) { this.exclusions = v; return this; }
+        /** Per-category mob spawn remap overriding {@link #mobSpawnStrategy}. Defaults to empty. @since 1.0.0 */
         public Builder mobSpawnStrategyByCategory(Map<MobCategory, RemapStrategy> v) { this.mobSpawnStrategyByCategory = v; return this; }
+        /** Content to add to matched biomes. Defaults to empty. @since 1.0.0 */
         public Builder additions(Additions v) { this.additions = v; return this; }
+        /** Per-biome atmosphere override. Defaults to no-op. @since 1.0.0 */
         public Builder atmosphere(AtmosphereOverride v) { this.atmosphere = v; return this; }
+        /** Dimension-wide client fog override. Defaults to no-op. @since 1.1.0 */
         public Builder clientAtmosphere(ClientAtmosphereOverride v) { this.clientAtmosphere = v; return this; }
+        /** Feature predicates, spawn overrides, and block overrides. Defaults to empty. @since 1.0.0 */
         public Builder contentOverrides(ContentOverrides v) { this.contentOverrides = v; return this; }
+        /** Conflict-resolution priority; higher wins per dimension. Defaults to {@link WorldshapeDescriptor#DEFAULT_PRIORITY}. @since 1.0.0 */
         public Builder priority(int v) { this.priority = v; return this; }
 
+        /** Validate required fields and construct the descriptor. @since 1.0.0 */
         public WorldshapeDescriptor build() {
             if (dimension == null) throw new IllegalStateException("dimension is required");
             if (playableRange == null) throw new IllegalStateException("playableRange is required");

@@ -9,6 +9,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  * {@code VerticalRange}, and {@code RemapStrategy} maps it into the worldshape's playable
  * range. JSON shape: {@code {"min_y": <int>, "max_y": <int>, "distribution":
  * "<HeightDistribution>"}}. The canonical constructor rejects {@code minY > maxY}.
+ * @since 1.0.0
  */
 public record VerticalRange(int minY, int maxY, HeightDistribution distribution) {
     public VerticalRange {
@@ -17,6 +18,7 @@ public record VerticalRange(int minY, int maxY, HeightDistribution distribution)
         }
     }
 
+    /** Height of the band in blocks ({@code maxY - minY}). @since 1.0.0 */
     public int span() {
         return maxY - minY;
     }

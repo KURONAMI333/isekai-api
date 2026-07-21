@@ -23,10 +23,11 @@ import org.jetbrains.annotations.Nullable;
  * a {@code "type"} field, e.g. {@code {"type": "isekai_api:fixed_y", "y": 64}}. The legacy
  * {@code isekai:} prefix is accepted as a deprecated alias.
  *
+ * @since 1.0.0
  */
 public interface SurfaceAnchor {
 
-    /** This variant's payload codec (no {@code "type"} field); must be the registered instance. */
+    /** This variant's payload codec (no {@code "type"} field); must be the registered instance. @since 1.0.0 */
     MapCodec<? extends SurfaceAnchor> codec();
 
     /**
@@ -40,7 +41,7 @@ public interface SurfaceAnchor {
     Codec<SurfaceAnchor> CODEC = IsekaiDispatch.dispatchCodec(
             IsekaiSpiTypes.SURFACE_ANCHOR_REGISTRY, SurfaceAnchor::codec, "SurfaceAnchor");
 
-    /** Topmost solid block per column (vanilla heightmap WORLD_SURFACE). */
+    /** Topmost solid block per column (vanilla heightmap WORLD_SURFACE). @since 1.0.0 */
     record WorldSurface() implements SurfaceAnchor {
         public static final WorldSurface INSTANCE = new WorldSurface();
         public static final MapCodec<WorldSurface> MAP_CODEC = MapCodec.unit(INSTANCE);
@@ -51,7 +52,7 @@ public interface SurfaceAnchor {
         }
     }
 
-    /** Top of the highest contiguous body of the given fluid in each column. */
+    /** Top of the highest contiguous body of the given fluid in each column. @since 1.0.0 */
     record BelowFluid(Fluid fluid) implements SurfaceAnchor {
         public static final MapCodec<BelowFluid> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 BuiltInRegistries.FLUID.byNameCodec().fieldOf("fluid").forGetter(BelowFluid::fluid)
@@ -72,7 +73,7 @@ public interface SurfaceAnchor {
         }
     }
 
-    /** Fixed Y level regardless of terrain. */
+    /** Fixed Y level regardless of terrain. @since 1.0.0 */
     record FixedY(int y) implements SurfaceAnchor {
         public static final MapCodec<FixedY> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 Codec.INT.fieldOf("y").forGetter(FixedY::y)

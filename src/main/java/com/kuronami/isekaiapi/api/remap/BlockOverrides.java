@@ -29,6 +29,7 @@ import java.util.Map;
  * <p>Both maps default to empty. The biome key is exact match — to apply to many biomes,
  * list each. Both rules read these maps from the active worldshape at apply-time, so the
  * overrides are hot-reloadable along with the rest of the worldshape JSON.
+ * @since 1.0.0
  */
 public record BlockOverrides(
         Map<ResourceKey<Biome>, BlockState> surfaceTop,
@@ -41,6 +42,7 @@ public record BlockOverrides(
 
     public static final BlockOverrides EMPTY = new BlockOverrides(Map.of(), Map.of());
 
+    /** {@code true} when no surface-top or default-block override is set. @since 1.0.0 */
     public boolean isEmpty() {
         return surfaceTop.isEmpty() && defaultBlock.isEmpty();
     }

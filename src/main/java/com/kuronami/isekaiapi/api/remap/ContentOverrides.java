@@ -29,6 +29,7 @@ import java.util.Map;
  *
  * <p>All three default to empty. JSON shape: {@code content_overrides: { feature_predicates:
  * {...}, structure_spawn_overrides: [...], block_overrides: {...} }}.
+ * @since 1.0.0
  */
 public record ContentOverrides(
         Map<ResourceKey<PlacedFeature>, SpatialPredicate> featurePredicates,
@@ -44,6 +45,7 @@ public record ContentOverrides(
     public static final ContentOverrides EMPTY = new ContentOverrides(
             Map.of(), List.of(), BlockOverrides.EMPTY);
 
+    /** {@code true} when no feature predicate, spawn override, or block override is set. @since 1.0.0 */
     public boolean isEmpty() {
         return featurePredicates.isEmpty()
                 && structureSpawnOverrides.isEmpty()

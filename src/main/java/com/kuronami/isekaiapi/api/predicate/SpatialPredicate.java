@@ -33,10 +33,12 @@ import java.util.List;
  * {@link #test(EvaluationContext)}, and expose any nested predicates via {@link #children()} so
  * validators can walk the tree.
  *
+ * @since 1.0.0
  */
 public interface SpatialPredicate {
 
     /** This variant's payload codec (no {@code "type"} field); must be the instance registered
+     * @since 1.0.0
      *  under {@link com.kuronami.isekaiapi.api.registry.IsekaiRegistries#SPATIAL_PREDICATE_TYPE}. */
     MapCodec<? extends SpatialPredicate> codec();
 
@@ -54,7 +56,7 @@ public interface SpatialPredicate {
     // Leaf variants
     // ---------------------------------------------------------------------
 
-    /** Y coordinate must fall within [min, max] (inclusive). */
+    /** Y coordinate must fall within [min, max] (inclusive). @since 1.0.0 */
     record YInRange(int min, int max) implements SpatialPredicate {
         public static final MapCodec<YInRange> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 Codec.INT.fieldOf("min").forGetter(YInRange::min),
@@ -68,7 +70,7 @@ public interface SpatialPredicate {
         }
     }
 
-    /** Block has solid ground beneath and at least {@code minClearance} blocks of empty space above. */
+    /** Block has solid ground beneath and at least {@code minClearance} blocks of empty space above. @since 1.0.0 */
     record SolidFloor(int minClearance) implements SpatialPredicate {
         public static final MapCodec<SolidFloor> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 Codec.INT.fieldOf("min_clearance").forGetter(SolidFloor::minClearance)
@@ -78,7 +80,7 @@ public interface SpatialPredicate {
         @Override public boolean test(EvaluationContext ctx) { return ctx.solidFloor(minClearance); }
     }
 
-    /** Block has solid ceiling above and at least {@code minClearance} blocks of empty space below. */
+    /** Block has solid ceiling above and at least {@code minClearance} blocks of empty space below. @since 1.0.0 */
     record SolidCeiling(int minClearance) implements SpatialPredicate {
         public static final MapCodec<SolidCeiling> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 Codec.INT.fieldOf("min_clearance").forGetter(SolidCeiling::minClearance)
@@ -88,7 +90,7 @@ public interface SpatialPredicate {
         @Override public boolean test(EvaluationContext ctx) { return ctx.solidCeiling(minClearance); }
     }
 
-    /** Local terrain slope falls within [minSlope, maxSlope]. 0 = flat, 1 = 45deg. */
+    /** Local terrain slope falls within [minSlope, maxSlope]. 0 = flat, 1 = 45deg. @since 1.0.0 */
     record TerrainSlope(double minSlope, double maxSlope) implements SpatialPredicate {
         public static final MapCodec<TerrainSlope> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 Codec.DOUBLE.fieldOf("min_slope").forGetter(TerrainSlope::minSlope),
@@ -103,6 +105,7 @@ public interface SpatialPredicate {
      * Block matches any entry in {@code targets} within {@code maxDistance}. {@code targets}
      * accepts the standard {@link HolderSet} JSON shapes: a single block id, a list of
      * block ids, or a tag reference like {@code "#minecraft:logs"}.
+     * @since 1.0.0
      */
     record NearBlock(HolderSet<Block> targets, int maxDistance) implements SpatialPredicate {
         public static final MapCodec<NearBlock> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
@@ -114,7 +117,7 @@ public interface SpatialPredicate {
         @Override public boolean test(EvaluationContext ctx) { return ctx.nearBlock(targets, maxDistance); }
     }
 
-    /** Position is within {@code maxDistance} of a chunk whose biome key matches. */
+    /** Position is within {@code maxDistance} of a chunk whose biome key matches. @since 1.0.0 */
     record NearBiome(ResourceKey<Biome> biome, int maxDistance) implements SpatialPredicate {
         public static final MapCodec<NearBiome> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 ResourceKey.codec(Registries.BIOME).fieldOf("biome").forGetter(NearBiome::biome),
@@ -125,7 +128,7 @@ public interface SpatialPredicate {
         @Override public boolean test(EvaluationContext ctx) { return ctx.nearBiome(biome, maxDistance); }
     }
 
-    /** Position is inside the specified fluid. */
+    /** Position is inside the specified fluid. @since 1.0.0 */
     record InFluid(Fluid fluid) implements SpatialPredicate {
         public static final MapCodec<InFluid> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 BuiltInRegistries.FLUID.byNameCodec().fieldOf("fluid").forGetter(InFluid::fluid)
@@ -135,7 +138,7 @@ public interface SpatialPredicate {
         @Override public boolean test(EvaluationContext ctx) { return ctx.inFluid(fluid); }
     }
 
-    /** Always true. */
+    /** Always true. @since 1.0.0 */
     record Always() implements SpatialPredicate {
         public static final Always INSTANCE = new Always();
         public static final MapCodec<Always> MAP_CODEC = MapCodec.unit(INSTANCE);
@@ -144,7 +147,7 @@ public interface SpatialPredicate {
         @Override public boolean test(EvaluationContext ctx) { return true; }
     }
 
-    /** Always false. */
+    /** Always false. @since 1.0.0 */
     record Never() implements SpatialPredicate {
         public static final Never INSTANCE = new Never();
         public static final MapCodec<Never> MAP_CODEC = MapCodec.unit(INSTANCE);
@@ -157,7 +160,7 @@ public interface SpatialPredicate {
     // Combinators (recursive — resolve children via the dispatch CODEC)
     // ---------------------------------------------------------------------
 
-    /** All sub-predicates must hold. */
+    /** All sub-predicates must hold. @since 1.0.0 */
     record And(List<SpatialPredicate> all) implements SpatialPredicate {
         public And { all = List.copyOf(all); }
         public static final MapCodec<And> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
@@ -172,7 +175,7 @@ public interface SpatialPredicate {
         @Override public List<SpatialPredicate> children() { return all; }
     }
 
-    /** Any sub-predicate holds. */
+    /** Any sub-predicate holds. @since 1.0.0 */
     record Or(List<SpatialPredicate> any) implements SpatialPredicate {
         public Or { any = List.copyOf(any); }
         public static final MapCodec<Or> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
@@ -187,7 +190,7 @@ public interface SpatialPredicate {
         @Override public List<SpatialPredicate> children() { return any; }
     }
 
-    /** Negation of inner predicate. */
+    /** Negation of inner predicate. @since 1.0.0 */
     record Not(SpatialPredicate inner) implements SpatialPredicate {
         public static final MapCodec<Not> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 Codec.lazyInitialized(() -> CODEC).fieldOf("inner").forGetter(Not::inner)

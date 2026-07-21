@@ -15,10 +15,11 @@ import java.util.Set;
  * <p>Original vanilla rules are <b>never mutated in place</b> — they are read once at
  * {@code ServerAboutToStartEvent}, then replaced by remap-derived equivalents at biome
  * modifier resolution time.
+ * @since 1.0.0
  */
 public interface IsekaiRemap {
 
-    /** Single-layer worldshape. */
+    /** Single-layer worldshape. @since 1.0.0 */
     void declareWorldshape(WorldshapeDescriptor descriptor);
 
     /**
@@ -30,16 +31,16 @@ public interface IsekaiRemap {
     void declareLayeredWorldshape(ResourceKey<Level> dimension,
                                    List<LayeredDescriptor> layers);
 
-    /** Debug helper. Triggers a worldgen reload to re-apply biome modifiers. */
+    /** Debug helper. Triggers a worldgen reload to re-apply biome modifiers. @since 1.0.0 */
     void updateWorldshape(ResourceKey<Level> dimension, WorldshapeDescriptor newDescriptor);
 
-    /** Withdraw a consumer's declaration. Worldgen reload required. */
+    /** Withdraw a consumer's declaration. Worldgen reload required. @since 1.0.0 */
     void removeWorldshape(ResourceKey<Level> dimension);
 
-    /** Currently-active single-layer descriptor for the given dimension, if any. */
+    /** Currently-active single-layer descriptor for the given dimension, if any. @since 1.0.0 */
     Optional<WorldshapeDescriptor> getActiveDescriptor(ResourceKey<Level> dimension);
 
-    /** Currently-active layered descriptors for the given dimension, if any. */
+    /** Currently-active layered descriptors for the given dimension, if any. @since 1.0.0 */
     List<LayeredDescriptor> getActiveLayers(ResourceKey<Level> dimension);
 
     /**
@@ -56,9 +57,10 @@ public interface IsekaiRemap {
      *
      * @return descriptor active at this Y, or empty if neither layer nor single descriptor
      *         applies
+     * @since 1.0.0
      */
     Optional<WorldshapeDescriptor> getDescriptorAt(ResourceKey<Level> dimension, int y);
 
-    /** All dimensions that currently have any worldshape declaration (single or layered). */
+    /** All dimensions that currently have any worldshape declaration (single or layered). @since 1.0.0 */
     Set<ResourceKey<Level>> getDeclaredDimensions();
 }

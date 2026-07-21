@@ -40,6 +40,7 @@ import java.util.Optional;
  * particle / audio / music overrides — every {@code BiomeSpecialEffects} field not already
  * exposed at the top level. Nested to keep the codec under Mojang DataFixerUpper's 16-field
  * group limit; top-level fields are unchanged from earlier API versions.
+ * @since 1.0.0
  */
 public record AtmosphereOverride(
         Optional<Boolean> hasPrecipitation,
@@ -64,6 +65,7 @@ public record AtmosphereOverride(
      * remaining {@code BiomeSpecialEffects} fields not at {@link AtmosphereOverride}'s top
      * level. Nested to fit the codec field-group limit; conceptually all per-biome
      * sensory overrides.
+     * @since 1.0.0
      */
     public record EffectsExtras(
             Optional<BiomeSpecialEffects.GrassColorModifier> grassColorModifier,
@@ -87,6 +89,7 @@ public record AtmosphereOverride(
                 Music.CODEC.optionalFieldOf("music").forGetter(EffectsExtras::backgroundMusic)
         ).apply(i, EffectsExtras::new));
 
+        /** {@code true} when no extra effect is set — nothing is overridden. @since 1.0.0 */
         public boolean isNoOp() {
             return grassColorModifier.isEmpty() && ambientParticle.isEmpty()
                     && ambientLoopSound.isEmpty() && ambientMoodSound.isEmpty()
@@ -122,7 +125,7 @@ public record AtmosphereOverride(
                     .forGetter(AtmosphereOverride::mobSpawnCosts)
     ).apply(i, AtmosphereOverride::new));
 
-    /** {@code true} when every field is empty — biome's atmosphere stays untouched. */
+    /** {@code true} when every field is empty — biome's atmosphere stays untouched. @since 1.0.0 */
     public boolean isNoOp() {
         return hasPrecipitation.isEmpty() && temperature.isEmpty() && downfall.isEmpty()
                 && skyColor.isEmpty() && fogColor.isEmpty()

@@ -35,6 +35,7 @@ import java.util.Optional;
  *
  * <p>Vanilla colour encoding: 24-bit RGB packed as a single int (0xRRGGBB).
  * Fog distances are in blocks (vanilla overworld is roughly near=0, far=192 at clear weather).
+ * @since 1.1.0
  */
 public record ClientAtmosphereOverride(
         Optional<Integer> fogColor,
@@ -51,6 +52,7 @@ public record ClientAtmosphereOverride(
             Codec.FLOAT.optionalFieldOf("fog_far_distance").forGetter(ClientAtmosphereOverride::fogFarDistance)
     ).apply(i, ClientAtmosphereOverride::new));
 
+    /** {@code true} when no fog override is set — rendering is left to vanilla. @since 1.1.0 */
     public boolean isNoOp() {
         return fogColor.isEmpty() && fogNearDistance.isEmpty() && fogFarDistance.isEmpty();
     }

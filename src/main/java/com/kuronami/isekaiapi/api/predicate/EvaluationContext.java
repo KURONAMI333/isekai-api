@@ -29,24 +29,24 @@ import net.minecraft.world.level.material.Fluid;
  */
 public interface EvaluationContext {
 
-    /** The position being tested. */
+    /** The position being tested. @since 2.0.0 */
     BlockPos pos();
 
-    /** True when there is solid ground directly below {@link #pos()} and at least {@code minClearance} air above it. */
+    /** True when there is solid ground directly below {@link #pos()} and at least {@code minClearance} air above it. @since 2.0.0 */
     boolean solidFloor(int minClearance);
 
-    /** True when there is a solid ceiling directly above {@link #pos()} and at least {@code minClearance} air below it. */
+    /** True when there is a solid ceiling directly above {@link #pos()} and at least {@code minClearance} air below it. @since 2.0.0 */
     boolean solidCeiling(int minClearance);
 
-    /** True when {@link #pos()} is inside the given fluid. */
+    /** True when {@link #pos()} is inside the given fluid. @since 2.0.0 */
     boolean inFluid(Fluid fluid);
 
-    /** True when any block matching {@code targets} occurs within {@code maxDistance} of {@link #pos()}. */
+    /** True when any block matching {@code targets} occurs within {@code maxDistance} of {@link #pos()}. @since 2.0.0 */
     boolean nearBlock(HolderSet<Block> targets, int maxDistance);
 
-    /** True when a chunk whose biome is {@code biome} occurs within {@code maxDistance} of {@link #pos()}. */
+    /** True when a chunk whose biome is {@code biome} occurs within {@code maxDistance} of {@link #pos()}. @since 2.0.0 */
     boolean nearBiome(ResourceKey<Biome> biome, int maxDistance);
 
-    /** True when the local terrain slope at {@link #pos()} falls within {@code [minSlope, maxSlope]}. */
+    /** True when the local terrain slope at {@link #pos()} falls within {@code [minSlope, maxSlope]}. @since 2.0.0 */
     boolean terrainSlope(double minSlope, double maxSlope);
 }

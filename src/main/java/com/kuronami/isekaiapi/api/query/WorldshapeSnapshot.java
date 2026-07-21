@@ -12,6 +12,7 @@ import java.util.List;
  *
  * <p>Diagnostic-only: this view describes the input rules a remap would see, not the
  * post-modifier result that actually generates.
+ * @since 1.0.0
  */
 public record WorldshapeSnapshot(
         ResourceKey<Level> dimension,
@@ -25,6 +26,7 @@ public record WorldshapeSnapshot(
         mobs = List.copyOf(mobs);
     }
 
+    /** {@code true} when the snapshot holds no scanned features, structures, or mobs. @since 1.0.0 */
     public boolean isEmpty() {
         return placedFeatures.isEmpty() && structures.isEmpty() && mobs.isEmpty();
     }

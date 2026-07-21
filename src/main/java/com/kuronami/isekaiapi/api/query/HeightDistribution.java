@@ -8,6 +8,7 @@ import net.minecraft.util.StringRepresentable;
  * {@code HeightProvider} families: {@code uniform} (flat), {@code trapezoid} / {@code
  * triangle} (center-weighted), {@code biased_low} / {@code biased_high} (skewed toward one
  * end). Serialized via its lowercase name in JSON (e.g. {@code "distribution": "uniform"}).
+ * @since 1.0.0
  */
 public enum HeightDistribution implements StringRepresentable {
     UNIFORM("uniform"),
