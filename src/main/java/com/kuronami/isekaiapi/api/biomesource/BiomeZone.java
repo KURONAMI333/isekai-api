@@ -181,7 +181,7 @@ public interface BiomeZone {
 
     /**
      * Match where a {@link NormalNoise} sampled at the position exceeds {@code threshold}. The
-     * noise is built once at zone construction from a {@link NoiseParameters} ref + a
+     * noise is built once at zone construction from a {@link NormalNoise.NoiseParameters} ref + a
      * {@code seed} (so the pattern is deterministic and independent of the world seed — by
      * design, since {@code BiomeZone} has no access to world context). Use to introduce
      * organic, non-geometric biome borders.

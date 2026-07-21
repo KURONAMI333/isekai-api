@@ -235,7 +235,7 @@ public record WorldshapeDescriptor(
      * Convenience builder for Java consumers — avoids threading 14 positional arguments
      * through the canonical constructor and gives optional fields sensible defaults.
      * Required fields ({@code dimension}, {@code playableRange}, {@code surfaceAnchor},
-     * three strategies, {@code defaultStructurePredicate}) must be set before {@link #build}
+     * three strategies, {@code defaultStructurePredicate}) must be set before {@link Builder#build()}
      * is called; optional fields default to {@code Set.of()} / {@code Map.of()} / EMPTY
      * sub-records / {@link #DEFAULT_PRIORITY}.
      *

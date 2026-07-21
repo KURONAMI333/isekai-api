@@ -21,7 +21,12 @@ base {
     archivesName = mod_id
 }
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    // Ship source + javadoc jars so Java consumers get IDE navigation and inline docs.
+    withSourcesJar()
+    withJavadocJar()
+}
 
 neoForge {
     version = project.neo_version
@@ -110,12 +115,32 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
 sourceSets.main.resources.srcDir generateModMetadata
 neoForge.ideSyncTask generateModMetadata
 
-// Keep the GameTest harness out of the published library. The tests run from
-// build/classes during `runGameTestServer`, but the shipped jar must stay a pure
-// worldgen library — no test classes, no test structure template.
-tasks.named('jar', Jar) {
-    exclude 'com/kuronami/isekaiapi/gametest/**'
-    exclude 'data/isekai_api/structure/**'
+// Keep the GameTest harness out of every published jar. The tests run from
+// build/classes during `runGameTestServer`, but the shipped library must stay a pure
+// worldgen library — no test classes, no test structure template. The sources jar
+// archives allSource (java + resources), so it needs the same excludes as the main jar;
+// withSourcesJar()/withJavadocJar() do not inherit the main jar's filters.
+def testPayloadExcludes = { CopySpec spec ->
+    spec.exclude 'com/kuronami/isekaiapi/gametest/**'
+    spec.exclude 'data/isekai_api/structure/**'
+}
+tasks.named('jar', Jar) { testPayloadExcludes(it) }
+tasks.named('sourcesJar', Jar) { testPayloadExcludes(it) }
+
+// Consumers only ever touch the api/ package — everything else is @ApiStatus.Internal.
+// Scope javadoc (and thus the javadoc jar) to api/ only: this keeps the published docs
+// to the supported surface and keeps the GameTest sources out of the doc pass. The full
+// compile classpath stays available so api/ signatures referencing Mojang/NeoForge types
+// resolve. External -link is left off (offline, and Mojang publishes no javadoc).
+tasks.named('javadoc', Javadoc) {
+    source = sourceSets.main.allJava.matching {
+        include 'com/kuronami/isekaiapi/api/**'
+    }
+    options.encoding = 'UTF-8'
+    // all doclint checks (broken {@link}, malformed HTML, bad references) except
+    // "missing" — a public worldgen library does not carry a @param for every record
+    // component; class- and method-level prose carries the contract instead.
+    options.addStringOption('Xdoclint:all,-missing', '-quiet')
 }
 
 publishing {
