@@ -17,17 +17,18 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  * a {@code "type"} field, e.g. {@code {"type": "isekai_api:blend", "blend_height": 4}}. The legacy
  * {@code isekai:} prefix is accepted as a deprecated alias.
  *
+ * @since 1.0.0
  */
 public interface TransitionRule {
 
-    /** This variant's payload codec (no {@code "type"} field); must be the registered instance. */
+    /** This variant's payload codec (no {@code "type"} field); must be the registered instance. @since 1.0.0 */
     MapCodec<? extends TransitionRule> codec();
 
     /** Dispatching codec keyed on a {@code "type"} field, backed by the TransitionRule registry. */
     Codec<TransitionRule> CODEC = IsekaiDispatch.dispatchCodec(
             IsekaiSpiTypes.TRANSITION_RULE_REGISTRY, TransitionRule::codec, "TransitionRule");
 
-    /** Adjacent layers butt-join at the boundary Y. */
+    /** Adjacent layers butt-join at the boundary Y. @since 1.0.0 */
     record Hard() implements TransitionRule {
         public static final Hard INSTANCE = new Hard();
         public static final MapCodec<Hard> MAP_CODEC = MapCodec.unit(INSTANCE);
@@ -35,7 +36,7 @@ public interface TransitionRule {
         @Override public MapCodec<? extends TransitionRule> codec() { return MAP_CODEC; }
     }
 
-    /** Smoothly blend layers over {@code blendHeight} blocks. */
+    /** Smoothly blend layers over {@code blendHeight} blocks. @since 1.0.0 */
     record Blend(int blendHeight) implements TransitionRule {
         public Blend {
             if (blendHeight < 0) throw new IllegalArgumentException("blendHeight < 0");
@@ -47,7 +48,7 @@ public interface TransitionRule {
         @Override public MapCodec<? extends TransitionRule> codec() { return MAP_CODEC; }
     }
 
-    /** Insert {@code gapHeight} blocks of empty space between layers. */
+    /** Insert {@code gapHeight} blocks of empty space between layers. @since 1.0.0 */
     record Gap(int gapHeight) implements TransitionRule {
         public Gap {
             if (gapHeight < 0) throw new IllegalArgumentException("gapHeight < 0");

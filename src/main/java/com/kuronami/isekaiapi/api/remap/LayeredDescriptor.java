@@ -7,6 +7,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 /**
  * One layer in a multi-layer worldshape. Layers stack along Y; the consumer-supplied
  * {@link WorldshapeDescriptor} controls remap behavior within {@code yRange}.
+ * @since 1.0.0
  */
 public record LayeredDescriptor(
         VerticalRange yRange,

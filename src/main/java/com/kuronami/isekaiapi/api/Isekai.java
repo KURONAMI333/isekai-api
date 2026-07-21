@@ -21,15 +21,18 @@ import com.kuronami.isekaiapi.impl.IsekaiInternal;
  * appliers, and the structure-placement Mixin) lives in
  * {@code com.kuronami.isekaiapi.impl.IsekaiInternal}, not here. The public surface stays
  * minimal: query + remap.
+ * @since 1.0.0
  */
 public final class Isekai {
 
     private Isekai() {}
 
+    /** Read-only access to vanilla + modded worldgen rules. @since 1.0.0 */
     public static IsekaiQuery query() {
         return IsekaiInternal.query();
     }
 
+    /** Declare and inspect worldshape transformations. @since 1.0.0 */
     public static IsekaiRemap remap() {
         return IsekaiInternal.remap();
     }

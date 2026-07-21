@@ -52,16 +52,18 @@ import java.util.List;
  *   <li>{@code edge_jitter} — perturbs the test coordinate by a small noise offset before delegating to {@code inner}.</li>
  * </ul>
  *
+ * @since 1.0.0
  */
 public interface BiomeZone {
 
     /**
      * Test this zone at a biome-grid position. {@code quartX/Y/Z} are quart coordinates
      * (block &gt;&gt; 2); implementations convert to block coordinates as needed.
+     * @since 1.0.0
      */
     boolean test(int quartX, int quartY, int quartZ);
 
-    /** This variant's payload codec (no {@code "type"} field); must be the registered instance. */
+    /** This variant's payload codec (no {@code "type"} field); must be the registered instance. @since 1.0.0 */
     MapCodec<? extends BiomeZone> codec();
 
     /** Nested zones, for tree-walking. Empty for leaf variants. @since 2.0.0 */
@@ -73,12 +75,14 @@ public interface BiomeZone {
 
     // --- variants ---
 
+    /** Matches everywhere. Use as the catch-all last entry. @since 1.0.0 */
     record Always() implements BiomeZone {
         public static final MapCodec<Always> MAP_CODEC = MapCodec.unit(Always::new);
         @Override public boolean test(int x, int y, int z) { return true; }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
     }
 
+    /** Matches where block Y &ge; {@code y}. @since 1.0.0 */
     record YAbove(int y) implements BiomeZone {
         public static final MapCodec<YAbove> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 Codec.INT.fieldOf("y").forGetter(YAbove::y)).apply(i, YAbove::new));
@@ -86,6 +90,7 @@ public interface BiomeZone {
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
     }
 
+    /** Matches where block Y &lt; {@code y}. @since 1.0.0 */
     record YBelow(int y) implements BiomeZone {
         public static final MapCodec<YBelow> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 Codec.INT.fieldOf("y").forGetter(YBelow::y)).apply(i, YBelow::new));
@@ -93,6 +98,7 @@ public interface BiomeZone {
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
     }
 
+    /** Matches where {@code min} &le; block Y &lt; {@code max}. @since 1.0.0 */
     record YBetween(int min, int max) implements BiomeZone {
         public YBetween {
             if (min >= max) throw new IllegalArgumentException(
@@ -108,6 +114,7 @@ public interface BiomeZone {
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
     }
 
+    /** Matches within {@code radius} of {@code (centerX, centerZ)} in the XZ plane. @since 1.0.0 */
     record WithinDistance(double radius, int centerX, int centerZ) implements BiomeZone {
         public WithinDistance {
             if (radius < 0) throw new IllegalArgumentException(
@@ -126,6 +133,7 @@ public interface BiomeZone {
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
     }
 
+    /** Matches beyond {@code radius} of {@code (centerX, centerZ)} in the XZ plane. @since 1.0.0 */
     record BeyondDistance(double radius, int centerX, int centerZ) implements BiomeZone {
         public BeyondDistance {
             if (radius < 0) throw new IllegalArgumentException(
@@ -144,6 +152,7 @@ public interface BiomeZone {
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
     }
 
+    /** Matches where all inner zones match. @since 1.0.0 */
     record And(List<BiomeZone> all) implements BiomeZone {
         public And { all = List.copyOf(all); }
         public static final MapCodec<And> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
@@ -157,6 +166,7 @@ public interface BiomeZone {
         @Override public List<BiomeZone> children() { return all; }
     }
 
+    /** Matches where any inner zone matches. @since 1.0.0 */
     record Or(List<BiomeZone> any) implements BiomeZone {
         public Or { any = List.copyOf(any); }
         public static final MapCodec<Or> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
@@ -170,6 +180,7 @@ public interface BiomeZone {
         @Override public List<BiomeZone> children() { return any; }
     }
 
+    /** Matches where the inner zone does not match. @since 1.0.0 */
     record Not(BiomeZone inner) implements BiomeZone {
         public static final MapCodec<Not> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 Codec.lazyInitialized(() -> CODEC).fieldOf("inner").forGetter(Not::inner))
@@ -188,6 +199,7 @@ public interface BiomeZone {
      *
      * <p>{@code size_xz} / {@code size_y} are 1/scale factors applied to the sampled block
      * coordinate — bigger values produce wider noise features.
+     * @since 1.0.0
      */
     record NoiseThreshold(Holder<NormalNoise.NoiseParameters> noise, long seed, double threshold,
                           double sizeXz, double sizeY, NormalNoise sampler) implements BiomeZone {
@@ -220,6 +232,7 @@ public interface BiomeZone {
      *
      * <p>Like {@link NoiseThreshold} the jitter noise is deterministic from a fixed
      * {@code seed} (no world context available).
+     * @since 1.0.0
      */
     record EdgeJitter(BiomeZone inner, Holder<NormalNoise.NoiseParameters> noise, long seed,
                       double strength, double sizeXz, NormalNoise xSampler, NormalNoise zSampler)

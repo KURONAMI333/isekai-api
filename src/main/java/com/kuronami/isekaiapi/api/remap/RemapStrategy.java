@@ -26,10 +26,11 @@ import java.util.List;
  * report any density multiplier via {@link #countFactor()} (default 1.0), and expose nested
  * strategies via {@link #children()} (default empty).
  *
+ * @since 1.0.0
  */
 public interface RemapStrategy {
 
-    /** This variant's payload codec (no {@code "type"} field); must be the registered instance. */
+    /** This variant's payload codec (no {@code "type"} field); must be the registered instance. @since 1.0.0 */
     MapCodec<? extends RemapStrategy> codec();
 
     /**
@@ -48,7 +49,7 @@ public interface RemapStrategy {
     Codec<RemapStrategy> CODEC = IsekaiDispatch.dispatchCodec(
             IsekaiSpiTypes.REMAP_STRATEGY_REGISTRY, RemapStrategy::codec, "RemapStrategy");
 
-    /** Proportional linear scale from vanilla [a,b] into target [a',b']. */
+    /** Proportional linear scale from vanilla [a,b] into target [a',b']. @since 1.0.0 */
     record Linear() implements RemapStrategy {
         public static final Linear INSTANCE = new Linear();
         public static final MapCodec<Linear> MAP_CODEC = MapCodec.unit(INSTANCE);
@@ -80,6 +81,7 @@ public interface RemapStrategy {
      *   ]
      * }
      * }</pre>
+     * @since 1.0.0
      */
     record BandSplit(List<Band> bands) implements RemapStrategy {
         public BandSplit {
@@ -141,7 +143,7 @@ public interface RemapStrategy {
             return new VerticalRange(newMin, newMax, original.distribution());
         }
 
-        /** One band in a {@link BandSplit}: a vanilla source range + its target ratio. */
+        /** One band in a {@link BandSplit}: a vanilla source range + its target ratio. @since 1.0.0 */
         public record Band(com.kuronami.isekaiapi.api.query.VerticalRange vanillaSource, float targetRatio) {
             public Band {
                 if (targetRatio < 0) {
@@ -155,7 +157,7 @@ public interface RemapStrategy {
         }
     }
 
-    /** Hard-coded target range, ignoring vanilla. */
+    /** Hard-coded target range, ignoring vanilla. @since 1.0.0 */
     record FixedRange(int min, int max, HeightDistribution dist) implements RemapStrategy {
         public FixedRange {
             if (min > max) throw new IllegalArgumentException("min > max");
@@ -172,7 +174,7 @@ public interface RemapStrategy {
         }
     }
 
-    /** Axis flip: vanilla low maps to target high and vice versa. */
+    /** Axis flip: vanilla low maps to target high and vice versa. @since 1.0.0 */
     record Inverted() implements RemapStrategy {
         public static final Inverted INSTANCE = new Inverted();
         public static final MapCodec<Inverted> MAP_CODEC = MapCodec.unit(INSTANCE);
@@ -187,7 +189,7 @@ public interface RemapStrategy {
         }
     }
 
-    /** Scale the count/density of generated features by {@code factor} (1.0 = unchanged). */
+    /** Scale the count/density of generated features by {@code factor} (1.0 = unchanged). @since 1.0.0 */
     record CountScale(double factor) implements RemapStrategy {
         public CountScale {
             if (factor < 0) throw new IllegalArgumentException("factor < 0");
@@ -202,7 +204,7 @@ public interface RemapStrategy {
         @Override public double countFactor() { return factor; }
     }
 
-    /** Identity mapping: pass through vanilla unchanged. */
+    /** Identity mapping: pass through vanilla unchanged. @since 1.0.0 */
     record Identity() implements RemapStrategy {
         public static final Identity INSTANCE = new Identity();
         public static final MapCodec<Identity> MAP_CODEC = MapCodec.unit(INSTANCE);
@@ -211,7 +213,7 @@ public interface RemapStrategy {
         @Override public VerticalRange remap(VerticalRange original, RemapContext ctx) { return original; }
     }
 
-    /** Apply chain in order, each operating on the previous result. Must be non-empty. */
+    /** Apply chain in order, each operating on the previous result. Must be non-empty. @since 1.0.0 */
     record Pipe(List<RemapStrategy> chain) implements RemapStrategy {
         public Pipe {
             chain = List.copyOf(chain);

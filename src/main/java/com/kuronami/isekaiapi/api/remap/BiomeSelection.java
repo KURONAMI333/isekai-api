@@ -31,6 +31,7 @@ import java.util.Set;
  *
  * <p>Empty selection matches no biome (explicit-opt-in semantics — see
  * {@link com.kuronami.isekaiapi.biomemodifier.phase.BiomeMatcher} for rationale).
+ * @since 1.0.0
  */
 public record BiomeSelection(Set<ResourceKey<Biome>> keys, Set<TagKey<Biome>> tags) {
 
@@ -41,19 +42,22 @@ public record BiomeSelection(Set<ResourceKey<Biome>> keys, Set<TagKey<Biome>> ta
 
     public static final BiomeSelection EMPTY = new BiomeSelection(Set.of(), Set.of());
 
+    /** Selection matching the given biome keys and no tags. @since 1.0.0 */
     public static BiomeSelection ofKeys(Set<ResourceKey<Biome>> keys) {
         return new BiomeSelection(keys, Set.of());
     }
 
+    /** Selection matching the given biome tags and no explicit keys. @since 1.0.0 */
     public static BiomeSelection ofTags(Set<TagKey<Biome>> tags) {
         return new BiomeSelection(Set.of(), tags);
     }
 
+    /** True when neither keys nor tags are set (matches no biome). @since 1.0.0 */
     public boolean isEmpty() {
         return keys.isEmpty() && tags.isEmpty();
     }
 
-    /** Match a {@link Holder Biome holder} against this selection. */
+    /** Match a {@link Holder Biome holder} against this selection. @since 1.0.0 */
     public boolean matches(Holder<Biome> biome) {
         for (var key : keys) {
             if (biome.is(key)) return true;

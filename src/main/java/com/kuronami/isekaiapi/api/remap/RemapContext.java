@@ -17,6 +17,7 @@ public record RemapContext(VerticalRange playable, int worldBottom, int worldTop
      * vanilla Y=10..30 within world -64..320 keeps its proportional position and width when
      * placed into the playable range. Shared by {@code Linear}, {@code Inverted}, and the
      * {@code BandSplit} out-of-band fallback.
+     * @since 2.0.0
      */
     public VerticalRange linearScale(VerticalRange original) {
         int worldSpan = worldTop - worldBottom;
