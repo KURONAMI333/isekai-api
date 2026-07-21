@@ -1,7 +1,68 @@
 # Changelog
 
 All notable changes to Isekai API follow this file. Format roughly follows
-[Keep a Changelog](https://keepachangelog.com/).
+[Keep a Changelog](https://keepachangelog.com/). Compatibility policy — how datapack
+and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
+
+## [2.0.0] — 2026-07-22
+
+The rule-adaptation layer becomes an open extension point, terrain shape gets a
+copy-free hook mechanism, and the library ships as a proper Gradle dependency.
+
+**Datapacks are unaffected.** Every 1.x datapack loads unchanged: the `isekai:`
+dispatch prefix is accepted as a deprecated alias (logs one warning per id), and all
+existing payload schemas are byte-for-byte compatible. The breaking changes are on the
+**Java API** only (see below) — this is a major bump because the SPI interfaces changed
+shape, not because datapacks broke.
+
+### Breaking (Java API)
+
+The five in-house dispatch interfaces — `SpatialPredicate`, `RemapStrategy`, `BiomeZone`,
+`SurfaceAnchor`, `TransitionRule` — are now **registry-backed extension points** instead of
+`sealed` codec unions:
+
+- `sealed` is removed from all five. Exhaustive `switch` statements over their variants no
+  longer compile — handle them through their behavior methods or a `default` branch.
+- `String typeId()` is **removed** from all five. To recover a variant's registered id, ask
+  the registry: `registry.getKey(variant.codec())`. The registry keys live in
+  `api/registry/IsekaiRegistries`.
+- New abstract methods carry each interface's evaluation contract:
+  `SpatialPredicate.test(EvaluationContext)`, `RemapStrategy.remap(VerticalRange, RemapContext)`,
+  `SurfaceAnchor.resolveY(PlacementContext, BlockPos)`. Custom Java implementations must
+  supply them.
+
+Datapack authors and consumers who only use the built-in variants from JSON are unaffected.
+
+### Added
+
+- **Open SPI.** Third parties register their own variant of any of the five interfaces from
+  their own mod id by adding a `MapCodec` to the matching registry in
+  `api/registry/IsekaiRegistries` — no fork, no PR. See
+  [docs/DATAPACK_REFERENCE.md](docs/DATAPACK_REFERENCE.md) → "Extending the SPI".
+- `api/predicate/EvaluationContext` and `api/remap/RemapContext` — the world-access and
+  math seams that variant `test` / `remap` implementations receive.
+- **`isekai_api:hooked_overworld` preset + `hook/final_density` density function.** A new
+  dimension references the preset and overrides one small hook file to change terrain shape —
+  no 2500-line `noise_settings` copy. A whole floating-island world is two files.
+  ([README](README.md#quick-start--a-floating-island-world-in-2-files))
+- **`isekai_api:vanilla_overworld_surface`** — a delegate `SurfaceRules.RuleSource` that
+  reproduces the vanilla overworld surface rule, so overworld-replacement datapacks skip the
+  30 KB surface-rule copy.
+- **Distribution as a Gradle dependency**: `sources` and `javadoc` jars, and a maven repo.
+  See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md#depending-on-isekai-api).
+
+### Changed
+
+- **Dispatch prefix unified to `isekai_api:`.** All `"type"` values normalise to the
+  `isekai_api` namespace; docs and examples use it throughout.
+- Inline `apply_worldshape` / `apply_worldshape_structures` modifier forms are superseded by
+  the `_ref` forms.
+
+### Deprecated
+
+- The bare `isekai:` dispatch prefix — accepted with a one-time warning, **removed in the
+  next major**. Rewrite `"type": "isekai:*"` to `"type": "isekai_api:*"`.
+- Inline modifier forms — use the `_ref` forms. Same one-major grace.
 
 ## [1.1.0] — 2026-06-02
 
