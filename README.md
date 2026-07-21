@@ -81,12 +81,13 @@ Registered under the `isekai_api:` namespace (mod id), usable from `noise_settin
 | Masks | `mask_y_range` |
 | **Worldshape composers** | `squeeze`, `y_envelope`, `blended_noise`, `band_density`, `sloped_density` |
 
-The four worldshape composers build common terrain patterns without leaking consumer-theme names into the API:
+The five worldshape composers build common terrain patterns without leaking consumer-theme names into the API:
 
 - **`squeeze`** — vanilla tone-mapping (`x/2 - x^3/24` clamped to [-1, 1]). Re-implementation because `DensityFunctions.Mapped.Type` is package-private and unreachable from outside.
 - **`y_envelope(active_min_y, active_max_y, gradient_width, invert)`** — pure Y-axis mask. Returns 1 inside the active band, 0 outside, linear ramp through `gradient_width`. `invert: true` flips polarity (1 outside, 0 inside) — foundation for hollow-shell / inverted worlds.
 - **`blended_noise(size_xz, size_y, smear_multiplier)`** — `old_blended_noise` wrapper with `xz_scale`/`y_scale` fixed at 0.25. Bigger `size_xz` = chunkier terrain blobs; bigger `size_y` = taller ones.
 - **`band_density(active_min_y, active_max_y, gradient_width, invert, noise)`** — composer that takes any noise source and an active Y-band, wraps it in the standard `(-0.05 + -0.1 + mul(y_envelope, ...) + ...)` tree, then `blend_density` + `interpolated`. Drop in your noise via the `noise` field; wrap the result in `minecraft:squeeze` for the final tone.
+- **`sloped_density(depth_field, factor, base_noise)`** — emits the vanilla `sloped_cheese` shape `add(mul(4, quarter_negative(mul(depth_field, factor))), base_noise)` from neutral inputs, encapsulating the anti-terracing knowledge (full-weight 3D base noise) without theme vocabulary.
 
 Vanilla density functions stay accessible via standard `minecraft:` keys — Isekai does not re-export them. Compose Isekai primitives with vanilla density via standard density function references.
 
@@ -101,9 +102,9 @@ Density functions decide the *shape* of terrain; the biome source decides *which
 {
   "type": "isekai_api:rule",
   "rules": [
-    { "biome": "minecraft:plains",     "zone": { "type": "isekai:y_above", "y": 100 } },
-    { "biome": "minecraft:deep_dark",  "zone": { "type": "isekai:y_below", "y": 0 } },
-    { "biome": "minecraft:basalt_deltas", "zone": { "type": "isekai:always" } }   // catch-all last
+    { "biome": "minecraft:plains",     "zone": { "type": "isekai_api:y_above", "y": 100 } },
+    { "biome": "minecraft:deep_dark",  "zone": { "type": "isekai_api:y_below", "y": 0 } },
+    { "biome": "minecraft:basalt_deltas", "zone": { "type": "isekai_api:always" } }   // catch-all last
   ]
 }
 ```
@@ -112,15 +113,15 @@ Density functions decide the *shape* of terrain; the biome source decides *which
 
 | Variant | Payload | Matches |
 |---|---|---|
-| `isekai:always` | — | everywhere (use as the catch-all last entry) |
-| `isekai:y_above` | `{ y }` | block Y ≥ y |
-| `isekai:y_below` | `{ y }` | block Y < y |
-| `isekai:y_between` | `{ min, max }` | min ≤ block Y < max |
-| `isekai:within_distance` | `{ radius, [center_x], [center_z] }` | XZ distance from center ≤ radius |
-| `isekai:beyond_distance` | `{ radius, [center_x], [center_z] }` | XZ distance > radius |
-| `isekai:and` | `{ all: [...] }` | all inner zones match |
-| `isekai:or` | `{ any: [...] }` | any inner zone matches |
-| `isekai:not` | `{ inner }` | inner zone does not match |
+| `isekai_api:always` | — | everywhere (use as the catch-all last entry) |
+| `isekai_api:y_above` | `{ y }` | block Y ≥ y |
+| `isekai_api:y_below` | `{ y }` | block Y < y |
+| `isekai_api:y_between` | `{ min, max }` | min ≤ block Y < max |
+| `isekai_api:within_distance` | `{ radius, [center_x], [center_z] }` | XZ distance from center ≤ radius |
+| `isekai_api:beyond_distance` | `{ radius, [center_x], [center_z] }` | XZ distance > radius |
+| `isekai_api:and` | `{ all: [...] }` | all inner zones match |
+| `isekai_api:or` | `{ any: [...] }` | any inner zone matches |
+| `isekai_api:not` | `{ inner }` | inner zone does not match |
 
 This makes arbitrary biome distributions expressible from datapack: vertical layers, concentric rings, half-and-half regions, etc.
 
@@ -208,15 +209,15 @@ Sky / cloud / weather / sun / moon rendering remain hardcoded by vanilla; reachi
 "applies_to": { "tags": ["#minecraft:is_overworld"] }
 ```
 
-### Rule adaptation layer (sealed dispatch codecs)
+### Rule adaptation layer (registry-backed extension points)
 
-Five in-house sealed interfaces let you adapt vanilla / modded rules to your worldshape — composable, no specific worldshape committed to the API surface. Each dispatches via a `"type"` field in JSON; the dispatch keys use the bare `isekai:` prefix (these are in-house codecs, not registry-backed types):
+Five composable interfaces let you adapt vanilla / modded rules to your worldshape — no specific worldshape committed to the API surface. Each dispatches on a `"type"` field under the `isekai_api:` namespace, backed by an Isekai custom registry, so a third-party mod can register its own variant from its own mod id (see [Extending the SPI](docs/DATAPACK_REFERENCE.md#extending-the-spi--register-your-own-variant)). The legacy bare `isekai:` prefix is accepted as a deprecated alias.
 
-- **`SpatialPredicate`** (12 records) — `YInRange` / `SolidFloor` / `SolidCeiling` / `TerrainSlope` / `NearBlock` (HolderSet, tag-aware) / `NearBiome` / `InFluid` / `Always` / `Never` plus combinators `And` / `Or` / `Not`. Compose arbitrary structure placement conditions.
-- **`RemapStrategy`** (7 variants) — `Identity` / `Linear` / `Inverted` / `FixedRange` / `CountScale` / `BandSplit(List<Band>)` / `Pipe(List<RemapStrategy>)`. Map vanilla Y bands and feature counts onto your playable range. Every variant is JSON-encodable.
-- **`SurfaceAnchor`** (3 variants) — `WorldSurface` / `BelowFluid(fluid)` / `FixedY(y)`. Defines what "the surface" means in your worldshape.
+- **`SpatialPredicate`** (12 built-in records) — `YInRange` / `SolidFloor` / `SolidCeiling` / `TerrainSlope` / `NearBlock` (HolderSet, tag-aware) / `NearBiome` / `InFluid` / `Always` / `Never` plus combinators `And` / `Or` / `Not`. Compose arbitrary structure placement conditions.
+- **`RemapStrategy`** (7 built-in variants) — `Identity` / `Linear` / `Inverted` / `FixedRange` / `CountScale` / `BandSplit(List<Band>)` / `Pipe(List<RemapStrategy>)`. Map vanilla Y bands and feature counts onto your playable range. Every variant is JSON-encodable.
+- **`SurfaceAnchor`** (3 built-in variants) — `WorldSurface` / `BelowFluid(fluid)` / `FixedY(y)`. Defines what "the surface" means in your worldshape.
 - **`TransitionRule`** — `Hard` / `Blend(blend_height)` / `Gap(gap_height)` for multi-layer worldshapes.
-- **`BiomeZone`** (11 variants) — the biome-placement conditions used by the `isekai_api:rule` biome source (see above): `always` / `y_above` / `y_below` / `y_between` / `within_distance` / `beyond_distance` / `noise_threshold` (organic noise mask) / `edge_jitter` (perturbs an inner zone's borders with a small noise offset) plus combinators `and` / `or` / `not`.
+- **`BiomeZone`** (11 built-in variants) — the biome-placement conditions used by the `isekai_api:rule` biome source (see above): `always` / `y_above` / `y_below` / `y_between` / `within_distance` / `beyond_distance` / `noise_threshold` (organic noise mask) / `edge_jitter` (perturbs an inner zone's borders with a small noise offset) plus combinators `and` / `or` / `not`.
 
 ### Biome / Structure modifier integration
 
@@ -229,16 +230,16 @@ Datapack consumers don't need to write any Java. Drop a worldshape descriptor in
   "worldshape": {
     "dimension": "minecraft:overworld",
     "playable_range": { "min_y": 80, "max_y": 200, "distribution": "uniform" },
-    "surface_anchor": { "type": "isekai:fixed_y", "y": 150 },
-    "ore_strategy": { "type": "isekai:linear" },
-    "structure_strategy": { "type": "isekai:identity" },
-    "mob_spawn_strategy": { "type": "isekai:identity" },
+    "surface_anchor": { "type": "isekai_api:fixed_y", "y": 150 },
+    "ore_strategy": { "type": "isekai_api:linear" },
+    "structure_strategy": { "type": "isekai_api:identity" },
+    "mob_spawn_strategy": { "type": "isekai_api:identity" },
     "mob_spawn_strategy_by_category": {
-      "creature": { "type": "isekai:count_scale", "factor": 1.5 },
-      "monster":  { "type": "isekai:count_scale", "factor": 0.25 }
+      "creature": { "type": "isekai_api:count_scale", "factor": 1.5 },
+      "monster":  { "type": "isekai_api:count_scale", "factor": 0.25 }
     },
     "default_structure_predicate": {
-      "type": "isekai:y_in_range", "min": 80, "max": 200
+      "type": "isekai_api:y_in_range", "min": 80, "max": 200
     },
     "applies_to": ["minecraft:plains"],
     "exclusions": {
@@ -324,7 +325,9 @@ All subcommands require permission level 2 (operators).
 ./gradlew build
 ```
 
-Produces `build/libs/isekai_api-1.0.0.jar`.
+Produces `build/libs/isekai_api-2.0.0.jar` plus matching `-sources` and `-javadoc` jars.
+For consuming the library in another mod, see
+[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md#depending-on-isekai-api).
 
 ## Examples
 
@@ -343,8 +346,8 @@ Produces `build/libs/isekai_api-1.0.0.jar`.
 | Pack | Demonstrates |
 |---|---|
 | `declaration_only/skyland_minimal/` | Smallest valid single-layer descriptor |
-| `declaration_only/underground_only/` | `isekai:pipe` of `inverted` + `linear`, AND-composed structure predicate |
-| `declaration_only/layered_overworld/` | Two-layer stack with `isekai:blend` transition |
+| `declaration_only/underground_only/` | `isekai_api:pipe` of `inverted` + `linear`, AND-composed structure predicate |
+| `declaration_only/layered_overworld/` | Two-layer stack with `isekai_api:blend` transition |
 | `runtime_effects/biome_modifier_demo/` | REMOVE-phase demo (strips lava lakes from desert biomes) |
 | `runtime_effects/no_villages/` | Structure modifier disabling all five village variants |
 | `runtime_effects/peaceful_plains/` | Per-category mob spawn (creature 1.5×, monster 0.25× in plains) |
@@ -355,7 +358,7 @@ See `examples/README.md` for the layout and `docs/DATAPACK_REFERENCE.md` for eve
 
 A *universal* worldgen library has to be a small set of primitives you can combine to express *any* worldshape — including ones nobody has thought of yet. Naming primitives after specific use cases (`floating_island`, `tall_mountain`, etc.) freezes the design around those use cases and quietly excludes everything else.
 
-Isekai ships 16 mathematical primitives instead of named helpers. Every consumer — whether a worldshape built by the author or by any third-party modder — expresses its world using only those primitives, with the same expressive power.
+Isekai ships neutral mathematical primitives instead of named helpers. Every consumer — whether a worldshape built by the author or by any third-party modder — expresses its world using only those primitives, with the same expressive power.
 
 ## License
 

@@ -411,6 +411,59 @@ The legacy `isekai:` prefix is accepted as a deprecated alias.
 
 ---
 
+## Extending the SPI — register your own variant
+
+Each of the five dispatch types (`SpatialPredicate`, `RemapStrategy`, `BiomeZone`,
+`SurfaceAnchor`, `TransitionRule`) is a NeoForge custom registry of `MapCodec`s, so any mod can
+add a variant from its own mod id without a fork or PR. The registry keys are in
+`com.kuronami.isekaiapi.api.registry.IsekaiRegistries`. Three steps:
+
+**1. Implement the interface.** Return your payload `MapCodec` from `codec()` and implement the
+evaluation method. A leaf `SpatialPredicate` matching even-X positions:
+
+```java
+public record XParityPredicate() implements SpatialPredicate {
+    public static final MapCodec<XParityPredicate> MAP_CODEC = MapCodec.unit(new XParityPredicate());
+
+    @Override public boolean test(EvaluationContext ctx) { return (ctx.pos().getX() & 1) == 0; }
+    @Override public MapCodec<? extends SpatialPredicate> codec() { return MAP_CODEC; }
+}
+```
+
+`EvaluationContext` is the world-access seam: `pos()`, `solidFloor(n)`, `inFluid(f)`,
+`nearBlock(set, d)`, `nearBiome(key, d)`, `terrainSlope(min, max)`. `RemapStrategy` receives a
+`RemapContext` and returns a remapped `VerticalRange`; `BiomeZone.test(x, y, z)` takes bare
+coordinates; `SurfaceAnchor.resolveY(ctx, pos)` returns a Y or `null`.
+
+**2. Register the codec** on your mod's `RegisterEvent` (MOD bus), under the matching key:
+
+```java
+@EventBusSubscriber(modid = "yourmod", bus = EventBusSubscriber.Bus.MOD)
+public final class YourSpiTypes {
+    @SubscribeEvent
+    static void onRegister(RegisterEvent event) {
+        event.register(IsekaiRegistries.SPATIAL_PREDICATE_TYPE,
+                ResourceLocation.fromNamespaceAndPath("yourmod", "x_parity"),
+                () -> XParityPredicate.MAP_CODEC);
+    }
+}
+```
+
+**3. Use it from JSON** anywhere the type is accepted — dispatched by its registered id, and
+composable with the built-ins:
+
+```json
+{ "type": "isekai_api:and", "all": [
+  { "type": "yourmod:x_parity" },
+  { "type": "isekai_api:y_in_range", "min": 60, "max": 200 }
+] }
+```
+
+That is the entire footprint — Isekai's own code holds no reference to your variant; registry
+membership alone makes it decodable and evaluable.
+
+---
+
 ## WorldshapeDescriptor (the `isekai/worldshape/*.json` body)
 
 ```jsonc
