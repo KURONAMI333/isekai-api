@@ -1,6 +1,7 @@
 package com.kuronami.isekaiapi.registry;
 
 import com.kuronami.isekaiapi.IsekaiApi;
+import com.kuronami.isekaiapi.api.biomesource.BiomeZone;
 import com.kuronami.isekaiapi.api.predicate.SpatialPredicate;
 import com.kuronami.isekaiapi.api.registry.IsekaiRegistries;
 import com.kuronami.isekaiapi.api.remap.RemapStrategy;
@@ -68,6 +69,28 @@ public final class IsekaiSpiTypes {
         REMAP_STRATEGY_TYPES.register("pipe",        () -> RemapStrategy.Pipe.MAP_CODEC);
     }
 
+    // ---- BiomeZone -------------------------------------------------------
+
+    public static final DeferredRegister<MapCodec<? extends BiomeZone>> BIOME_ZONE_TYPES =
+            DeferredRegister.create(IsekaiRegistries.BIOME_ZONE_TYPE, IsekaiApi.MODID);
+
+    public static final Supplier<Registry<MapCodec<? extends BiomeZone>>> BIOME_ZONE_REGISTRY =
+            BIOME_ZONE_TYPES.getRegistry();
+
+    static {
+        BIOME_ZONE_TYPES.register("always",          () -> BiomeZone.Always.MAP_CODEC);
+        BIOME_ZONE_TYPES.register("y_above",         () -> BiomeZone.YAbove.MAP_CODEC);
+        BIOME_ZONE_TYPES.register("y_below",         () -> BiomeZone.YBelow.MAP_CODEC);
+        BIOME_ZONE_TYPES.register("y_between",       () -> BiomeZone.YBetween.MAP_CODEC);
+        BIOME_ZONE_TYPES.register("within_distance", () -> BiomeZone.WithinDistance.MAP_CODEC);
+        BIOME_ZONE_TYPES.register("beyond_distance", () -> BiomeZone.BeyondDistance.MAP_CODEC);
+        BIOME_ZONE_TYPES.register("and",             () -> BiomeZone.And.MAP_CODEC);
+        BIOME_ZONE_TYPES.register("or",              () -> BiomeZone.Or.MAP_CODEC);
+        BIOME_ZONE_TYPES.register("not",             () -> BiomeZone.Not.MAP_CODEC);
+        BIOME_ZONE_TYPES.register("noise_threshold", () -> BiomeZone.NoiseThreshold.MAP_CODEC);
+        BIOME_ZONE_TYPES.register("edge_jitter",     () -> BiomeZone.EdgeJitter.MAP_CODEC);
+    }
+
     /**
      * Create all five custom registries and wire their population onto the mod event bus.
      * {@code makeRegistry} must run before {@code NewRegistryEvent}; calling it here (from the
@@ -80,6 +103,9 @@ public final class IsekaiSpiTypes {
         REMAP_STRATEGY_TYPES.makeRegistry(b -> b.sync(false));
         REMAP_STRATEGY_TYPES.register(modBus);
 
-        IsekaiApi.LOGGER.info("[Isekai] SPI type registries created (spatial_predicate, remap_strategy)");
+        BIOME_ZONE_TYPES.makeRegistry(b -> b.sync(false));
+        BIOME_ZONE_TYPES.register(modBus);
+
+        IsekaiApi.LOGGER.info("[Isekai] SPI type registries created (spatial_predicate, remap_strategy, biome_zone)");
     }
 }
