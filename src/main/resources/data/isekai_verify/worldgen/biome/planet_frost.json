@@ -1,0 +1,22 @@
+{
+  "has_precipitation": false,
+  "temperature": -0.5,
+  "downfall": 0.0,
+  "effects": {
+    "fog_color": 723723,
+    "sky_color": 0,
+    "water_color": 4020182,
+    "water_fog_color": 329011
+  },
+  "carvers": {},
+  "features": [
+    [], [], [], [], [], [],
+    [
+      "minecraft:ore_diamond",
+      "minecraft:ore_lapis"
+    ],
+    [], [], [], []
+  ],
+  "spawn_costs": {},
+  "spawners": {}
+}

@@ -1,0 +1,40 @@
+{
+  "dimension": "isekai_verify:cosmos",
+  "playable_range": { "min_y": -64, "max_y": 320, "distribution": "uniform" },
+  "surface_anchor": { "type": "isekai_api:world_surface" },
+  "ore_strategy": { "type": "isekai_api:identity" },
+  "structure_strategy": { "type": "isekai_api:identity" },
+  "mob_spawn_strategy": { "type": "isekai_api:identity" },
+  "default_structure_predicate": { "type": "isekai_api:always" },
+  "applies_to": { "keys": [
+    "isekai_verify:planet_verdant",
+    "isekai_verify:planet_ember",
+    "isekai_verify:planet_frost"
+  ] },
+  "atmosphere": {
+    "has_precipitation": false,
+    "sky_color": 0,
+    "fog_color": 526344,
+    "water_fog_color": 329011
+  },
+  "client_atmosphere": {
+    "fog_color": 328966,
+    "fog_near_distance": 24.0,
+    "fog_far_distance": 220.0
+  },
+  "content_overrides": {
+    "block_overrides": {
+      "surface_top": {
+        "isekai_verify:planet_verdant": { "Name": "minecraft:grass_block", "Properties": { "snowy": "false" } },
+        "isekai_verify:planet_ember": { "Name": "minecraft:red_sand" },
+        "isekai_verify:planet_frost": { "Name": "minecraft:snow_block" }
+      },
+      "default_block": {
+        "isekai_verify:planet_verdant": { "Name": "minecraft:stone" },
+        "isekai_verify:planet_ember": { "Name": "minecraft:red_sandstone" },
+        "isekai_verify:planet_frost": { "Name": "minecraft:packed_ice" }
+      }
+    }
+  },
+  "priority": 100
+}
