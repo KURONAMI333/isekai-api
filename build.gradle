@@ -127,6 +127,11 @@ def testPayloadExcludes = { CopySpec spec ->
     // Dev-loaded from build/resources; must never ship — a neutral library must not carry
     // a consumer-flavoured world (the v0.1 preset-library sin).
     spec.exclude 'data/isekai_verify/**'
+    // The cosmos acceptance world replaces the vanilla overworld in-dev by overriding these
+    // two minecraft-namespace registry entries. They are pure verification fixtures — shipping
+    // them would clobber every consumer's overworld. Dev-only, jar-excluded like isekai_verify.
+    spec.exclude 'data/minecraft/worldgen/noise_settings/overworld.json'
+    spec.exclude 'data/minecraft/worldgen/world_preset/normal.json'
 }
 tasks.named('jar', Jar) { testPayloadExcludes(it) }
 tasks.named('sourcesJar', Jar) { testPayloadExcludes(it) }

@@ -1,0 +1,44 @@
+{
+  "type": "isekai_api:max",
+  "a": {
+    "type": "isekai_api:add",
+    "a": { "type": "isekai_api:constant", "value": 38.0 },
+    "b": { "type": "isekai_api:negate", "f": { "type": "isekai_api:distance", "ref_x": 0.0, "ref_y": 100.0, "ref_z": 0.0, "mode": "xyz" } }
+  },
+  "b": {
+    "type": "isekai_api:max",
+    "a": {
+      "type": "isekai_api:repeat",
+      "period_x": 176.0,
+      "period_z": 176.0,
+      "f": {
+        "type": "isekai_api:add",
+        "a": { "type": "isekai_api:constant", "value": 40.0 },
+        "b": { "type": "isekai_api:negate", "f": { "type": "isekai_api:distance", "ref_x": 88.0, "ref_y": 90.0, "ref_z": 88.0, "mode": "xyz" } }
+      }
+    },
+    "b": {
+      "type": "isekai_api:max",
+      "a": {
+        "type": "isekai_api:repeat",
+        "period_x": 192.0,
+        "period_z": 192.0,
+        "f": {
+          "type": "isekai_api:add",
+          "a": { "type": "isekai_api:constant", "value": 44.0 },
+          "b": { "type": "isekai_api:negate", "f": { "type": "isekai_api:distance", "ref_x": 100.0, "ref_y": 115.0, "ref_z": 55.0, "mode": "xyz" } }
+        }
+      },
+      "b": {
+        "type": "isekai_api:repeat",
+        "period_x": 200.0,
+        "period_z": 200.0,
+        "f": {
+          "type": "isekai_api:add",
+          "a": { "type": "isekai_api:constant", "value": 28.0 },
+          "b": { "type": "isekai_api:negate", "f": { "type": "isekai_api:distance", "ref_x": 55.0, "ref_y": 155.0, "ref_z": 150.0, "mode": "xyz" } }
+        }
+      }
+    }
+  }
+}
