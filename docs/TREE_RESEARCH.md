@@ -35,7 +35,7 @@ The placer = shape only. Density (forest vs sparse) = the placed_feature placeme
 ## Isekai design (decision)
 Add Isekai placer types (neutral-named, geometric): trunk `leaning`, `branching`; foliage `sphere`(ellipsoid+noise), `disc`(flat umbrella), `cone`(conifer profile), `fan`(palm fronds), `weeping`(hanging). Internal `Shape` helper for analytic ones. Consumers compose palms / charred snags / etc. in `minecraft:tree` JSON with block providers + Isekai placement for density. Isekai stays neutral (no baked species/blocks). Build incrementally: register scaffold → 1 trunk + 1 foliage → in-game verify a tree generates → add rest → density → consumer demo.
 
-## Local jar analysis (mods kura actually plays — 1.21.1)
+## Local jar analysis (mods actually played in the dev environment — 1.21.1)
 - **Nature's Spirit 2.2.5** = the exact target pattern. 35 `minecraft:tree` features; ~13 CUSTOM placers + vanilla for simple trees. Real param-rich custom placer configs:
   - `coconut_trunk_placer` (palm): `base_height`, `height_rand_a/b`, `fork_probability` (float), `trunk_steps` (IntProvider), `can_grow_through` (block tag). foliage `coconut_foliage_placer` radius 0/offset 0 (crown shape hardcoded in placer).
   - `wisteria_trunk_placer` (drooping): `extra_branch_length`/`extra_branch_steps` (IntProvider), `place_branch_per_log_probability` (float). foliage `wisteria_foliage_placer`.

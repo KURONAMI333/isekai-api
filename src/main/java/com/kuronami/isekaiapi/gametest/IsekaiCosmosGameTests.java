@@ -39,7 +39,7 @@ import java.nio.file.Path;
  * so it cannot generate chunks of the {@code isekai_verify:cosmos} dimension. These tests prove the
  * <em>shape formula</em> (multi-sphere density evaluated through the real noise_settings router) and
  * the <em>zoning/atmosphere data</em>; the block-for-block reification of the planets is the
- * dedicated-server RCON probe / kura visual gate (same ceiling as W5).
+ * dedicated-server RCON probe / manual visual gate (same ceiling as W5).
  */
 @GameTestHolder(IsekaiApi.MODID)
 public final class IsekaiCosmosGameTests {
@@ -184,7 +184,7 @@ public final class IsekaiCosmosGameTests {
     // Cosmic atmosphere: the worldshape's atmosphere override applies its dark-space colours to a
     // biome's special effects. Decoded from the on-disk cosmos descriptor (the real datapack).
     // (Whether the_end sky renderer *displays* biome sky_color is a client concern — the visual is a
-    // kura gate; here we prove the data is applied.)
+    // manual visual gate; here we prove the data is applied.)
     // =====================================================================
 
     @PrefixGameTestTemplate(false)

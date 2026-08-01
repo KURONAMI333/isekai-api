@@ -33,7 +33,7 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Machine self-test of the seven worldshapes kura hand-checked on paper for v1
+ * Machine self-test of the seven worldshapes hand-checked on paper for v1
  * (砂漠+オアシス / マグマ+蟻巣 / 針山 / 水没 / 1チャンク1biome / 鏡写し / 球状), re-run against the
  * real v2 API as on-disk scratch datapacks under {@code examples/selftest_7/}.
  *
