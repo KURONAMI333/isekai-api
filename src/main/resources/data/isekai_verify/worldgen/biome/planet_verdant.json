@@ -18,9 +18,9 @@
     ],
     [], [],
     [
-      "minecraft:patch_grass_plain",
-      "minecraft:trees_plains",
-      "minecraft:flower_plains"
+      "isekai_verify:cap_patch_grass",
+      "isekai_verify:cap_trees_plains",
+      "isekai_verify:cap_flowers"
     ],
     []
   ],
