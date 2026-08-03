@@ -16,7 +16,11 @@
       "minecraft:ore_redstone",
       "minecraft:ore_copper"
     ],
-    [], [], [], []
+    [], [],
+    [
+      "isekai_verify:cap_dead_bush"
+    ],
+    []
   ],
   "spawn_costs": {},
   "spawners": {}

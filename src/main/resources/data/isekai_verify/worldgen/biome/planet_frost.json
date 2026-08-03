@@ -15,7 +15,12 @@
       "minecraft:ore_diamond",
       "minecraft:ore_lapis"
     ],
-    [], [], [], []
+    [], [],
+    [
+      "minecraft:trees_taiga",
+      "minecraft:patch_grass_taiga_2"
+    ],
+    []
   ],
   "spawn_costs": {},
   "spawners": {}
