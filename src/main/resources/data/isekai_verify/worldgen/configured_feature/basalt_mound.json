@@ -1,0 +1,14 @@
+{
+  "type": "isekai_api:cluster",
+  "config": {
+    "block": {
+      "type": "minecraft:weighted_state_provider",
+      "entries": [
+        { "data": { "Name": "minecraft:basalt", "Properties": { "axis": "y" } }, "weight": 2 },
+        { "data": { "Name": "minecraft:blackstone" }, "weight": 1 }
+      ]
+    },
+    "size": { "type": "minecraft:uniform", "min_inclusive": 14, "max_inclusive": 30 },
+    "can_replace_solid": false
+  }
+}

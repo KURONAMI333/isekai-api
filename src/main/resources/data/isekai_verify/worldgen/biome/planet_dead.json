@@ -1,0 +1,22 @@
+{
+  "has_precipitation": false,
+  "temperature": 0.3,
+  "downfall": 0.0,
+  "effects": {
+    "fog_color": 5981750,
+    "sky_color": 0,
+    "water_color": 4159204,
+    "water_fog_color": 329011
+  },
+  "carvers": {},
+  "features": [
+    [], [], [], [], [], [], [], [], [],
+    [
+      "isekai_verify:cap_bone_pile",
+      "isekai_verify:cap_dead_bush"
+    ],
+    []
+  ],
+  "spawn_costs": {},
+  "spawners": {}
+}
