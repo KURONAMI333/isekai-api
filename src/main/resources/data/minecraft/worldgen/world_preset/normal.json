@@ -8,15 +8,1204 @@
           "type": "isekai_api:rule",
           "fallback": "isekai_verify:planet_verdant",
           "rules": [
-            { "zone": { "type": "isekai_api:within_distance", "radius": 150.0, "center_x": 0, "center_z": 0 }, "biome": "isekai_verify:planet_verdant" },
-            { "zone": { "type": "isekai_api:noise_threshold", "noise": { "firstOctave": -9, "amplitudes": [ 1.0, 1.0, 1.0 ] }, "seed": 1441, "threshold": 0.0, "size_xz": 1.0, "size_y": 1.0 }, "biome": "isekai_verify:planet_ember" },
-            { "zone": { "type": "isekai_api:noise_threshold", "noise": { "firstOctave": -9, "amplitudes": [ 1.0, 1.0, 1.0 ] }, "seed": 9987, "threshold": 0.0, "size_xz": 1.0, "size_y": 1.0 }, "biome": "isekai_verify:planet_frost" }
+            {
+              "zone": {
+                "type": "isekai_api:within_distance",
+                "radius": 150.0,
+                "center_x": 0,
+                "center_z": 0
+              },
+              "biome": "isekai_verify:planet_verdant"
+            },
+            {
+              "zone": {
+                "type": "isekai_api:and",
+                "all": [
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4001,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4002,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4003,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4004,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  }
+                ]
+              },
+              "biome": "isekai_verify:planet_mushroom"
+            },
+            {
+              "zone": {
+                "type": "isekai_api:and",
+                "all": [
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4001,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4002,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4003,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4004,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  }
+                ]
+              },
+              "biome": "isekai_verify:planet_volcanic"
+            },
+            {
+              "zone": {
+                "type": "isekai_api:and",
+                "all": [
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4001,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4002,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4003,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4004,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  }
+                ]
+              },
+              "biome": "isekai_verify:planet_crystal"
+            },
+            {
+              "zone": {
+                "type": "isekai_api:and",
+                "all": [
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4001,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4002,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4003,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4004,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  }
+                ]
+              },
+              "biome": "isekai_verify:planet_dead"
+            },
+            {
+              "zone": {
+                "type": "isekai_api:and",
+                "all": [
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4001,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4002,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4003,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4004,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  }
+                ]
+              },
+              "biome": "isekai_verify:planet_verdant"
+            },
+            {
+              "zone": {
+                "type": "isekai_api:and",
+                "all": [
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4001,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4002,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4003,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4004,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  }
+                ]
+              },
+              "biome": "isekai_verify:planet_verdant"
+            },
+            {
+              "zone": {
+                "type": "isekai_api:and",
+                "all": [
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4001,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4002,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4003,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4004,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  }
+                ]
+              },
+              "biome": "isekai_verify:planet_ember"
+            },
+            {
+              "zone": {
+                "type": "isekai_api:and",
+                "all": [
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4001,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4002,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4003,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4004,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  }
+                ]
+              },
+              "biome": "isekai_verify:planet_ember"
+            },
+            {
+              "zone": {
+                "type": "isekai_api:and",
+                "all": [
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4001,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4002,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4003,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4004,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  }
+                ]
+              },
+              "biome": "isekai_verify:planet_frost"
+            },
+            {
+              "zone": {
+                "type": "isekai_api:and",
+                "all": [
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4001,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4002,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4003,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4004,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  }
+                ]
+              },
+              "biome": "isekai_verify:planet_frost"
+            },
+            {
+              "zone": {
+                "type": "isekai_api:and",
+                "all": [
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4001,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4002,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4003,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4004,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  }
+                ]
+              },
+              "biome": "isekai_verify:planet_stone"
+            },
+            {
+              "zone": {
+                "type": "isekai_api:and",
+                "all": [
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4001,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4002,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4003,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4004,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  }
+                ]
+              },
+              "biome": "isekai_verify:planet_stone"
+            },
+            {
+              "zone": {
+                "type": "isekai_api:and",
+                "all": [
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4001,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4002,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4003,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4004,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  }
+                ]
+              },
+              "biome": "isekai_verify:planet_desert"
+            },
+            {
+              "zone": {
+                "type": "isekai_api:and",
+                "all": [
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4001,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4002,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4003,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4004,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  }
+                ]
+              },
+              "biome": "isekai_verify:planet_desert"
+            },
+            {
+              "zone": {
+                "type": "isekai_api:and",
+                "all": [
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4001,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4002,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4003,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:not",
+                    "inner": {
+                      "type": "isekai_api:noise_threshold",
+                      "noise": {
+                        "firstOctave": -8,
+                        "amplitudes": [
+                          1.0,
+                          1.0,
+                          1.0
+                        ]
+                      },
+                      "seed": 4004,
+                      "threshold": 0.0,
+                      "size_xz": 1.0,
+                      "size_y": 1.0
+                    }
+                  }
+                ]
+              },
+              "biome": "isekai_verify:planet_jungle"
+            },
+            {
+              "zone": {
+                "type": "isekai_api:and",
+                "all": [
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4001,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4002,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4003,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  },
+                  {
+                    "type": "isekai_api:noise_threshold",
+                    "noise": {
+                      "firstOctave": -8,
+                      "amplitudes": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    "seed": 4004,
+                    "threshold": 0.0,
+                    "size_xz": 1.0,
+                    "size_y": 1.0
+                  }
+                ]
+              },
+              "biome": "isekai_verify:planet_jungle"
+            }
           ]
         },
         "settings": "minecraft:overworld"
       }
     },
-
     "minecraft:the_nether": {
       "type": "minecraft:the_nether",
       "generator": {
@@ -28,7 +1217,6 @@
         "settings": "minecraft:nether"
       }
     },
-
     "minecraft:the_end": {
       "type": "minecraft:the_end",
       "generator": {
