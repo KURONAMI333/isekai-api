@@ -1,0 +1,28 @@
+{
+  "has_precipitation": false,
+  "temperature": 0.5,
+  "downfall": 0.2,
+  "effects": {
+    "fog_color": 7368816,
+    "sky_color": 0,
+    "water_color": 4159204,
+    "water_fog_color": 329011
+  },
+  "carvers": {},
+  "features": [
+    [], [], [], [], [], [],
+    [
+      "minecraft:ore_iron_upper",
+      "minecraft:ore_coal_upper",
+      "minecraft:ore_iron_middle"
+    ],
+    [], [],
+    [
+      "isekai_verify:cap_stone_boulder",
+      "isekai_verify:cap_patch_grass"
+    ],
+    []
+  ],
+  "spawn_costs": {},
+  "spawners": {}
+}

@@ -9,7 +9,14 @@
   "applies_to": { "keys": [
     "isekai_verify:planet_verdant",
     "isekai_verify:planet_ember",
-    "isekai_verify:planet_frost"
+    "isekai_verify:planet_frost",
+    "isekai_verify:planet_stone",
+    "isekai_verify:planet_desert",
+    "isekai_verify:planet_mushroom",
+    "isekai_verify:planet_jungle",
+    "isekai_verify:planet_volcanic",
+    "isekai_verify:planet_crystal",
+    "isekai_verify:planet_dead"
   ] },
   "atmosphere": {
     "has_precipitation": false,
@@ -27,12 +34,26 @@
       "surface_top": {
         "isekai_verify:planet_verdant": { "Name": "minecraft:grass_block", "Properties": { "snowy": "false" } },
         "isekai_verify:planet_ember": { "Name": "minecraft:red_sand" },
-        "isekai_verify:planet_frost": { "Name": "minecraft:snow_block" }
+        "isekai_verify:planet_frost": { "Name": "minecraft:snow_block" },
+        "isekai_verify:planet_stone": { "Name": "minecraft:stone" },
+        "isekai_verify:planet_desert": { "Name": "minecraft:sand" },
+        "isekai_verify:planet_mushroom": { "Name": "minecraft:mycelium" },
+        "isekai_verify:planet_jungle": { "Name": "minecraft:grass_block", "Properties": { "snowy": "false" } },
+        "isekai_verify:planet_volcanic": { "Name": "minecraft:basalt", "Properties": { "axis": "y" } },
+        "isekai_verify:planet_crystal": { "Name": "minecraft:calcite" },
+        "isekai_verify:planet_dead": { "Name": "minecraft:coarse_dirt" }
       },
       "default_block": {
         "isekai_verify:planet_verdant": { "Name": "minecraft:stone" },
         "isekai_verify:planet_ember": { "Name": "minecraft:red_sandstone" },
-        "isekai_verify:planet_frost": { "Name": "minecraft:packed_ice" }
+        "isekai_verify:planet_frost": { "Name": "minecraft:packed_ice" },
+        "isekai_verify:planet_stone": { "Name": "minecraft:deepslate" },
+        "isekai_verify:planet_desert": { "Name": "minecraft:sandstone" },
+        "isekai_verify:planet_mushroom": { "Name": "minecraft:stone" },
+        "isekai_verify:planet_jungle": { "Name": "minecraft:stone" },
+        "isekai_verify:planet_volcanic": { "Name": "minecraft:blackstone" },
+        "isekai_verify:planet_crystal": { "Name": "minecraft:amethyst_block" },
+        "isekai_verify:planet_dead": { "Name": "minecraft:deepslate" }
       }
     }
   },

@@ -1,0 +1,15 @@
+{
+  "type": "isekai_api:cluster",
+  "config": {
+    "block": {
+      "type": "minecraft:weighted_state_provider",
+      "entries": [
+        { "data": { "Name": "minecraft:cobblestone" }, "weight": 2 },
+        { "data": { "Name": "minecraft:andesite" }, "weight": 1 },
+        { "data": { "Name": "minecraft:diorite" }, "weight": 1 }
+      ]
+    },
+    "size": { "type": "minecraft:uniform", "min_inclusive": 8, "max_inclusive": 18 },
+    "can_replace_solid": false
+  }
+}

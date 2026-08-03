@@ -1,0 +1,24 @@
+{
+  "has_precipitation": false,
+  "temperature": 1.2,
+  "downfall": 0.9,
+  "effects": {
+    "fog_color": 3897915,
+    "sky_color": 0,
+    "water_color": 4159204,
+    "water_fog_color": 329011
+  },
+  "carvers": {},
+  "features": [
+    [], [], [], [], [], [], [], [], [],
+    [
+      "minecraft:trees_jungle",
+      "minecraft:patch_grass_jungle",
+      "minecraft:vines",
+      "minecraft:bamboo_light"
+    ],
+    []
+  ],
+  "spawn_costs": {},
+  "spawners": {}
+}

@@ -1,0 +1,22 @@
+{
+  "has_precipitation": false,
+  "temperature": 2.0,
+  "downfall": 0.0,
+  "effects": {
+    "fog_color": 14730380,
+    "sky_color": 0,
+    "water_color": 4159204,
+    "water_fog_color": 329011
+  },
+  "carvers": {},
+  "features": [
+    [], [], [], [], [], [], [], [], [],
+    [
+      "isekai_verify:cap_cactus",
+      "minecraft:patch_dead_bush_2"
+    ],
+    []
+  ],
+  "spawn_costs": {},
+  "spawners": {}
+}

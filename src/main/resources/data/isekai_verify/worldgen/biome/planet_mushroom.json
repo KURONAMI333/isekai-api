@@ -1,0 +1,21 @@
+{
+  "has_precipitation": false,
+  "temperature": 0.9,
+  "downfall": 1.0,
+  "effects": {
+    "fog_color": 9662683,
+    "sky_color": 0,
+    "water_color": 4159204,
+    "water_fog_color": 329011
+  },
+  "carvers": {},
+  "features": [
+    [], [], [], [], [], [], [], [], [],
+    [
+      "isekai_verify:cap_mushrooms"
+    ],
+    []
+  ],
+  "spawn_costs": {},
+  "spawners": {}
+}

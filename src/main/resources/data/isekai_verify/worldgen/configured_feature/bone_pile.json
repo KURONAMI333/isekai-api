@@ -1,0 +1,11 @@
+{
+  "type": "isekai_api:cluster",
+  "config": {
+    "block": {
+      "type": "minecraft:simple_state_provider",
+      "state": { "Name": "minecraft:bone_block", "Properties": { "axis": "y" } }
+    },
+    "size": { "type": "minecraft:uniform", "min_inclusive": 6, "max_inclusive": 14 },
+    "can_replace_solid": false
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "type": "isekai_api:cluster",
+  "config": {
+    "block": {
+      "type": "minecraft:weighted_state_provider",
+      "entries": [
+        { "data": { "Name": "minecraft:amethyst_block" }, "weight": 3 },
+        { "data": { "Name": "minecraft:budding_amethyst" }, "weight": 1 }
+      ]
+    },
+    "size": { "type": "minecraft:uniform", "min_inclusive": 15, "max_inclusive": 35 },
+    "can_replace_solid": false
+  }
+}
