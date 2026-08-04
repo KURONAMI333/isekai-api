@@ -2,7 +2,7 @@
   "dimension": "isekai_verify:cosmos",
   "playable_range": { "min_y": -64, "max_y": 320, "distribution": "uniform" },
   "surface_anchor": { "type": "isekai_api:world_surface" },
-  "ore_strategy": { "type": "isekai_api:identity" },
+  "ore_strategy": { "type": "isekai_api:column_local" },
   "structure_strategy": { "type": "isekai_api:identity" },
   "mob_spawn_strategy": { "type": "isekai_api:identity" },
   "default_structure_predicate": { "type": "isekai_api:always" },
