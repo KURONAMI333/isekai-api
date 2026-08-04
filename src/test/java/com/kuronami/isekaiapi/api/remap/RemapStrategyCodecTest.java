@@ -58,6 +58,33 @@ class RemapStrategyCodecTest {
         assertFalse(json.contains("\"isekai:"), json);
     }
 
+    @Test void columnLocalDecodesBareAndFullyStated() {
+        RemapStrategy bare = decode("{\"type\":\"isekai_api:column_local\"}");
+        assertEquals(RemapStrategy.ColumnLocal.DEFAULT, bare);
+
+        RemapStrategy stated = decode("{\"type\":\"isekai_api:column_local\","
+                + "\"top\":{\"type\":\"isekai_api:world_surface\"},"
+                + "\"bottom\":{\"type\":\"isekai_api:world_floor\",\"max_scan\":256},"
+                + "\"scale\":\"proportional\",\"reference_thickness\":48,"
+                + "\"surface_y\":80,\"floor_y\":-32}");
+        RemapStrategy.ColumnLocal cl = assertInstanceOf(RemapStrategy.ColumnLocal.class, stated);
+        assertEquals(ColumnBand.DepthScale.PROPORTIONAL, cl.scale());
+        assertEquals(48, cl.referenceThickness());
+        assertEquals(80, cl.surfaceY());
+        assertEquals(-32, cl.floorY());
+        assertEquals(new SurfaceAnchor.WorldFloor(SurfaceAnchor.WorldSurface.INSTANCE, 256), cl.bottom());
+    }
+
+    @Test void columnLocalRoundTripsThroughEncode() {
+        RemapStrategy original = new RemapStrategy.ColumnLocal(
+                SurfaceAnchor.WorldSurface.INSTANCE,
+                new SurfaceAnchor.WorldFloor(new SurfaceAnchor.FixedY(320), 200),
+                ColumnBand.DepthScale.BLOCKS, 48, 64, -64);
+        String json = encode(original);
+        assertTrue(json.contains("isekai_api:column_local"), json);
+        assertEquals(original, decode(json));
+    }
+
     @Test void nestedPipeRoundTrip() {
         RemapStrategy original = new RemapStrategy.Pipe(java.util.List.of(
                 RemapStrategy.Linear.INSTANCE, new RemapStrategy.CountScale(2.0)));
