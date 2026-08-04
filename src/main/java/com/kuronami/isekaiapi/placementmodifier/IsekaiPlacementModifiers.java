@@ -24,6 +24,8 @@ import org.jetbrains.annotations.ApiStatus;
  *       com.kuronami.isekaiapi.api.predicate.SpatialPredicate}</li>
  *   <li>{@code isekai_api:scatter} — jitter into N samples within a radius with optional
  *       minimum spacing (vanilla {@code count + in_square} plus non-overlap)</li>
+ *   <li>{@code isekai_api:column_relative} — depth into the column's own terrain, for
+ *       worldshapes whose altitude varies per column</li>
  * </ul>
  */
 @ApiStatus.Internal
@@ -53,10 +55,13 @@ public final class IsekaiPlacementModifiers {
     public static final Supplier<PlacementModifierType<SlopeFilterModifier>> SLOPE_FILTER =
             TYPES.register("slope_filter", () -> () -> SlopeFilterModifier.CODEC);
 
+    public static final Supplier<PlacementModifierType<ColumnRelativeModifier>> COLUMN_RELATIVE =
+            TYPES.register("column_relative", () -> () -> ColumnRelativeModifier.CODEC);
+
     private IsekaiPlacementModifiers() {}
 
     public static void register(IEventBus modBus) {
         TYPES.register(modBus);
-        IsekaiApi.LOGGER.info("[Isekai] placement modifiers registered: surface_relative, fluid_relative, in_block_context, spatial_predicate, scatter, fluid_edge, slope_filter");
+        IsekaiApi.LOGGER.info("[Isekai] placement modifiers registered: surface_relative, fluid_relative, in_block_context, spatial_predicate, scatter, fluid_edge, slope_filter, column_relative");
     }
 }

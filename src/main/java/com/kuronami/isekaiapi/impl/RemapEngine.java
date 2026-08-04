@@ -1,6 +1,7 @@
 package com.kuronami.isekaiapi.impl;
 
 import com.kuronami.isekaiapi.api.query.VerticalRange;
+import com.kuronami.isekaiapi.api.remap.ColumnBand;
 import com.kuronami.isekaiapi.api.remap.RemapContext;
 import com.kuronami.isekaiapi.api.remap.RemapStrategy;
 
@@ -34,6 +35,19 @@ public final class RemapEngine {
                                        int worldBottom,
                                        int worldTop) {
         return strategy.remap(original, new RemapContext(playable, worldBottom, worldTop));
+    }
+
+    /**
+     * Ask {@code strategy} for a terrain-relative projection of {@code original}. Present only
+     * for strategies that cannot express themselves as one absolute Y range (see
+     * {@link RemapStrategy#remapToColumn}); callers fall back to {@link #apply} when empty.
+     */
+    public static java.util.Optional<ColumnBand> applyColumn(RemapStrategy strategy,
+                                                             VerticalRange original,
+                                                             VerticalRange playable,
+                                                             int worldBottom,
+                                                             int worldTop) {
+        return strategy.remapToColumn(original, new RemapContext(playable, worldBottom, worldTop));
     }
 
     /**
