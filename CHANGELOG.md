@@ -45,6 +45,16 @@ Datapack authors and consumers who only use the built-in variants from JSON are 
   dimension references the preset and overrides one small hook file to change terrain shape —
   no 2500-line `noise_settings` copy. A whole floating-island world is two files.
   ([README](README.md#quick-start--a-floating-island-world-in-2-files))
+- **Terrain-relative ore remap** — `isekai_api:column_local` (RemapStrategy),
+  `isekai_api:world_floor` (SurfaceAnchor) and `isekai_api:column_relative` (placement
+  modifier). Every other remap strategy produces one absolute Y band per feature, which can
+  only ever be right for terrain at one altitude; `column_local` normalizes a feature's
+  vanilla Y to a depth and resolves it against each column's own surface and underside as the
+  feature is placed. Floating islands, orbiting planets and sky continents get the same
+  internal ore layout whatever height they sit at. `RemapStrategy` gained a
+  `remapToColumn(VerticalRange, RemapContext)` **default** method returning
+  `Optional.empty()`, so every existing strategy — built-in or third-party — keeps the
+  absolute behaviour unchanged.
 - **`isekai_api:vanilla_overworld_surface`** — a delegate `SurfaceRules.RuleSource` that
   reproduces the vanilla overworld surface rule, so overworld-replacement datapacks skip the
   30 KB surface-rule copy.

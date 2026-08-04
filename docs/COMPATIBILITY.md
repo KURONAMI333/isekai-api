@@ -58,6 +58,14 @@ extension points. If you wrote Java against 1.x:
 | `variant.typeId()` | `registry.getKey(variant.codec())`, where `registry` is the matching `IsekaiRegistries` registry |
 | implementing the interface directly | also implement the new abstract method (`test` / `remap` / `resolveY`) |
 
+`RemapStrategy` additionally gained `remapToColumn(VerticalRange, RemapContext)` in 2.0.0. It
+is a **default** method returning `Optional.empty()`, i.e. "this strategy has no
+terrain-relative form, use `remap`" — existing implementations, built-in or third-party, need
+no change. Override it only when a strategy's band cannot be stated as one absolute Y range;
+`isekai_api:column_local` is the built-in that does. Callers that consume strategies directly
+should try `remapToColumn` first and fall back to `remap`, the order
+`AddPhase.remappedOreFeatures` uses.
+
 Consumers who only build descriptors from the factory/record API (`WorldshapeDescriptor.builder()`,
 `new SpatialPredicate.YInRange(...)`, etc.) and authors who only write JSON need no changes.
 

@@ -168,6 +168,7 @@ Go in a placed feature's modifier list.
 | `isekai_api:spatial_predicate` | `predicate` (SpatialPredicate) | place only where the predicate holds |
 | `isekai_api:scatter` | `count` (IntProvider), `radius` (int 1–32, default 8), `min_spacing` (int 0–32, default 0), `max_attempts_multiplier` (int 1–8, default 3) | jitter the input into `count` XZ samples within `radius`; if `min_spacing > 0`, reject samples within `min_spacing` blocks of an already-accepted one. Pair with a heightmap/Y-anchor modifier downstream. Use over `count + in_square` whenever you want clustered features that don't stack on each other. |
 | `isekai_api:fluid_edge` | `fluid` (fluid id / list / `#tag`), `max_distance` (int 1–16, default 4), `mode` (`near`\|`far`, default `near`) | accept positions where a matching fluid is (`near`) or isn't (`far`) within `max_distance` blocks in XZ. Geometric distance filter — pure membership test, no theme. |
+| `isekai_api:column_relative` | `top` / `bottom` (SurfaceAnchor, default `world_surface` / `world_floor`), `from_depth` / `to_depth` (double), `scale` (`blocks`\|`proportional`, default `blocks`), `reference_thickness` (int 1–4096, default 128), `distribution` (HeightDistribution, default `uniform`) | place at a **depth into the column's own terrain** instead of an absolute Y. `0.0` is the free space above the body, `1.0` the free space below it. `blocks` measures a fixed block distance from whichever end the band is nearer to (so an ore keeps its distance from the surface whatever the body's size); `proportional` measures a fraction of the body's own thickness (so the layout stretches with it). Normally emitted by `isekai_api:column_local` rather than written by hand. |
 | `isekai_api:slope_filter` | `min_slope` / `max_slope` (double 0–1, defaults 0/1), `sample_radius` (int 1–8, default 2), `heightmap` (Heightmap type, default `WORLD_SURFACE_WG`) | accept positions where the local heightmap slope (max neighbour-height-delta over `sample_radius`, normalised) falls within `[min_slope, max_slope]`. 0 = flat, 1 ≈ 45°+ cliff. |
 
 (`IntProvider` = a vanilla int provider: a bare int like `5`, or `{"type":"minecraft:uniform","min_inclusive":0,"max_inclusive":8}` — flat fields, no `value:` wrapper in 1.21.1.)
@@ -385,7 +386,28 @@ The legacy `isekai:` prefix is accepted as a deprecated alias.
 | `isekai_api:fixed_range` | `min`, `max` (int), `dist` (HeightDistribution) |
 | `isekai_api:count_scale` | `factor` (double ≥ 0) |
 | `isekai_api:band_split` | `bands` (list of `{ vanilla_source: VerticalRange, target_ratio: float }`) |
+| `isekai_api:column_local` | `top` / `bottom` (SurfaceAnchor, default `world_surface` / `world_floor`), `scale` (`blocks`\|`proportional`, default `blocks`), `reference_thickness` (int, default 128), `surface_y` (int, default 64), `floor_y` (int, default -64) |
 | `isekai_api:pipe` | `chain` (non-empty list of strategies) |
+
+`isekai_api:column_local` is the strategy for worldshapes whose terrain altitude varies per
+column — floating islands, orbiting planets, sky continents. Every other variant produces one
+absolute Y band per feature, which can be right for terrain at exactly one altitude; this one
+normalizes each feature's Y to a depth (`(surface_y - y) / (surface_y - floor_y)`, clamped to
+`0..1`) and resolves that depth against each column's own anchors as the feature is placed. With
+the default `reference_thickness` of 128 a feature declared at vanilla Y=51 stays "13 blocks
+below the surface" wherever the surface happens to be; a smaller value compresses vanilla's whole
+128-block surface-to-bedrock span into a thinner body. Put it last in a `pipe` — strategies after
+it can no longer affect the Y.
+
+```json
+{
+  "ore_strategy": {
+    "type": "isekai_api:column_local",
+    "scale": "blocks",
+    "reference_thickness": 48
+  }
+}
+```
 
 `structure_strategy` only acts through the `count_scale` factor (it scales RandomSpread spacing); other variants are no-ops there.
 
@@ -396,6 +418,20 @@ The legacy `isekai:` prefix is accepted as a deprecated alias.
 | `isekai_api:world_surface` | — |
 | `isekai_api:below_fluid` | `fluid` (fluid key) |
 | `isekai_api:fixed_y` | `y` (int) |
+| `isekai_api:world_floor` | `start` (SurfaceAnchor, default `world_surface`), `max_scan` (int 1–4096, default 128) |
+
+`isekai_api:world_floor` is the mirror of `world_surface`: it scans downward from `start` and
+returns the first free space *below* the terrain — the underside of a floating body. It resolves
+to nothing when no body is found within `max_scan`, and equally when the body never ends, so in
+solid ground-to-bedrock terrain it simply skips the placement.
+
+```json
+{
+  "type": "isekai_api:surface_relative",
+  "anchor": { "type": "isekai_api:world_floor" },
+  "offset": { "type": "minecraft:uniform", "min_inclusive": 1, "max_inclusive": 16 }
+}
+```
 
 ### TransitionRule (layered worldshapes)
 
