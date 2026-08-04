@@ -1,0 +1,26 @@
+{
+  "feature": "isekai_verify:ore_coal",
+  "placement": [
+    {
+      "type": "minecraft:count",
+      "count": 40
+    },
+    {
+      "type": "minecraft:in_square"
+    },
+    {
+      "type": "isekai_api:surface_relative",
+      "anchor": {
+        "type": "isekai_api:world_surface"
+      },
+      "offset": {
+        "type": "minecraft:uniform",
+        "min_inclusive": -17,
+        "max_inclusive": -2
+      }
+    },
+    {
+      "type": "minecraft:biome"
+    }
+  ]
+}

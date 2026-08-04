@@ -10,7 +10,26 @@
   },
   "carvers": {},
   "features": [
-    [], [], [], [], [], [], [], [], [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [
+      "isekai_verify:ore_coal",
+      "isekai_verify:ore_coal_rich",
+      "isekai_verify:ore_copper",
+      "isekai_verify:ore_iron",
+      "isekai_verify:ore_iron_deep",
+      "isekai_verify:ore_lapis",
+      "isekai_verify:ore_gold",
+      "isekai_verify:ore_redstone",
+      "isekai_verify:ore_redstone_rich",
+      "isekai_verify:ore_diamond"
+    ],
+    [],
+    [],
     [
       "isekai_verify:cap_mushrooms"
     ],
