@@ -108,6 +108,26 @@ def wait_loaded(rcon: Rcon, x: int, y: int, z: int, timeout: float = 180.0) -> b
     return False
 
 
+def solid_volume(s: Sphere, w: int, y0: int, y1: int) -> int:
+    """Blocks of the sphere inside the (2w+1)^2 probe window between y0 and y1.
+
+    The denominator for the density ceiling. Computed geometrically from the
+    sphere rather than measured, because the ore fills have already removed the
+    blocks by the time we would want to count them.
+    """
+    total = 0
+    for y in range(y0, y1 + 1):
+        dy = y - s.cy
+        rr = s.r * s.r - dy * dy
+        if rr <= 0:
+            continue
+        for dx in range(-w, w + 1):
+            for dz in range(-w, w + 1):
+                if dx * dx + dz * dz <= rr:
+                    total += 1
+    return total
+
+
 def slab_bounds(s: Sphere) -> list[tuple[str, int, int]]:
     lo, hi = int(s.cy - s.r), int(s.cy + s.r)
     step = (hi - lo) / 3.0
@@ -124,7 +144,7 @@ def probe(rcon: Rcon, s: Sphere, half: int) -> dict[str, dict[str, int]]:
 
     counts: dict[str, dict[str, int]] = {}
     for slab, y0, y1 in slab_bounds(s):
-        counts[slab] = {}
+        counts[slab] = {"_solid": solid_volume(s, w, y0, y1)}
         for ore, blocks in ORE_BLOCKS.items():
             total = 0
             for block in blocks:
@@ -151,6 +171,7 @@ BIOMES = [
     "planet_crystal",
     "planet_dead",
 ]
+MAX_ORE_FRACTION = 0.05  # any single ore filling >5% of a slab is a compression bug
 AT_ZERO_RE = re.compile(r"\(0 blocks? away\)")
 SHIFTS = range(-2, 3)
 
@@ -221,9 +242,22 @@ def main() -> int:
         header = "  slab    " + "".join(f"{o:>10}" for o in ORE_BLOCKS)
         print(header)
         for slab in SLABS:
+            vol = counts[slab]["_solid"]
+            pct = f"  ({100 * sum(counts[slab][o] for o in ORE_BLOCKS) / vol:.1f}% of {vol})" if vol else ""
             print(
-                f"  {slab:<8}" + "".join(f"{counts[slab][o]:>10}" for o in ORE_BLOCKS)
+                f"  {slab:<8}"
+                + "".join(f"{counts[slab][o]:>10}" for o in ORE_BLOCKS)
+                + pct
             )
+
+        for slab in SLABS:
+            vol = counts[slab]["_solid"]
+            for ore in ORE_BLOCKS:
+                if vol and counts[slab][ore] / vol > MAX_ORE_FRACTION:
+                    violations.append(
+                        f"{s.name}: {ore} is {100 * counts[slab][ore] / vol:.1f}% of the "
+                        f"{slab} slab (ceiling {100 * MAX_ORE_FRACTION:.0f}%)"
+                    )
 
         upper_shallow = counts["upper"]["coal"] + counts["upper"]["copper"]
         iron_any = sum(counts[sl]["iron"] for sl in SLABS)
