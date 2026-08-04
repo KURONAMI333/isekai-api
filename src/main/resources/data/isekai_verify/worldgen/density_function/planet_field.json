@@ -33,9 +33,9 @@
           "type": "isekai_api:negate",
           "f": {
             "type": "isekai_api:distance",
-            "ref_x": 205.0,
+            "ref_x": 206.9,
             "ref_y": 239.0,
-            "ref_z": 117.0,
+            "ref_z": 92.2,
             "mode": "xyz"
           }
         }
