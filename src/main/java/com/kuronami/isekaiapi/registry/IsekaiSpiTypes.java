@@ -67,6 +67,7 @@ public final class IsekaiSpiTypes {
         REMAP_STRATEGY_TYPES.register("fixed_range", () -> RemapStrategy.FixedRange.MAP_CODEC);
         REMAP_STRATEGY_TYPES.register("inverted",    () -> RemapStrategy.Inverted.MAP_CODEC);
         REMAP_STRATEGY_TYPES.register("count_scale", () -> RemapStrategy.CountScale.MAP_CODEC);
+        REMAP_STRATEGY_TYPES.register("column_local",() -> RemapStrategy.ColumnLocal.MAP_CODEC);
         REMAP_STRATEGY_TYPES.register("identity",    () -> RemapStrategy.Identity.MAP_CODEC);
         REMAP_STRATEGY_TYPES.register("pipe",        () -> RemapStrategy.Pipe.MAP_CODEC);
     }
@@ -105,6 +106,7 @@ public final class IsekaiSpiTypes {
         SURFACE_ANCHOR_TYPES.register("world_surface", () -> SurfaceAnchor.WorldSurface.MAP_CODEC);
         SURFACE_ANCHOR_TYPES.register("below_fluid",   () -> SurfaceAnchor.BelowFluid.MAP_CODEC);
         SURFACE_ANCHOR_TYPES.register("fixed_y",       () -> SurfaceAnchor.FixedY.MAP_CODEC);
+        SURFACE_ANCHOR_TYPES.register("world_floor",   () -> SurfaceAnchor.WorldFloor.MAP_CODEC);
     }
 
     // ---- TransitionRule --------------------------------------------------

@@ -73,6 +73,62 @@ public interface SurfaceAnchor {
         }
     }
 
+    /**
+     * Underside of the topmost body in the column — the mirror of {@link WorldSurface}. Where
+     * that returns the first free space <i>above</i> the terrain, this scans downward from
+     * {@code start} and returns the first free space <i>below</i> it.
+     *
+     * <p>The scan crosses at most {@code maxScan} blocks in total: leading air (from
+     * {@code start} down to the top of the body) plus the body itself. It returns {@code null}
+     * when no body is found within the budget, and also when the body never ends — so in solid
+     * ground-to-bedrock terrain this anchor never resolves and the placement is skipped. It is
+     * a floating-terrain anchor by construction: islands, orbiting planets, sky continents.
+     *
+     * <p>JSON: {@code {"type": "isekai_api:world_floor"}}, or with either field overridden,
+     * {@code {"type": "isekai_api:world_floor", "start": {"type": "isekai_api:fixed_y", "y": 320},
+     * "max_scan": 256}}.
+     * @since 2.0.0
+     */
+    record WorldFloor(SurfaceAnchor start, int maxScan) implements SurfaceAnchor {
+
+        /** Default total scan budget in blocks. @since 2.0.0 */
+        public static final int DEFAULT_MAX_SCAN = 128;
+
+        /** Scan down from the world surface with the default budget. @since 2.0.0 */
+        public static final WorldFloor DEFAULT = new WorldFloor(WorldSurface.INSTANCE, DEFAULT_MAX_SCAN);
+
+        public static final MapCodec<WorldFloor> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+                Codec.lazyInitialized(() -> CODEC).optionalFieldOf("start", WorldSurface.INSTANCE)
+                        .forGetter(WorldFloor::start),
+                Codec.intRange(1, 4096).optionalFieldOf("max_scan", DEFAULT_MAX_SCAN)
+                        .forGetter(WorldFloor::maxScan)
+        ).apply(i, WorldFloor::new));
+
+        @Override public MapCodec<? extends SurfaceAnchor> codec() { return MAP_CODEC; }
+
+        @Override public @Nullable Integer resolveY(PlacementContext ctx, BlockPos pos) {
+            Integer from = start.resolveY(ctx, pos);
+            if (from == null) return null;
+            WorldGenLevel level = ctx.getLevel();
+            int bottom = level.getMinBuildHeight();
+            int y = Math.min(from, level.getMaxBuildHeight() - 1);
+            BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+            boolean inBody = false;
+            for (int step = 0; step <= maxScan; step++) {
+                int cy = y - step;
+                if (cy < bottom) return null;
+                cursor.set(pos.getX(), cy, pos.getZ());
+                boolean air = level.getBlockState(cursor).isAir();
+                if (!inBody) {
+                    inBody = !air;          // still descending through the space above the body
+                } else if (air) {
+                    return cy;              // first free space under the body
+                }
+            }
+            return null;  // no body, or a body deeper than the scan budget
+        }
+    }
+
     /** Fixed Y level regardless of terrain. @since 1.0.0 */
     record FixedY(int y) implements SurfaceAnchor {
         public static final MapCodec<FixedY> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(

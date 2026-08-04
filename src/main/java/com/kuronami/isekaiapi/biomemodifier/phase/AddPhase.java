@@ -134,9 +134,19 @@ public final class AddPhase {
             if (!originalFeatures.contains(info.key())) continue;
             var original = lookup.get(info.key()).orElse(null);
             if (original == null) continue;
-            var newRange = RemapEngine.apply(strategy, info.range(), playable,
+            // Terrain-relative strategies resolve per column at placement time; everything else
+            // bakes one absolute band. Both rebuild paths return null on the same condition
+            // (no HeightRangePlacement), keeping ADD symmetric with REMOVE.
+            var band = RemapEngine.applyColumn(strategy, info.range(), playable,
                     snapshot.worldBottom(), snapshot.worldTop());
-            PlacedFeature rebuilt = PlacedFeatureRebuilder.withNewRange(original.value(), newRange);
+            PlacedFeature rebuilt;
+            if (band.isPresent()) {
+                rebuilt = PlacedFeatureRebuilder.withColumnBand(original.value(), band.get());
+            } else {
+                var newRange = RemapEngine.apply(strategy, info.range(), playable,
+                        snapshot.worldBottom(), snapshot.worldTop());
+                rebuilt = PlacedFeatureRebuilder.withNewRange(original.value(), newRange);
+            }
             if (rebuilt == null) continue;
             Holder<PlacedFeature> rebuiltHolder = Holder.direct(rebuilt);
             Set<GenerationStep.Decoration> steps = snapshot.stepsFor(info.key());

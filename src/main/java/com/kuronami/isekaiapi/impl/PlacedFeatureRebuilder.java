@@ -1,6 +1,8 @@
 package com.kuronami.isekaiapi.impl;
 
 import com.kuronami.isekaiapi.api.query.VerticalRange;
+import com.kuronami.isekaiapi.api.remap.ColumnBand;
+import com.kuronami.isekaiapi.placementmodifier.ColumnRelativeModifier;
 import net.minecraft.world.level.levelgen.VerticalAnchor;
 import net.minecraft.world.level.levelgen.heightproviders.BiasedToBottomHeight;
 import net.minecraft.world.level.levelgen.heightproviders.HeightProvider;
@@ -51,6 +53,31 @@ public final class PlacedFeatureRebuilder {
         for (PlacementModifier mod : oldMods) {
             if (!swapped && mod instanceof HeightRangePlacement hrp) {
                 newMods.add(rebuildHRP(hrp.height, newRange));
+                swapped = true;
+            } else {
+                newMods.add(mod);
+            }
+        }
+        if (!swapped) return null;
+        return new PlacedFeature(original.feature(), List.copyOf(newMods));
+    }
+
+    /**
+     * Build a new {@link PlacedFeature} whose vertical placement is the terrain-relative
+     * {@code band} instead of an absolute Y range: the first {@link HeightRangePlacement} is
+     * swapped for an {@code isekai_api:column_relative} modifier and every other modifier
+     * (count, in_square, biome filter, …) is preserved in order. Returns {@code null} when
+     * {@code original} has no {@link HeightRangePlacement} to replace — the same contract as
+     * {@link #withNewRange}, so the ADD phase's rebuild set stays identical to the REMOVE
+     * phase's removal set whichever path a strategy takes.
+     */
+    public static PlacedFeature withColumnBand(PlacedFeature original, ColumnBand band) {
+        List<PlacementModifier> oldMods = original.placement();
+        boolean swapped = false;
+        List<PlacementModifier> newMods = new ArrayList<>(oldMods.size());
+        for (PlacementModifier mod : oldMods) {
+            if (!swapped && mod instanceof HeightRangePlacement) {
+                newMods.add(new ColumnRelativeModifier(band));
                 swapped = true;
             } else {
                 newMods.add(mod);

@@ -9,6 +9,7 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Maps a vanilla {@link VerticalRange} into the consumer's playable range, and/or scales the
@@ -38,6 +39,19 @@ public interface RemapStrategy {
      * don't affect Y placement (e.g. {@code CountScale}) return {@code original} unchanged. @since 2.0.0
      */
     VerticalRange remap(VerticalRange original, RemapContext ctx);
+
+    /**
+     * Optional terrain-relative projection. A strategy that returns a {@link ColumnBand} here is
+     * saying "this band cannot be expressed as one absolute Y range" — the band is resolved
+     * per column at placement time instead, so terrain at different altitudes gets the same
+     * internal layout. Returning {@link Optional#empty()} (the default) keeps the strategy on
+     * the absolute path through {@link #remap(VerticalRange, RemapContext)}, which is what every
+     * strategy shipped before 2.0.0 does.
+     * @since 2.0.0
+     */
+    default Optional<ColumnBand> remapToColumn(VerticalRange original, RemapContext ctx) {
+        return Optional.empty();
+    }
 
     /** Feature/mob density multiplier contributed by this strategy (1.0 = unchanged). @since 2.0.0 */
     default double countFactor() { return 1.0; }
@@ -189,6 +203,94 @@ public interface RemapStrategy {
         }
     }
 
+    /**
+     * Project each feature's vanilla Y band onto the terrain of the column it is placed in,
+     * instead of onto one absolute Y band. This is the strategy for worldshapes whose terrain
+     * altitude varies per column — floating islands, orbiting planets, sky continents — where a
+     * single absolute band is right for at most one piece of terrain and wrong for every other.
+     *
+     * <p>A feature's Y is first normalized to a depth: {@code (surface_y - y) / (surface_y -
+     * floor_y)}, clamped to {@code 0..1}. {@code surface_y}/{@code floor_y} name the vanilla Y
+     * levels that stand for "the top of the terrain" and "the bottom of it" — the defaults, 64
+     * and -64, are vanilla's sea level and bedrock, so a feature declared at vanilla Y=51 reads
+     * as "13 blocks down". The resulting depth band is handed to a {@link ColumnBand}, which
+     * resolves it against each column's own {@link #top()} and {@link #bottom()} anchors at
+     * placement time.
+     *
+     * <p>With the default {@code reference_thickness} of {@link ColumnBand#VANILLA_THICKNESS}
+     * the mapping is one depth unit per block, i.e. vanilla depths are carried over unchanged
+     * and only the altitude they hang from moves. A smaller value compresses the whole vanilla
+     * column into a thinner body: {@code 48} squeezes vanilla's 128-block surface-to-bedrock
+     * span into 48 blocks, which is what a 32-to-116-block-thick planet can hold.
+     *
+     * <p>JSON (every field optional):
+     * <pre>{@code
+     * {
+     *   "type": "isekai_api:column_local",
+     *   "top": { "type": "isekai_api:world_surface" },
+     *   "bottom": { "type": "isekai_api:world_floor" },
+     *   "scale": "blocks",
+     *   "reference_thickness": 128,
+     *   "surface_y": 64,
+     *   "floor_y": -64
+     * }
+     * }</pre>
+     * @since 2.0.0
+     */
+    record ColumnLocal(SurfaceAnchor top, SurfaceAnchor bottom, ColumnBand.DepthScale scale,
+                       int referenceThickness, int surfaceY, int floorY) implements RemapStrategy {
+        public ColumnLocal {
+            if (surfaceY <= floorY) {
+                throw new IllegalArgumentException("surface_y (" + surfaceY + ") must be above floor_y (" + floorY + ")");
+            }
+            if (referenceThickness <= 0) {
+                throw new IllegalArgumentException("reference_thickness must be > 0: " + referenceThickness);
+            }
+        }
+
+        /** Vanilla depths (surface 64, bedrock -64), carried onto each column's own terrain. @since 2.0.0 */
+        public static final ColumnLocal DEFAULT = new ColumnLocal(
+                SurfaceAnchor.WorldSurface.INSTANCE, SurfaceAnchor.WorldFloor.DEFAULT,
+                ColumnBand.DepthScale.BLOCKS, ColumnBand.VANILLA_THICKNESS, 64, -64);
+
+        public static final MapCodec<ColumnLocal> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+                SurfaceAnchor.CODEC.optionalFieldOf("top", SurfaceAnchor.WorldSurface.INSTANCE)
+                        .forGetter(ColumnLocal::top),
+                SurfaceAnchor.CODEC.optionalFieldOf("bottom", SurfaceAnchor.WorldFloor.DEFAULT)
+                        .forGetter(ColumnLocal::bottom),
+                ColumnBand.DepthScale.CODEC.optionalFieldOf("scale", ColumnBand.DepthScale.BLOCKS)
+                        .forGetter(ColumnLocal::scale),
+                Codec.intRange(1, 4096).optionalFieldOf("reference_thickness", ColumnBand.VANILLA_THICKNESS)
+                        .forGetter(ColumnLocal::referenceThickness),
+                Codec.INT.optionalFieldOf("surface_y", 64).forGetter(ColumnLocal::surfaceY),
+                Codec.INT.optionalFieldOf("floor_y", -64).forGetter(ColumnLocal::floorY)
+        ).apply(i, ColumnLocal::new));
+
+        @Override public MapCodec<? extends RemapStrategy> codec() { return MAP_CODEC; }
+
+        /**
+         * Absolute-path fallback for callers that cannot defer to a column (the query/preview
+         * surface). Reports the proportional projection into the playable range; the placement
+         * path uses {@link #remapToColumn} instead.
+         */
+        @Override public VerticalRange remap(VerticalRange original, RemapContext ctx) {
+            return ctx.linearScale(original);
+        }
+
+        @Override public Optional<ColumnBand> remapToColumn(VerticalRange original, RemapContext ctx) {
+            // maxY is the shallow end of the band, minY the deep end.
+            return Optional.of(new ColumnBand(top, bottom,
+                    depthOf(original.maxY()), depthOf(original.minY()),
+                    scale, referenceThickness, original.distribution()));
+        }
+
+        /** Normalized depth of a vanilla Y: 0 at {@code surfaceY}, 1 at {@code floorY}. @since 2.0.0 */
+        public double depthOf(int y) {
+            double d = (surfaceY - y) / (double) (surfaceY - floorY);
+            return Math.max(0.0, Math.min(1.0, d));
+        }
+    }
+
     /** Scale the count/density of generated features by {@code factor} (1.0 = unchanged). @since 1.0.0 */
     record CountScale(double factor) implements RemapStrategy {
         public CountScale {
@@ -232,6 +334,24 @@ public interface RemapStrategy {
                 acc = child.remap(acc, ctx);
             }
             return acc;
+        }
+        /**
+         * The last column-producing entry in the chain wins. Absolute strategies before it feed
+         * it their projected range; entries after it keep folding the absolute range but cannot
+         * un-column the result, so a column-producing strategy belongs at the end of the chain.
+         */
+        @Override public Optional<ColumnBand> remapToColumn(VerticalRange original, RemapContext ctx) {
+            VerticalRange acc = original;
+            Optional<ColumnBand> band = Optional.empty();
+            for (RemapStrategy child : chain) {
+                Optional<ColumnBand> childBand = child.remapToColumn(acc, ctx);
+                if (childBand.isPresent()) {
+                    band = childBand;
+                } else {
+                    acc = child.remap(acc, ctx);
+                }
+            }
+            return band;
         }
         @Override public double countFactor() {
             double product = 1.0;
