@@ -9,14 +9,15 @@
       "type": "minecraft:in_square"
     },
     {
-      "type": "isekai_api:surface_relative",
-      "anchor": {
-        "type": "isekai_api:world_surface"
-      },
-      "offset": {
+      "type": "minecraft:height_range",
+      "height": {
         "type": "minecraft:uniform",
-        "min_inclusive": -26,
-        "max_inclusive": -3
+        "min_inclusive": {
+          "absolute": 38
+        },
+        "max_inclusive": {
+          "absolute": 61
+        }
       }
     },
     {
