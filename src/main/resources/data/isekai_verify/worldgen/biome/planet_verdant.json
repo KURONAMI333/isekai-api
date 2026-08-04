@@ -10,13 +10,25 @@
   },
   "carvers": {},
   "features": [
-    [], [], [], [], [], [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
     [
-      "minecraft:ore_dirt",
-      "minecraft:ore_coal_upper",
-      "minecraft:ore_iron_middle"
+      "isekai_verify:ore_coal",
+      "isekai_verify:ore_coal_rich",
+      "isekai_verify:ore_copper",
+      "isekai_verify:ore_iron",
+      "isekai_verify:ore_iron_deep",
+      "isekai_verify:ore_lapis",
+      "isekai_verify:ore_gold",
+      "isekai_verify:ore_redstone",
+      "isekai_verify:ore_diamond"
     ],
-    [], [],
+    [],
+    [],
     [
       "isekai_verify:cap_patch_grass",
       "isekai_verify:cap_trees_plains",
@@ -27,8 +39,18 @@
   "spawn_costs": {},
   "spawners": {
     "creature": [
-      { "type": "minecraft:sheep", "maxCount": 4, "minCount": 2, "weight": 12 },
-      { "type": "minecraft:cow", "maxCount": 4, "minCount": 2, "weight": 8 }
+      {
+        "type": "minecraft:sheep",
+        "maxCount": 4,
+        "minCount": 2,
+        "weight": 12
+      },
+      {
+        "type": "minecraft:cow",
+        "maxCount": 4,
+        "minCount": 2,
+        "weight": 8
+      }
     ]
   }
 }
