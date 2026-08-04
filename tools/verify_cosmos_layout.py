@@ -22,6 +22,16 @@ the JSON drifts from what was verified):
   4. Visibility: every sphere has at least MIN_VISIBLE_NEIGHBORS other spheres
      (any periodic image) within MAX_VISIBLE_GAP surface-to-surface distance,
      so the sky is never empty at typical render distance.
+  5. XZ column non-occlusion: `isekai_api:world_floor` walks a column straight
+     down and only ever returns the *topmost* object's floor, so any pair of
+     spheres whose XZ (not 3D) disks overlap will have the lower sphere's core
+     ore silently fail to place in the overlap footprint — the 3D spacing
+     check in (2) does not catch this because two spheres can be far apart in
+     Y (and thus pass the 3D surface-gap check) while still overlapping when
+     projected onto the XZ plane. This check requires every pair (including a
+     sphere against its own periodic images, so a future radius bump past
+     period/2 gets caught too) to have non-negative XZ surface-to-surface gap
+     over the same periodic-image search as (2).
 
 Exit 0 with "OK" when every check passes; exit 1 listing every violation
 otherwise.
@@ -131,6 +141,32 @@ def min_surface_gap(a: Sphere, b: Sphere) -> float:
     return best
 
 
+def min_xz_surface_gap(a: Sphere, b: Sphere) -> float:
+    """Minimum XZ-only surface-to-surface distance between a and b over all
+    periodic images (including a vs its own other periodic images when
+    a is b). This is the quantity `isekai_api:world_floor` column occlusion
+    actually cares about: two spheres can be arbitrarily far apart in Y (and
+    so pass min_surface_gap's 3D check) while still overlapping when the
+    column is collapsed onto the XZ plane, which silently drops the lower
+    sphere's floor-anchored ore for every column in the overlap."""
+    shifts_a = SHIFT_RANGE if a.period is not None else (0,)
+    shifts_b = SHIFT_RANGE if b.period is not None else (0,)
+    best = math.inf
+    for sxa, sza in itertools.product(shifts_a, shifts_a):
+        ax = a.cx + sxa * (a.period or 0.0)
+        az = a.cz + sza * (a.period or 0.0)
+        for sxb, szb in itertools.product(shifts_b, shifts_b):
+            if a is b and (sxa, sza) == (sxb, szb):
+                continue
+            bx = b.cx + sxb * (b.period or 0.0)
+            bz = b.cz + szb * (b.period or 0.0)
+            d = math.hypot(ax - bx, az - bz)
+            gap = d - a.r - b.r
+            if gap < best:
+                best = gap
+    return best
+
+
 def check_boundary(sphere: Sphere) -> str | None:
     if sphere.period is None:
         return None
@@ -171,6 +207,24 @@ def main() -> int:
                 f"SPACING: {a.name} - {b.name}: gap={gap:.2f} < {MIN_SURFACE_GAP}"
             )
 
+    for a, b in itertools.combinations(spheres, 2):
+        xz_gap = min_xz_surface_gap(a, b)
+        if xz_gap < 0:
+            violations.append(
+                f"XZ-OCCLUSION: {a.name} - {b.name}: xz_gap={xz_gap:.2f} < 0 "
+                "(world_floor column occlusion — lower sphere loses its core ore "
+                "in the overlap footprint)"
+            )
+    for a in spheres:
+        if a.period is None:
+            continue
+        xz_gap = min_xz_surface_gap(a, a)
+        if xz_gap < 0:
+            violations.append(
+                f"XZ-OCCLUSION: {a.name} vs its own periodic image: "
+                f"xz_gap={xz_gap:.2f} < 0 (radius >= period/2)"
+            )
+
     for a in spheres:
         n = sum(
             1
@@ -197,7 +251,7 @@ def main() -> int:
             print(f"  - {v}")
         return 1
 
-    print("OK: no boundary, spacing, Y-range, or visibility violations")
+    print("OK: no boundary, spacing, Y-range, visibility, or XZ-occlusion violations")
     return 0
 
 
