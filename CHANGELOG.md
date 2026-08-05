@@ -4,6 +4,76 @@ All notable changes to Isekai API follow this file. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/). Compatibility policy — how datapack
 and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
+## [2.1.0] — 2026-08-05
+
+Three features that the documentation promised but the implementation never
+delivered are now real: biome zones vary with the world seed, `count_scale`
+thins structures, and `TransitionRule` blend/gap are evaluated.
+
+**No Java API breaks.** Everything added is a `default` method or a new static,
+so variants written against 1.x / 2.0.0 compile and run unchanged.
+
+### Changed — datapack behaviour
+
+- **`isekai_api:noise_threshold` and `isekai_api:edge_jitter` now vary with the
+  world seed.** Their JSON `seed` field is unchanged in shape but changed in
+  meaning: it was an absolute noise seed, and is now combined with the world
+  seed via `BiomeZone.deriveSeed`. Two worlds made from the same datapack with
+  different seeds get different patterns; the same seed reproduces. **Worlds
+  created before 2.1.0 will generate a different pattern in newly explored
+  chunks** — finish or retire such a world before updating.
+- Combinators (`and` / `or` / `not`) propagate the world seed to their children.
+  Purely geometric zones (`always`, `y_above`, `y_below`, `y_between`,
+  `within_distance`, `beyond_distance`) are unaffected by seed, as before.
+- **A world's terrain *shape* is not seeded by this change.** Density functions
+  built only from `isekai_api:distance` / `repeat` / `add` / `max` and constants
+  stay identical in every world; seed variation there comes from including a
+  vanilla `minecraft:noise` term, which the world seed already drives.
+
+### Added
+
+- **`structure_strategy` accepts `isekai_api:count_scale`.** A factor below 1.0
+  deterministically thins vanilla structures from `(world seed, chunk x, chunk z,
+  structure id)`. It vetoes candidates at `Structure.findValidGenerationPoint`
+  rather than touching `RandomSpreadStructurePlacement.spacing`: that placement
+  object is shared by every dimension referencing the structure set, and
+  `ChunkGeneratorStructureState` caches the candidate grid at world load, so
+  rescaling spacing would leak across dimensions and break seed reproducibility.
+  The consequence of the safer route is that structures can be **made rarer but
+  not more common** — a factor above 1.0 is a validation error, not a silent
+  round-down.
+- **`TransitionRule.Blend` and `Gap` are evaluated** at layer boundaries.
+  `Blend(b)` spreads the seam across a `b`-block band whose per-position choice
+  between the two descriptors ramps from 0 to 1, turning a flat seam into a
+  grainy gradient. `Gap(g)` leaves the top `g` blocks of the lower layer
+  unclaimed. Blend affects a descriptor's positional output — `block_overrides`
+  (`surface_top`, `default_block`) and `structure_predicates` — not terrain
+  shape, and not ore/mob/feature remap (those select a layer by biome, not Y).
+- `BiomeZone.withWorldSeed(long)` and `BiomeZone.deriveSeed(long, long)`.
+  `withWorldSeed` defaults to returning `this`, so third-party variants keep
+  working; a third-party *combinator* that does not override it will not
+  propagate the seed to nested built-in noise zones.
+- `IsekaiRemap.getDescriptorAt(dimension, x, y, z)` as a `default` method
+  delegating to the existing Y-only form.
+- A server-start warning when a rule biome source never received a world seed.
+
+### Fixed
+
+- `IsekaiValidator` rejected every non-identity `structure_strategy` while its
+  own comment said it warned.
+- The layered-worldshape reader documented a file-level `"transition"` field in
+  its javadoc; `LayeredFile` has no such component and the key was silently
+  discarded. The `layered_overworld` example wrote it, put `blend` on the
+  topmost layer (which has nothing above it), and used a `structure_strategy`
+  the validator rejects.
+- `README.md` reported 3 `SurfaceAnchor` and 7 `RemapStrategy` variants; there
+  are 4 and 8. Its two `BiomeZone` counts disagreed with each other (9 and 11);
+  there are 11.
+- `examples/2_placement/moon_world/worldshape.json` used the deprecated
+  `isekai:` prefix.
+- `tools/check_since.py` read `return foo(...)` inside a method body as a
+  declaration.
+
 ## [2.0.0] — 2026-07-22
 
 The rule-adaptation layer becomes an open extension point, terrain shape gets a
@@ -297,8 +367,7 @@ surface blocks, and structures.
   variants at structure placement time. Per-structure predicates from
   `structure_predicates` are honored; absent structures fall back to
   `defaultStructurePredicate`.
-- `RandomSpreadStructurePlacement.spacing` / `.separation` — per-dimension
-  scaling by the descriptor's `structure_strategy` CountScale factor.
+  `structure_strategy` accepts only `identity` in this release.
 
 ### Commands (operator-only)
 - `/isekai version`, `stats`, `reload`
