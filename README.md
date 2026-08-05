@@ -109,7 +109,7 @@ Density functions decide the *shape* of terrain; the biome source decides *which
 }
 ```
 
-`BiomeZone` is a neutral spatial condition evaluated at biome-grid resolution (one sample per 4 blocks, coordinates only — biome assignment happens before terrain exists). It dispatches on `"type"` with 9 variants:
+`BiomeZone` is a neutral spatial condition evaluated at biome-grid resolution (one sample per 4 blocks, coordinates only — biome assignment happens before terrain exists). It dispatches on `"type"` with 11 variants:
 
 | Variant | Payload | Matches |
 |---|---|---|
@@ -214,9 +214,9 @@ Sky / cloud / weather / sun / moon rendering remain hardcoded by vanilla; reachi
 Five composable interfaces let you adapt vanilla / modded rules to your worldshape — no specific worldshape committed to the API surface. Each dispatches on a `"type"` field under the `isekai_api:` namespace, backed by an Isekai custom registry, so a third-party mod can register its own variant from its own mod id (see [Extending the SPI](docs/DATAPACK_REFERENCE.md#extending-the-spi--register-your-own-variant)). The legacy bare `isekai:` prefix is accepted as a deprecated alias.
 
 - **`SpatialPredicate`** (12 built-in records) — `YInRange` / `SolidFloor` / `SolidCeiling` / `TerrainSlope` / `NearBlock` (HolderSet, tag-aware) / `NearBiome` / `InFluid` / `Always` / `Never` plus combinators `And` / `Or` / `Not`. Compose arbitrary structure placement conditions.
-- **`RemapStrategy`** (7 built-in variants) — `Identity` / `Linear` / `Inverted` / `FixedRange` / `CountScale` / `BandSplit(List<Band>)` / `Pipe(List<RemapStrategy>)`. Map vanilla Y bands and feature counts onto your playable range. Every variant is JSON-encodable.
-- **`SurfaceAnchor`** (3 built-in variants) — `WorldSurface` / `BelowFluid(fluid)` / `FixedY(y)`. Defines what "the surface" means in your worldshape.
-- **`TransitionRule`** — `Hard` / `Blend(blend_height)` / `Gap(gap_height)` for multi-layer worldshapes.
+- **`RemapStrategy`** (8 built-in variants) — `Identity` / `Linear` / `Inverted` / `FixedRange` / `CountScale` / `BandSplit(List<Band>)` / `ColumnLocal(...)` / `Pipe(List<RemapStrategy>)`. Map vanilla Y bands and feature counts onto your playable range. Every variant is JSON-encodable.
+- **`SurfaceAnchor`** (4 built-in variants) — `WorldSurface` / `BelowFluid(fluid)` / `FixedY(y)` / `WorldFloor(start, max_scan)`. Defines what "the surface" means in your worldshape.
+- **`TransitionRule`** — `Hard` / `Blend(blend_height)` / `Gap(gap_height)` for the seams between layers of a multi-layer worldshape.
 - **`BiomeZone`** (11 built-in variants) — the biome-placement conditions used by the `isekai_api:rule` biome source (see above): `always` / `y_above` / `y_below` / `y_between` / `within_distance` / `beyond_distance` / `noise_threshold` (organic noise mask) / `edge_jitter` (perturbs an inner zone's borders with a small noise offset) plus combinators `and` / `or` / `not`.
 
 ### Biome / Structure modifier integration

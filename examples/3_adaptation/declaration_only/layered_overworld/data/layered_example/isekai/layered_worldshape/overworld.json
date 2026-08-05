@@ -4,25 +4,25 @@
     {
       "y_range": {
         "min_y": -64,
-        "max_y": 70,
+        "max_y": 120,
         "distribution": "uniform"
       },
       "descriptor": {
         "dimension": "minecraft:overworld",
         "playable_range": {
           "min_y": -64,
-          "max_y": 70,
+          "max_y": 120,
           "distribution": "uniform"
         },
         "surface_anchor": { "type": "isekai_api:world_surface" },
         "ore_strategy":      { "type": "isekai_api:linear" },
-        "structure_strategy":{ "type": "isekai_api:linear" },
+        "structure_strategy":{ "type": "isekai_api:identity" },
         "mob_spawn_strategy":{ "type": "isekai_api:linear" },
         "default_structure_predicate": {
-          "type": "isekai_api:y_in_range", "min": -64, "max": 70
+          "type": "isekai_api:y_in_range", "min": -64, "max": 120
         }
       },
-      "transition": { "type": "isekai_api:hard" }
+      "transition": { "type": "isekai_api:blend", "blend_height": 8 }
     },
     {
       "y_range": {
@@ -39,7 +39,7 @@
         },
         "surface_anchor": { "type": "isekai_api:fixed_y", "y": 160 },
         "ore_strategy":      { "type": "isekai_api:linear" },
-        "structure_strategy":{ "type": "isekai_api:linear" },
+        "structure_strategy":{ "type": "isekai_api:count_scale", "factor": 0.4 },
         "mob_spawn_strategy":{ "type": "isekai_api:count_scale", "factor": 0.4 },
         "default_structure_predicate": {
           "type": "isekai_api:and",
@@ -50,8 +50,7 @@
         },
         "priority": 120
       },
-      "transition": { "type": "isekai_api:blend", "blend_height": 4 }
+      "transition": { "type": "isekai_api:hard" }
     }
-  ],
-  "transition": { "type": "isekai_api:blend", "blend_height": 4 }
+  ]
 }

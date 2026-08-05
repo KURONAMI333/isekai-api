@@ -138,8 +138,31 @@ Coordinates are authored in **block** space. Evaluated at biome-grid resolution 
 | `isekai_api:and` | `all` (list of zones) | all match |
 | `isekai_api:or` | `any` (list of zones) | any match |
 | `isekai_api:not` | `inner` (zone) | inner does not match |
-| `isekai_api:noise_threshold` | `noise` (noise key/inline), `seed` (long, default 0), `threshold` (double, default 0), `size_xz` / `size_y` (double, default 64) | true where a deterministic noise sample exceeds `threshold` — organic biome masks |
+| `isekai_api:noise_threshold` | `noise` (noise key/inline), `seed` (long, default 0), `threshold` (double, default 0), `size_xz` / `size_y` (double, default 64) | true where a noise sample exceeds `threshold` — organic biome masks |
 | `isekai_api:edge_jitter` | `inner` (zone), `noise` (noise key/inline), `seed` (long, default 0), `strength` (double 0–32, default 4), `size_xz` (double, default 32) | wraps `inner`, perturbs the test coordinate by a small noise offset before delegating — turns geometric borders into wavy organic ones |
+
+#### What `seed` means on the two noise zones
+
+`seed` is **not** the seed the noise is sampled with. It is combined with the **world seed** to
+produce that seed, so:
+
+- the same datapack draws a different pattern in every world — two players who both install your
+  pack do not get the same continents;
+- the same world seed always redraws the same pattern, so worlds stay reproducible and
+  re-generating a chunk is stable;
+- two zones in one pack with different `seed` values stay independent of each other, which is what
+  the field is for. Give each zone that must not mirror another its own value.
+
+Leaving `seed` off (default `0`) is fine — the world seed alone already separates worlds. Set it
+only to keep sibling zones apart.
+
+Because the world seed now participates, a pack carrying these zones produces a **different
+layout than it did under 2.0.0** for the same world seed. Nothing needs rewriting; the JSON is
+unchanged and only the pattern moves.
+
+Fixed, seed-independent geometry is still available — that is what every other zone type in the
+table above is. If a feature must sit at the same coordinates in every world, express it with
+`within_distance` / `y_between` / … rather than a noise zone.
 
 ---
 
@@ -409,7 +432,34 @@ it can no longer affect the Y.
 }
 ```
 
-`structure_strategy` only acts through the `count_scale` factor (it scales RandomSpread spacing); other variants are no-ops there.
+### `structure_strategy` thins, it does not multiply
+
+`structure_strategy` accepts only `isekai_api:identity`, `isekai_api:count_scale` with a
+`factor` of `0.0`–`1.0`, and `isekai_api:pipe`s of those. A factor of `0.4` keeps roughly 40% of
+the structures the dimension would otherwise get:
+
+```json
+{
+  "structure_strategy": { "type": "isekai_api:count_scale", "factor": 0.4 }
+}
+```
+
+The thinning is a veto on placements the vanilla grid already produced, applied per chunk and
+per structure type, and derived from the world seed — so it is stable across saves and chunk
+regeneration, and two structure types thin independently.
+
+A `factor` above `1.0` is a validation error rather than a silent clamp. Making a structure
+*more* common needs candidate chunks that vanilla's grid never produced, and that grid is not
+reachable from a worldshape: the `RandomSpreadStructurePlacement` carrying `spacing` /
+`separation` is shared by every dimension referencing the same structure set, and the chunk set
+derived from it is computed once per world load and cached. Editing it per-dimension would leak
+into other dimensions and desynchronise the cache from the live values, which breaks seed
+reproducibility. To raise a structure's frequency, override its `StructureSet` JSON in your
+datapack.
+
+The Y-band variants (`linear`, `inverted`, `fixed_range`, `band_split`, `column_local`) are
+rejected here: they describe where in a column something sits, which says nothing about how
+often a structure spawns. Use them in `ore_strategy` / `mob_spawn_strategy` instead.
 
 ### SurfaceAnchor (`surface_anchor`)
 
@@ -440,6 +490,45 @@ solid ground-to-bedrock terrain it simply skips the placement.
 | `isekai_api:hard` | — |
 | `isekai_api:blend` | `blend_height` (int ≥ 0) |
 | `isekai_api:gap` | `gap_height` (int ≥ 0) |
+
+A layer's `transition` governs the seam to the layer directly above it — the layer whose
+`y_range.min_y` equals this layer's `y_range.max_y`.
+
+- **`hard`** — butt join. Every block belongs to whichever layer's half-open
+  `[min_y, max_y)` contains it.
+- **`blend`** — the two descriptors interleave across a band of `blend_height` blocks centred
+  on the seam. Each block in the band picks the upper or the lower descriptor, with the odds
+  running from "almost always lower" at the bottom of the band to "almost always upper" at the
+  top, so the seam reads as a speckled gradient instead of a flat line. What actually changes
+  is the descriptor's per-position output — `content_overrides.block_overrides`
+  (`surface_top`, `default_block`) and `structure_predicates`. Terrain shape comes from density
+  functions and is not affected. A `blend` whose seam has no layer directly above it has
+  nothing to blend into and behaves as `hard`.
+- **`gap`** — the layer gives up its top `gap_height` blocks: no descriptor applies there,
+  exactly as if the two `y_range`s had been authored that far apart. Use it to keep a layer's
+  `y_range` stated as its nominal span while still opening space above it.
+
+```json
+{
+  "layers": [
+    {
+      "y_range": { "min_y": -64, "max_y": 64, "distribution": "uniform" },
+      "descriptor": { "…": "underground layer" },
+      "transition": { "type": "isekai_api:blend", "blend_height": 8 }
+    },
+    {
+      "y_range": { "min_y": 64, "max_y": 320, "distribution": "uniform" },
+      "descriptor": { "…": "surface layer" },
+      "transition": { "type": "isekai_api:hard" }
+    }
+  ]
+}
+```
+
+The per-block choice is a pure hash of the coordinates and the seam Y — no world seed, no RNG
+state — so a regenerated chunk always reproduces the original. Client fog resolves by Y alone
+and therefore sees `blend` seams as `hard` (a per-position pick would make fog flicker as the
+camera moves); `gap` is a pure Y interval and applies there too.
 
 ### HeightDistribution (used by `playable_range.distribution`, `fixed_range.dist`)
 
