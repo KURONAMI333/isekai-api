@@ -152,10 +152,9 @@ public final class IsekaiValidator {
         // Walk per-category overrides too — each is an independent strategy tree.
         d.mobSpawnStrategyByCategory().forEach((cat, strat) ->
                 crossCheckStrategy("mob_spawn_strategy_by_category[" + cat.getSerializedName() + "]", strat));
-        // structure_strategy only reaches RandomSpreadStructurePlacement.spacing via the
-        // CountScale factor — Linear / Inverted / FixedRange / BandSplit have no semantic
-        // meaning for structure spawn frequency and are silently ignored at chunk gen.
-        // Warn the consumer so the no-op isn't surprising.
+        // structure_strategy acts only through the CountScale factor (structure thinning).
+        // Linear / Inverted / FixedRange / BandSplit are Y-band remaps with no meaning for
+        // structure frequency, so accepting them would be a silent no-op — reject instead.
         verifyStructureStrategyMeaningful(d.structureStrategy());
     }
 
@@ -181,16 +180,37 @@ public final class IsekaiValidator {
     }
 
     /**
-     * Reject any {@code structure_strategy} other than Identity (or a Pipe of Identity).
-     * Structure <em>placement density</em> (RandomSpread spacing/separation) is baked into
-     * the immutable {@code StructureSet} at codec-decode time and cannot be retargeted from
-     * a worldshape — there is no NeoForge StructureSet modifier hook. To change how often a
-     * structure spawns, override its {@code StructureSet} JSON directly in your datapack.
-     * Structure <em>exclusion</em> (via the structure modifier) and structure <em>placement
-     * conditions</em> (via {@code structure_predicates}) ARE supported.
+     * Accept only the {@code structure_strategy} variants that reach chunk generation:
+     * {@code Identity}, {@code CountScale} with a factor in {@code [0, 1]}, and {@code Pipe}s
+     * of those.
+     *
+     * <p>{@code CountScale} thins the structures vanilla's placement grid offers, via
+     * {@link com.kuronami.isekaiapi.impl.StructureThinning}. It cannot go the other way:
+     * a factor above 1.0 would need candidate chunks that the grid never produced, and the
+     * grid is not reachable from a worldshape (the {@code RandomSpreadStructurePlacement} is
+     * shared across dimensions and its derived chunk set is cached per world load). Rejecting
+     * such a factor keeps that limit visible instead of silently clamping it.
+     *
+     * <p>The Y-remapping variants (Linear / Inverted / FixedRange / BandSplit / ColumnLocal)
+     * describe where a feature sits in a column, which has no meaning for how often a
+     * structure spawns; they would be silent no-ops here.
      */
-    private static void verifyStructureStrategyMeaningful(com.kuronami.isekaiapi.api.remap.RemapStrategy s) {
+    // Package-private rather than private so the accept/reject contract can be locked by a
+    // unit test without standing up a ResourceManager.
+    static void verifyStructureStrategyMeaningful(com.kuronami.isekaiapi.api.remap.RemapStrategy s) {
         if (s instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.Identity) return;
+        if (s instanceof com.kuronami.isekaiapi.api.remap.RemapStrategy.CountScale cs) {
+            if (cs.factor() > 1.0) {
+                throw new IllegalArgumentException(
+                        "structure_strategy: count_scale factor " + cs.factor() + " > 1.0 — structures "
+                                + "can only be thinned, not multiplied. A worldshape vetoes placements "
+                                + "the vanilla StructureSet grid already produced; it cannot add new "
+                                + "ones (the grid is shared across dimensions and cached per world "
+                                + "load). To make a structure more common, override its StructureSet "
+                                + "JSON in your datapack.");
+            }
+            return;
+        }
         // Composite strategies (Pipe) recurse via children(); a Pipe-of-Identity is meaningful.
         if (!s.children().isEmpty()) {
             for (var child : s.children()) verifyStructureStrategyMeaningful(child);
@@ -198,10 +218,10 @@ public final class IsekaiValidator {
         }
         throw new IllegalArgumentException(
                 "structure_strategy: " + s.getClass().getSimpleName()
-                        + " has no effect — structure placement density can't be remapped from a "
-                        + "worldshape (StructureSet spacing is immutable; override the StructureSet "
-                        + "JSON in your datapack instead). Use ore_strategy / mob_spawn_strategy for "
-                        + "Y-range / count remap; structure_strategy must be isekai:identity.");
+                        + " has no effect — it remaps Y bands, which says nothing about how often a "
+                        + "structure spawns. Use isekai_api:count_scale (factor 0..1) to thin "
+                        + "structures, ore_strategy / mob_spawn_strategy for Y-range remap, or "
+                        + "isekai_api:identity to leave structures alone.");
     }
 
     /** Cross-field checks for a {@code LayeredFile}: non-overlapping y_ranges, monotone. */
