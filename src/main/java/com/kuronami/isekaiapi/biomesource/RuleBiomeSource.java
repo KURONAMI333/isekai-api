@@ -37,9 +37,9 @@ import org.jetbrains.annotations.ApiStatus;
  * }
  * }</pre>
  *
- * <p>Evaluation is pure (position → biome), so it's deterministic and seed-independent at
- * the rule layer; any randomness must come from the zone conditions themselves (none do
- * yet — all current zones are geometric).
+ * <p>Evaluation is pure (position → biome) at the rule layer: the rules are tried in order and
+ * the first match wins, with no randomness of its own. Randomness lives in the zones, and the
+ * zones get it from the world seed — see {@link #bindWorldSeed(long)}.
  */
 @ApiStatus.Internal
 public class RuleBiomeSource extends BiomeSource {
@@ -60,9 +60,38 @@ public class RuleBiomeSource extends BiomeSource {
     private final Holder<Biome> fallback;
     private final List<Rule> rules;
 
+    /**
+     * The rule list actually evaluated: {@link #rules} with every zone bound to this level's
+     * world seed. Starts as the unbound list so a source that never sees {@link #bindWorldSeed}
+     * (a dimension created outside the normal server level lifecycle) still generates rather than
+     * failing. Written once per level load, read from every worldgen worker — volatile for safe
+     * publication of the freshly built zone tree.
+     */
+    private volatile List<Rule> activeRules;
+    private volatile boolean bound;
+
     public RuleBiomeSource(Holder<Biome> fallback, List<Rule> rules) {
         this.fallback = fallback;
         this.rules = List.copyOf(rules);
+        this.activeRules = this.rules;
+    }
+
+    /**
+     * Rebuild every rule's zone against {@code worldSeed}, so noise-backed zones draw a pattern
+     * unique to this world. Called once per level from the level-load hook, before any chunk is
+     * generated; idempotent, and re-binding always re-derives from the datapack's own {@code seed}
+     * fields rather than from the previously derived values.
+     */
+    public void bindWorldSeed(long worldSeed) {
+        this.activeRules = rules.stream()
+                .map(r -> new Rule(r.zone().withWorldSeed(worldSeed), r.biome()))
+                .toList();
+        this.bound = true;
+    }
+
+    /** Whether {@link #bindWorldSeed} has run — diagnostics only. */
+    public boolean isBound() {
+        return bound;
     }
 
     @Override
@@ -79,7 +108,7 @@ public class RuleBiomeSource extends BiomeSource {
 
     @Override
     public Holder<Biome> getNoiseBiome(int quartX, int quartY, int quartZ, Climate.Sampler sampler) {
-        for (Rule rule : rules) {
+        for (Rule rule : activeRules) {
             if (rule.zone().test(quartX, quartY, quartZ)) {
                 return rule.biome();
             }
