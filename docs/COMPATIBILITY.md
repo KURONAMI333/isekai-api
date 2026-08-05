@@ -69,6 +69,35 @@ should try `remapToColumn` first and fall back to `remap`, the order
 Consumers who only build descriptors from the factory/record API (`WorldshapeDescriptor.builder()`,
 `new SpatialPredicate.YInRange(...)`, etc.) and authors who only write JSON need no changes.
 
+## Datapack behavior change in 2.1.0 — BiomeZone noise follows the world seed
+
+`isekai_api:noise_threshold` and `isekai_api:edge_jitter` used to seed their noise from the
+literal `seed` written in the JSON, which made the pattern a property of the *pack* rather than of
+the *world*: every player who installed a given pack got a byte-identical biome layout. From 2.1.0
+the world seed is folded in, so the pattern differs per world and repeats for the same world seed.
+
+The schema is untouched — the same JSON loads, and `seed` keeps its role of separating sibling
+zones from each other. What moves is the pattern a given world seed produces. Packs that relied on
+a *fixed* pattern should state it with the geometric zone types, which are seed-independent by
+construction.
+
+## Java API compatibility across 2.1.0
+
+`BiomeZone` gained two elements, both additive:
+
+- `default BiomeZone withWorldSeed(long)` — returns `this` unless the zone's result depends on the
+  world seed. Third-party variants written against 1.x or 2.0.0 inherit the default and keep
+  compiling and behaving as before.
+- `static long deriveSeed(long worldSeed, long zoneSeed)` — the combining function the built-ins
+  use. Third-party noise-backed variants that want per-world patterns should override
+  `withWorldSeed` and route their seed through this.
+
+A third-party variant that does **not** override `withWorldSeed` is never re-derived, so it keeps
+whatever determinism it had. A third-party *combinator* is the one case worth checking: since the
+default returns `this`, it will not pass the world seed down to the zones it wraps, and a built-in
+noise zone nested inside it stays on the unbound pattern. Override `withWorldSeed` to rebuild
+around `child.withWorldSeed(worldSeed)` if your variant holds children.
+
 ## Depending on Isekai API
 
 Isekai is a `compileOnly` worldgen library: you compile against its `api` package, and the
