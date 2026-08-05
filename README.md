@@ -323,9 +323,14 @@ All subcommands require permission level 2 (operators).
 
 Produces `build/libs/isekai_api-2.0.0.jar` plus matching `-sources` and `-javadoc` jars.
 
-To depend on Isekai from another mod, add it as a `compileOnly` dependency. It is already on
-[Cursemaven](https://cursemaven.com) (the CurseForge file is approved), and also served as a
-raw-URL maven from this repo's `maven` branch. Full coordinates and the compatibility contract
+To depend on Isekai from another mod, add it as a `compileOnly` dependency:
+
+```gradle
+repositories { maven { url = "https://raw.githubusercontent.com/KURONAMI333/isekai-api/maven" } }
+dependencies { compileOnly "com.kuronami.isekaiapi:isekai_api:2.0.0" }
+```
+
+[Cursemaven](https://cursemaven.com) works too. Full coordinates and the compatibility contract
 are in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md#depending-on-isekai-api).
 
 ## Examples
