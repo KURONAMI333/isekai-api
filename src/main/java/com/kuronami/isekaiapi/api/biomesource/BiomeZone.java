@@ -48,9 +48,13 @@ import java.util.List;
  *   <li>{@code within_distance} {@code {radius, [center_x], [center_z]}} — XZ distance &le; radius.</li>
  *   <li>{@code beyond_distance} {@code {radius, [center_x], [center_z]}} — XZ distance &gt; radius.</li>
  *   <li>{@code and} {@code {all: [...]}} / {@code or} {@code {any: [...]}} / {@code not} {@code {inner}} — combinators.</li>
- *   <li>{@code noise_threshold} — true where a deterministic noise sample exceeds {@code threshold}.</li>
+ *   <li>{@code noise_threshold} — true where a noise sample exceeds {@code threshold}.</li>
  *   <li>{@code edge_jitter} — perturbs the test coordinate by a small noise offset before delegating to {@code inner}.</li>
  * </ul>
+ *
+ * <p><b>World seed.</b> Noise-backed variants take their randomness from the world seed combined
+ * with the zone's own {@code seed} field, so the same datapack produces a different pattern in
+ * every world and the same pattern for the same world seed. See {@link #withWorldSeed(long)}.
  *
  * @since 1.0.0
  */
@@ -68,6 +72,56 @@ public interface BiomeZone {
 
     /** Nested zones, for tree-walking. Empty for leaf variants. @since 2.0.0 */
     default List<BiomeZone> children() { return List.of(); }
+
+    /**
+     * Return a copy of this zone bound to a world seed, or {@code this} when the zone's result
+     * does not depend on one.
+     *
+     * <p>{@link #test} receives only a coordinate, so a zone that wants world-seeded randomness
+     * cannot obtain the seed at test time. Instead the biome source rebuilds its whole zone tree
+     * once, when the level it belongs to is loaded, and evaluates the rebuilt tree from then on —
+     * the per-sample path stays a plain {@code test(x, y, z)} with no lookup.
+     *
+     * <p>Contract for implementors:
+     * <ul>
+     *   <li>The returned zone must be equivalent to this one in every respect except the noise
+     *       streams it derives from the world seed. In particular the codec fields must survive
+     *       unchanged, so the rebuilt zone still encodes back to the JSON it came from.</li>
+     *   <li>A zone with children must call {@code withWorldSeed} on each child and rebuild
+     *       itself around the results, otherwise nested noise zones stay unseeded.</li>
+     *   <li>Calling it again with a different seed must re-derive from the zone's own
+     *       {@code seed} field, not from the previously derived value.</li>
+     * </ul>
+     *
+     * <p>The default returns {@code this}, so purely geometric variants — including third-party
+     * ones written before this method existed — need no change.
+     *
+     * @param worldSeed the seed of the level this zone will be evaluated in
+     * @since 2.1.0
+     */
+    default BiomeZone withWorldSeed(long worldSeed) { return this; }
+
+    /**
+     * Combine a world seed with a zone-local {@code seed} field into the seed a noise-backed
+     * variant actually samples with. Mirrors how vanilla hands out derived randomness from
+     * {@code RandomState}: one level seed fans out into independent, reproducible streams.
+     *
+     * <p>Deterministic and injective in both arguments — two zones with different {@code seed}
+     * fields get different patterns inside one world, and the same zone gets a different pattern
+     * in every world. Third-party variants that implement {@link #withWorldSeed(long)} should
+     * route their seed through this so they behave like the built-ins.
+     *
+     * @since 2.1.0
+     */
+    static long deriveSeed(long worldSeed, long zoneSeed) {
+        // SplitMix64 finalizer over (worldSeed XOR odd-multiplied zoneSeed): the multiply is a
+        // bijection, so distinct zoneSeeds never collide, and the finalizer decorrelates worlds
+        // whose seeds differ by only a few bits.
+        long z = worldSeed ^ (zoneSeed * 0x9E3779B97F4A7C15L);
+        z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
+        z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
+        return z ^ (z >>> 31);
+    }
 
     /** Dispatching codec keyed on a {@code "type"} field, backed by the BiomeZone registry. */
     Codec<BiomeZone> CODEC = IsekaiDispatch.dispatchCodec(
@@ -164,6 +218,9 @@ public interface BiomeZone {
         }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
         @Override public List<BiomeZone> children() { return all; }
+        @Override public BiomeZone withWorldSeed(long worldSeed) {
+            return new And(all.stream().map(c -> c.withWorldSeed(worldSeed)).toList());
+        }
     }
 
     /** Matches where any inner zone matches. @since 1.0.0 */
@@ -178,6 +235,9 @@ public interface BiomeZone {
         }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
         @Override public List<BiomeZone> children() { return any; }
+        @Override public BiomeZone withWorldSeed(long worldSeed) {
+            return new Or(any.stream().map(c -> c.withWorldSeed(worldSeed)).toList());
+        }
     }
 
     /** Matches where the inner zone does not match. @since 1.0.0 */
@@ -188,14 +248,20 @@ public interface BiomeZone {
         @Override public boolean test(int x, int y, int z) { return !inner.test(x, y, z); }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
         @Override public List<BiomeZone> children() { return List.of(inner); }
+        @Override public BiomeZone withWorldSeed(long worldSeed) {
+            return new Not(inner.withWorldSeed(worldSeed));
+        }
     }
 
     /**
-     * Match where a {@link NormalNoise} sampled at the position exceeds {@code threshold}. The
-     * noise is built once at zone construction from a {@link NormalNoise.NoiseParameters} ref + a
-     * {@code seed} (so the pattern is deterministic and independent of the world seed — by
-     * design, since {@code BiomeZone} has no access to world context). Use to introduce
-     * organic, non-geometric biome borders.
+     * Match where a {@link NormalNoise} sampled at the position exceeds {@code threshold}. Use to
+     * introduce organic, non-geometric biome borders.
+     *
+     * <p>The noise stream comes from {@link BiomeZone#deriveSeed(long, long)} over the world seed
+     * and this zone's {@code seed} field, so one datapack draws a different pattern in every world
+     * while two zones with different {@code seed} fields stay independent inside one world. The
+     * sampler is built once per level load (see {@link BiomeZone#withWorldSeed(long)}), not per
+     * sample. Until a world seed is bound the zone samples as if the world seed were {@code 0}.
      *
      * <p>{@code size_xz} / {@code size_y} are 1/scale factors applied to the sampled block
      * coordinate — bigger values produce wider noise features.
@@ -212,8 +278,18 @@ public interface BiomeZone {
                 .apply(i, NoiseThreshold::fromConfig));
         public static NoiseThreshold fromConfig(Holder<NormalNoise.NoiseParameters> noise, long seed,
                                                 double threshold, double sizeXz, double sizeY) {
-            NormalNoise n = NormalNoise.create(RandomSource.create(seed), noise.value());
+            return seeded(noise, seed, threshold, sizeXz, sizeY, 0L);
+        }
+        private static NoiseThreshold seeded(Holder<NormalNoise.NoiseParameters> noise, long seed,
+                                             double threshold, double sizeXz, double sizeY, long worldSeed) {
+            NormalNoise n = NormalNoise.create(
+                    RandomSource.create(BiomeZone.deriveSeed(worldSeed, seed)), noise.value());
             return new NoiseThreshold(noise, seed, threshold, sizeXz, sizeY, n);
+        }
+        // Re-derives from the codec `seed` field, so re-binding a already-bound zone is a no-op
+        // rather than a compounding shift of the pattern.
+        @Override public BiomeZone withWorldSeed(long worldSeed) {
+            return seeded(noise, seed, threshold, sizeXz, sizeY, worldSeed);
         }
         @Override public boolean test(int qx, int qy, int qz) {
             double x = QuartPos.toBlock(qx) / sizeXz;
@@ -230,8 +306,11 @@ public interface BiomeZone {
      * organic ones without changing the inner zone's intent. The {@code strength} is the
      * maximum block-distance the test position is shifted.
      *
-     * <p>Like {@link NoiseThreshold} the jitter noise is deterministic from a fixed
-     * {@code seed} (no world context available).
+     * <p>Like {@link NoiseThreshold} the jitter noise is drawn from the world seed combined with
+     * this zone's {@code seed} field, so the ripple differs per world and repeats for the same
+     * world seed. The two offset streams are additionally salted apart from each other and from
+     * {@code noise_threshold}, so a jitter and a threshold sharing one {@code seed} do not warp
+     * and cut along the same contour.
      * @since 1.0.0
      */
     record EdgeJitter(BiomeZone inner, Holder<NormalNoise.NoiseParameters> noise, long seed,
@@ -246,12 +325,21 @@ public interface BiomeZone {
                 .apply(i, EdgeJitter::fromConfig));
         public static EdgeJitter fromConfig(BiomeZone inner, Holder<NormalNoise.NoiseParameters> noise,
                                             long seed, double strength, double sizeXz) {
+            return seeded(inner, noise, seed, strength, sizeXz, 0L);
+        }
+        private static EdgeJitter seeded(BiomeZone inner, Holder<NormalNoise.NoiseParameters> noise,
+                                         long seed, double strength, double sizeXz, long worldSeed) {
             // Two independent samplers (different seed bits) so x-offset and z-offset are
             // decorrelated — otherwise both axes jitter together and the warp collapses to a
-            // diagonal stretch instead of an organic ripple.
-            NormalNoise nx = NormalNoise.create(RandomSource.create(seed), noise.value());
-            NormalNoise nz = NormalNoise.create(RandomSource.create(seed ^ 0x9E3779B97F4A7C15L), noise.value());
+            // diagonal stretch instead of an organic ripple. Both are salted off the derived
+            // seed, which also keeps them clear of a noise_threshold carrying the same `seed`.
+            long derived = BiomeZone.deriveSeed(worldSeed, seed);
+            NormalNoise nx = NormalNoise.create(RandomSource.create(derived ^ 0x9E3779B97F4A7C15L), noise.value());
+            NormalNoise nz = NormalNoise.create(RandomSource.create(derived ^ 0xC2B2AE3D27D4EB4FL), noise.value());
             return new EdgeJitter(inner, noise, seed, strength, sizeXz, nx, nz);
+        }
+        @Override public BiomeZone withWorldSeed(long worldSeed) {
+            return seeded(inner.withWorldSeed(worldSeed), noise, seed, strength, sizeXz, worldSeed);
         }
         @Override public boolean test(int qx, int qy, int qz) {
             double bx = QuartPos.toBlock(qx);

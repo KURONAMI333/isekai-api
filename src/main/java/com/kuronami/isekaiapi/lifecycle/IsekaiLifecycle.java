@@ -1,13 +1,16 @@
 package com.kuronami.isekaiapi.lifecycle;
 
 import com.kuronami.isekaiapi.IsekaiApi;
+import com.kuronami.isekaiapi.biomesource.RuleBiomeSource;
 import com.kuronami.isekaiapi.impl.IsekaiInternal;
 import com.kuronami.isekaiapi.impl.VanillaRuleSnapshot;
 import com.kuronami.isekaiapi.validation.IsekaiValidator;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
+import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 
@@ -25,6 +28,8 @@ import org.jetbrains.annotations.ApiStatus;
  *       by the lazy scan in {@link IsekaiInternal#currentSnapshot()}.</li>
  *   <li>{@code ServerStoppingEvent} — invalidates the cached snapshot so the next world
  *       (possibly a different datapack set) re-scans rather than reusing a stale one.</li>
+ *   <li>{@code LevelEvent.Load} — hands the world seed to the level's {@code isekai_api:rule}
+ *       biome source, the one point in 1.21.1 where a {@code BiomeSource} can obtain it.</li>
  *   <li>{@code AddReloadListenerEvent} — registers the two
  *       {@link IsekaiReloadListener} instances (worldshape / layered_worldshape JSON
  *       loading) plus {@link SnapshotRefreshListener} (rebuild the snapshot on every
@@ -92,6 +97,36 @@ public final class IsekaiLifecycle {
             IsekaiApi.LOGGER.info("[Isekai] {} structure(s) using isekai_api types loaded in this world", n[0]);
         } catch (RuntimeException e) {
             IsekaiApi.LOGGER.warn("[Isekai] structure-presence check failed: {}", e.toString());
+        }
+    }
+
+    /**
+     * Hand the world seed to every {@code isekai_api:rule} biome source in the level that just
+     * loaded.
+     *
+     * <p>This is the only point where a {@code BiomeSource} can learn the seed. 1.21.1 routes the
+     * seed through {@code RandomState} — {@code ChunkMap} builds one from {@code level.getSeed()}
+     * and hands only its {@code Climate.Sampler} down to
+     * {@code BiomeSource#getNoiseBiome(int, int, int, Climate.Sampler)}, and the sampler carries
+     * six density functions and a spawn target, no seed. So the source has to be told out of band,
+     * before generation starts.
+     *
+     * <p>The timing is safe by construction: {@code MinecraftServer#createLevels} posts this event
+     * for a level immediately after constructing it and before both {@code setInitialSpawn} (the
+     * first thing that samples biomes) and {@code prepareLevels} (chunk generation). Client levels
+     * are skipped — they have no chunk generator and receive their biomes from the server.
+     */
+    @SubscribeEvent
+    public static void onLevelLoad(LevelEvent.Load event) {
+        if (!(event.getLevel() instanceof ServerLevel level)) return;
+        var biomeSource = level.getChunkSource().getGenerator().getBiomeSource();
+        if (biomeSource instanceof RuleBiomeSource source) {
+            source.bindWorldSeed(level.getSeed());
+            IsekaiApi.LOGGER.info("[Isekai] {}: rule biome source bound to the world seed",
+                    level.dimension().location());
+        } else {
+            IsekaiApi.LOGGER.debug("[Isekai] {}: biome source is {}, no rule zones to seed",
+                    level.dimension().location(), biomeSource.getClass().getSimpleName());
         }
     }
 
