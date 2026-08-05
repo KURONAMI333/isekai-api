@@ -89,7 +89,11 @@ public class RuleBiomeSource extends BiomeSource {
         this.bound = true;
     }
 
-    /** Whether {@link #bindWorldSeed} has run — diagnostics only. */
+    /**
+     * Whether {@link #bindWorldSeed} has run. Read by the server-started sweep, which warns about
+     * any source that slipped past the level-load hook and would therefore draw one shared
+     * pattern for every player.
+     */
     public boolean isBound() {
         return bound;
     }
