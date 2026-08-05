@@ -55,11 +55,33 @@ public interface IsekaiRemap {
      * (a gap), return empty. If no layered declaration exists for the dimension, fall back
      * to {@link #getActiveDescriptor(ResourceKey)}.
      *
+     * <p>Position-independent, so {@link TransitionRule.Blend} seams resolve as if they were
+     * {@link TransitionRule.Hard} — a blend is a spatial interleave and cannot be expressed
+     * from Y alone. {@link TransitionRule.Gap} does apply, being a pure Y interval. Callers
+     * that know X and Z should use {@link #getDescriptorAt(ResourceKey, int, int, int)}.
+     *
      * @return descriptor active at this Y, or empty if neither layer nor single descriptor
      *         applies
      * @since 1.0.0
      */
     Optional<WorldshapeDescriptor> getDescriptorAt(ResourceKey<Level> dimension, int y);
+
+    /**
+     * The descriptor that applies at a specific block position. Same resolution as
+     * {@link #getDescriptorAt(ResourceKey, int)}, with the layer seams evaluated per position
+     * so that {@link TransitionRule.Blend} interleaves the two neighbouring descriptors across
+     * its band and {@link TransitionRule.Gap} opens empty space below the seam.
+     *
+     * <p>The per-position choice is a pure hash of the coordinates and the seam Y, so it is
+     * stable across runs, saves and chunk regeneration.
+     *
+     * @return descriptor active at this position, or empty if neither layer nor single
+     *         descriptor applies
+     * @since 2.1.0
+     */
+    default Optional<WorldshapeDescriptor> getDescriptorAt(ResourceKey<Level> dimension, int x, int y, int z) {
+        return getDescriptorAt(dimension, y);
+    }
 
     /** All dimensions that currently have any worldshape declaration (single or layered). @since 1.0.0 */
     Set<ResourceKey<Level>> getDeclaredDimensions();

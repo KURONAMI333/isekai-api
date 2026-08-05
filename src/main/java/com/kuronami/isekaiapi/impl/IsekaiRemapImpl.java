@@ -91,15 +91,20 @@ public final class IsekaiRemapImpl implements IsekaiRemap {
     public Optional<WorldshapeDescriptor> getDescriptorAt(ResourceKey<Level> dimension, int y) {
         List<LayeredDescriptor> layers = multiLayer.get(dimension);
         if (layers != null && !layers.isEmpty()) {
-            // half-open interval [minY, maxY): standard for consecutive non-overlapping bands
-            for (LayeredDescriptor l : layers) {
-                if (y >= l.yRange().minY() && y < l.yRange().maxY()) {
-                    return Optional.of(l.descriptor());
-                }
-            }
-            // Y falls in a gap between layers — no descriptor applies. (TransitionRule.Gap
-            // explicitly models this; for Hard / Blend the validator enforces no gaps.)
-            return Optional.empty();
+            return LayerResolver.resolveByY(layers, y);
+        }
+        return getActiveDescriptor(dimension);
+    }
+
+    @Override
+    public Optional<WorldshapeDescriptor> getDescriptorAt(ResourceKey<Level> dimension,
+                                                           int x, int y, int z) {
+        List<LayeredDescriptor> layers = multiLayer.get(dimension);
+        if (layers != null && !layers.isEmpty()) {
+            // Half-open [minY, maxY) bands, with each layer's TransitionRule applied at the
+            // seam it owns. A position in a gap — authored or TransitionRule.Gap-derived —
+            // resolves to no descriptor.
+            return LayerResolver.resolve(layers, x, y, z);
         }
         return getActiveDescriptor(dimension);
     }

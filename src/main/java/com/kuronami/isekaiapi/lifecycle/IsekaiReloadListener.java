@@ -153,12 +153,13 @@ public final class IsekaiReloadListener extends SimpleJsonResourceReloadListener
     }
 
     /**
-     * Layered JSON shape:
+     * Layered JSON shape. The transition lives on each layer and governs the seam to the
+     * layer above it; there is no file-level transition field (one would be strictly less
+     * expressive, and {@link LayeredFile} does not read it).
      * <pre>
      * {
      *   "dimension": "minecraft:overworld",
-     *   "layers": [ { "y_range": ..., "descriptor": ..., "transition": ... }, ... ],
-     *   "transition": { "type": "isekai:hard" }   // top-level transition between adjacent layers
+     *   "layers": [ { "y_range": ..., "descriptor": ..., "transition": ... }, ... ]
      * }
      * </pre>
      */

@@ -101,7 +101,8 @@ public record WorldshapeSurfaceTopRule(ResourceKey<Level> dimension, SurfaceRule
                     var biome = context.biome.get();
                     var key = biome.unwrapKey().orElse(null);
                     if (key == null) return null;
-                    var worldshape = Isekai.remap().getDescriptorAt(dimension, blockY).orElse(null);
+                    var worldshape = Isekai.remap()
+                            .getDescriptorAt(dimension, blockX, blockY, blockZ).orElse(null);
                     if (worldshape == null) return null;
                     return worldshape.blockOverrides().surfaceTop().get(key);
                 }
