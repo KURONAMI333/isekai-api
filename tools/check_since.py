@@ -115,6 +115,11 @@ def main():
                 ]
                 if len(toks) < 2:
                     continue
+                # `return foo(...);` inside a method body reads like a declaration whose
+                # "return type" is the word `return`. Anything led by a statement keyword
+                # is a call site, not a declaration.
+                if toks[0] in KEYWORDS:
+                    continue
                 # exclude @Override
                 prev = lines[idx - 1].strip() if idx > 0 else ""
                 if prev.startswith("@Override") or "@Override" in line:
