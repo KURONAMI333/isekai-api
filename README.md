@@ -330,8 +330,9 @@ repositories { maven { url = "https://raw.githubusercontent.com/KURONAMI333/isek
 dependencies { compileOnly "com.kuronami.isekaiapi:isekai_api:2.0.0" }
 ```
 
-[Cursemaven](https://cursemaven.com) works too. Full coordinates and the compatibility contract
-are in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md#depending-on-isekai-api).
+[Cursemaven](https://cursemaven.com) works too once the CurseForge file for that version is
+approved. Full coordinates and the compatibility contract are in
+[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md#depending-on-isekai-api).
 
 ## Examples
 
