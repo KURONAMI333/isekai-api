@@ -76,12 +76,15 @@ consumer's own NeoForge provides the runtime. The published pom carries **no dep
 
 Two account-free distribution routes, both public:
 
-**Cursemaven** (works today — the CurseForge file is already approved):
+**Cursemaven** (available once the CurseForge file is approved):
 
 ```gradle
 repositories { maven { url = "https://cursemaven.com" } }
-dependencies { compileOnly "curse.maven:isekai-api-<projectId>:<fileId>" }
+dependencies { compileOnly "curse.maven:isekai-api-1557389:8581037" }   // 2.0.0
 ```
+
+The trailing number is the CurseForge *file* id, so it changes every release; the
+raw-URL route below takes an ordinary version string instead.
 
 **Raw-URL maven** (the repo's `maven` branch, served by GitHub):
 
