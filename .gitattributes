@@ -1,0 +1,3 @@
+# A maven repo must be served byte-for-byte: Gradle checks each artifact
+# against its .sha1 sidecar. Any line-ending conversion breaks resolution.
+* -text
