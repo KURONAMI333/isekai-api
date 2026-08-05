@@ -125,6 +125,8 @@ Density functions decide the *shape* of terrain; the biome source decides *which
 
 This makes arbitrary biome distributions expressible from datapack: vertical layers, concentric rings, half-and-half regions, etc.
 
+Two more variants, `isekai_api:noise_threshold` and `isekai_api:edge_jitter`, break those shapes up with noise. Their `seed` field is folded together with the **world seed**, so one pack draws a different pattern in every world and the same pattern for the same world seed — see [DATAPACK_REFERENCE.md](docs/DATAPACK_REFERENCE.md). Every other variant above is fixed geometry, unaffected by the seed.
+
 **`isekai_api:climate_zones`** — places biomes by matching the vanilla climate axes (temperature / humidity / continentalness / erosion / weirdness / depth) against per-rule range constraints. Same purpose as vanilla `minecraft:multi_noise` but each rule lists only the axes it cares about (others default to no constraint), and order is explicit (first match wins) instead of vanilla's nearest-point matching. Suited to Overworld-style multi-biome worlds where biome choice is climate-driven rather than position-driven.
 
 ### New dimensions
