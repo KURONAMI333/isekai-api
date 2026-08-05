@@ -130,6 +130,25 @@ public final class IsekaiLifecycle {
         }
     }
 
+    /**
+     * Report any {@code isekai_api:rule} biome source that reached a running server without a
+     * world seed. Such a source falls back to the pattern it would draw in a world seeded 0, i.e.
+     * the same layout for every player — the exact failure this seeding exists to prevent, and one
+     * that is invisible until two people compare screenshots. A log line is the cheapest way to
+     * make it diagnosable, so it is worth the one pass over the level list.
+     */
+    @SubscribeEvent
+    public static void onServerStarted(net.neoforged.neoforge.event.server.ServerStartedEvent event) {
+        for (ServerLevel level : event.getServer().getAllLevels()) {
+            if (level.getChunkSource().getGenerator().getBiomeSource() instanceof RuleBiomeSource source
+                    && !source.isBound()) {
+                IsekaiApi.LOGGER.warn("[Isekai] {}: rule biome source never received the world seed — "
+                        + "its noise zones will draw the same pattern in every world. This dimension "
+                        + "was created outside the normal level-load path.", level.dimension().location());
+            }
+        }
+    }
+
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
         // Drop the snapshot so the next world re-scans via the lazy path instead of
