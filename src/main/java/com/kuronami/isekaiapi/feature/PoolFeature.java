@@ -28,7 +28,12 @@ import org.jetbrains.annotations.ApiStatus;
  * Consumer chooses {@code fluid} (typically water/lava) and {@code rim_block} (sand for
  * desert-style ponds, stone for highland tarns, mud for swamps, etc.).
  *
- * <p>JSON: {@code {"type":"isekai_api:pool", "fluid":{"Name":"minecraft:water","Properties":{"level":"0"}}, "rim_block":{"type":"minecraft:simple_state_provider","state":{"Name":"minecraft:sand"}}, "xz_radius":{"type":"minecraft:uniform","value":{"min_inclusive":3,"max_inclusive":5}}, "depth":2}}.
+ * <p>JSON: {@code {"type":"isekai_api:pool", "fluid":{"Name":"minecraft:water","Properties":{"level":"0"}}, "rim_block":{"type":"minecraft:simple_state_provider","state":{"Name":"minecraft:sand"}}, "xz_radius":{"type":"minecraft:uniform","min_inclusive":3,"max_inclusive":5}, "depth":2}}.
+ *
+ * <p>{@code xz_radius} is an {@link IntProvider}: either a bare number, or a dispatched
+ * form whose fields sit <em>inline</em> beside {@code "type"}. {@code UniformInt}'s codec is
+ * a {@code MapCodec}, so there is no {@code "value"} wrapper — writing one fails registry
+ * load with "Not a number / No key min_inclusive".
  */
 @ApiStatus.Internal
 public class PoolFeature extends Feature<PoolFeature.Config> {
