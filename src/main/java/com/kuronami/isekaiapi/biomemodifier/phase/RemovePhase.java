@@ -1,11 +1,10 @@
 package com.kuronami.isekaiapi.biomemodifier.phase;
 
 import com.kuronami.isekaiapi.IsekaiApi;
-import com.kuronami.isekaiapi.api.query.PlacedFeatureInfo;
 import com.kuronami.isekaiapi.api.remap.RemapStrategy;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
 import com.kuronami.isekaiapi.impl.IsekaiInternal;
-import com.kuronami.isekaiapi.impl.VanillaRuleSnapshot;
+import com.kuronami.isekaiapi.impl.RemapTargets;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.biome.Biome;
@@ -15,7 +14,6 @@ import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.neoforged.neoforge.common.world.BiomeGenerationSettingsBuilder;
 import net.neoforged.neoforge.common.world.ModifiableBiomeInfo;
 
-import java.util.HashSet;
 import java.util.Set;
 import org.jetbrains.annotations.ApiStatus;
 
@@ -27,10 +25,15 @@ import org.jetbrains.annotations.ApiStatus;
  *       from every decoration step.</li>
  *   <li>{@link #excludedCarvers} — drop every ConfiguredWorldCarver in
  *       {@code exclusions.carvers} from every carving step.</li>
- *   <li>{@link #originalsPendingRemap} — drop every snapshot-known ore feature whose
+ *   <li>{@link #originalsPendingRemap} — drop every snapshot-known feature whose
  *       VerticalRange the ADD phase will re-inject under the active {@code oreStrategy}.
  *       Skipped when the strategy is {@link RemapStrategy.Identity}.</li>
  * </ul>
+ *
+ * <p>The removal set of {@link #originalsPendingRemap} comes from
+ * {@link RemapTargets#select}, the same function the ADD phase re-injects from, so the two
+ * halves cannot drift — in particular an {@code exclusions.features} entry is neither
+ * re-injected nor counted as pending remap.
  */
 @ApiStatus.Internal
 public final class RemovePhase {
@@ -64,7 +67,8 @@ public final class RemovePhase {
                                               ModifiableBiomeInfo.BiomeInfo.Builder builder) {
         if (descriptor.oreStrategy() instanceof RemapStrategy.Identity) return;
         if (biomeKey == null) return;
-        Set<ResourceKey<PlacedFeature>> remapTargets = collectRemapTargets(biomeKey);
+        Set<ResourceKey<PlacedFeature>> remapTargets = RemapTargets.select(
+                IsekaiInternal.currentSnapshot(), biomeKey, descriptor.exclusions().features());
         if (remapTargets.isEmpty()) return;
         int removed = removeFeaturesByKey(builder.getGenerationSettings(), remapTargets);
         if (removed > 0) {
@@ -107,24 +111,5 @@ public final class RemovePhase {
 
     private static <T> boolean matchesKey(Holder<T> holder, Set<ResourceKey<T>> targets) {
         return holder.unwrapKey().map(targets::contains).orElse(false);
-    }
-
-    /**
-     * Intersection of "ores tracked in the snapshot" ∩ "features originally in this biome".
-     * Scoping by biome ensures the matching ADD phase only re-injects features the biome
-     * actually had — pair invariant for the per-biome remap pipeline.
-     */
-    private static Set<ResourceKey<PlacedFeature>> collectRemapTargets(ResourceKey<Biome> biomeKey) {
-        VanillaRuleSnapshot snapshot = IsekaiInternal.currentSnapshot();
-        if (snapshot == null) return Set.of();
-        Set<ResourceKey<PlacedFeature>> inBiome = snapshot.featuresInBiome(biomeKey);
-        if (inBiome.isEmpty()) return Set.of();
-        Set<ResourceKey<PlacedFeature>> set = new HashSet<>();
-        for (PlacedFeatureInfo info : snapshot.placedFeatures()) {
-            if (snapshot.isFallback(info)) continue;
-            if (!inBiome.contains(info.key())) continue;
-            set.add(info.key());
-        }
-        return set;
     }
 }

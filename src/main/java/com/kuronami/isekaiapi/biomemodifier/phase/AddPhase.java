@@ -7,6 +7,7 @@ import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
 import com.kuronami.isekaiapi.impl.IsekaiInternal;
 import com.kuronami.isekaiapi.impl.PlacedFeatureRebuilder;
 import com.kuronami.isekaiapi.impl.RemapEngine;
+import com.kuronami.isekaiapi.impl.RemapTargets;
 import com.kuronami.isekaiapi.impl.VanillaRuleSnapshot;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
@@ -30,13 +31,21 @@ import org.jetbrains.annotations.ApiStatus;
  *   <li>{@link #additionalCarvers} — inject each entry of {@code additions.carvers}
  *       into the named carving step.</li>
  *   <li>{@link #remappedOreFeatures} — synthesize new PlacedFeatures by applying the
- *       active {@code oreStrategy} to each snapshot ore's VerticalRange and re-inject
- *       under the original decoration step(s).</li>
+ *       active {@code oreStrategy} to the VerticalRange of every remap target of this
+ *       biome and re-inject under the original decoration step(s). Despite the name the
+ *       {@code oreStrategy} governs every height-ranged feature in the biome, not just
+ *       ores — springs, geodes and lakes ride the same path.</li>
  * </ul>
  *
  * <p>All three short-circuit when the server context isn't available (datagen, early
  * lifecycle) or when there's nothing to add. The remap path additionally short-circuits
  * on {@link RemapStrategy.Identity}.
+ *
+ * <p>{@code additions.features} / {@code additions.carvers} are injected verbatim: they are
+ * the consumer naming an entry explicitly, so they are not filtered against
+ * {@code exclusions}. The remap path is the opposite case — nobody asked for those entries
+ * by name — and so it selects through {@link RemapTargets#select}, which drops anything the
+ * descriptor excluded.
  */
 @ApiStatus.Internal
 public final class AddPhase {
@@ -117,11 +126,14 @@ public final class AddPhase {
         VanillaRuleSnapshot snapshot = IsekaiInternal.currentSnapshot();
         if (snapshot == null || snapshot.isEmpty()) return;
 
-        // Per-biome scoping: only re-inject ores that were originally in THIS biome at
-        // scan time. Without this filter, every matched biome would receive every snapshot
-        // ore — plains would generate diamond, modded ores, etc, even though it never had them.
-        Set<net.minecraft.resources.ResourceKey<PlacedFeature>> originalFeatures = snapshot.featuresInBiome(biomeKey);
-        if (originalFeatures.isEmpty()) return;
+        // The set the REMOVE phase just deleted, computed by the same function so ADD can
+        // neither miss one nor invent one. It is scoped to this biome (otherwise plains would
+        // receive diamond and every modded ore) and it honours exclusions.features — a
+        // re-injected feature is an anonymous Holder.direct with no ResourceKey, so an
+        // excluded key put back here could never be removed again by any later pass.
+        Set<ResourceKey<PlacedFeature>> targets = RemapTargets.select(
+                snapshot, biomeKey, descriptor.exclusions().features());
+        if (targets.isEmpty()) return;
 
         HolderLookup.RegistryLookup<PlacedFeature> lookup =
                 server.registryAccess().lookupOrThrow(Registries.PLACED_FEATURE);
@@ -130,8 +142,7 @@ public final class AddPhase {
         var playable = descriptor.playableRange();
         int added = 0;
         for (PlacedFeatureInfo info : snapshot.placedFeatures()) {
-            if (snapshot.isFallback(info)) continue;
-            if (!originalFeatures.contains(info.key())) continue;
+            if (!targets.contains(info.key())) continue;
             var original = lookup.get(info.key()).orElse(null);
             if (original == null) continue;
             // Terrain-relative strategies resolve per column at placement time; everything else
