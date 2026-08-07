@@ -15,6 +15,7 @@ import com.kuronami.isekaiapi.biomemodifier.phase.ModifyPhase;
 import com.kuronami.isekaiapi.biomemodifier.phase.RemovePhase;
 import com.kuronami.isekaiapi.biomesource.RuleBiomeSource;
 import com.kuronami.isekaiapi.impl.IsekaiInternal;
+import com.kuronami.isekaiapi.impl.RemapTargets;
 import com.kuronami.isekaiapi.impl.VanillaRuleSnapshot;
 import com.kuronami.isekaiapi.structuremodifier.ApplyWorldshapeStructureModifier;
 import net.minecraft.core.Holder;
@@ -165,6 +166,99 @@ public final class IsekaiWorldgenGameTests {
             return;
         }
         helper.succeed();
+    }
+
+    /**
+     * A key in {@code exclusions.features} stays gone after the whole REMOVE→ADD pass.
+     *
+     * <p>This is the call-site lock for the remap re-injection bug: the ADD phase used to
+     * re-inject every snapshot feature of the biome regardless of the descriptor's
+     * exclusions, and because it re-injects through {@code Holder.direct} — no ResourceKey —
+     * the resurrected feature could never be removed again. Measured in a Sky World save
+     * over 9,409 chunks: {@code spring_water} and {@code spring_lava} were excluded and
+     * generated anyway (437 water sources, 87,988 flowing water, 18,247 lava sources).
+     *
+     * <p>Two runs over identical copies of plains: one with no exclusions, one excluding a
+     * single remap target picked from the live snapshot. The count of anonymous (injected)
+     * holders must drop by exactly the number of decoration steps that feature occupied.
+     * A unit test cannot cover this — the ADD phase needs {@code registryAccess()} off a
+     * live server to look up the original feature.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void excludedFeatureIsNotReinjectedByRemap(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var biomeLookup = level.registryAccess().lookupOrThrow(Registries.BIOME);
+        Biome plains = biomeLookup.getOrThrow(Biomes.PLAINS).value();
+        var originalInfo = plains.modifiableBiomeInfo().getOriginalBiomeInfo();
+        VanillaRuleSnapshot snapshot = IsekaiInternal.currentSnapshot();
+
+        // Pick the victim from the live snapshot rather than hardcoding a feature id, so the
+        // test doesn't depend on what plains happens to contain in this MC version. Lowest
+        // location string = stable choice across runs.
+        ResourceKey<PlacedFeature> victim = RemapTargets.select(snapshot, Biomes.PLAINS, Set.of())
+                .stream()
+                .min(java.util.Comparator.comparing(k -> k.location().toString()))
+                .orElse(null);
+        if (victim == null) {
+            helper.fail("plains has no remap targets — test precondition unmet");
+            return;
+        }
+
+        int withoutExclusion = runRemapAndCountInjected(originalInfo, Set.of());
+        if (withoutExclusion == 0) {
+            helper.fail("ADD phase injected nothing without exclusions — test precondition unmet");
+            return;
+        }
+        // A feature indexed under several decoration steps is injected once per step.
+        int victimInjections = Math.max(1, snapshot.stepsFor(victim).size());
+        int withExclusion = runRemapAndCountInjected(originalInfo, Set.of(victim));
+
+        int expected = withoutExclusion - victimInjections;
+        if (withExclusion != expected) {
+            helper.fail("excluding " + victim.location() + " should drop " + victimInjections
+                    + " injected feature(s): expected " + expected + ", got " + withExclusion
+                    + " (baseline " + withoutExclusion + ") — the ADD phase re-injected an "
+                    + "excluded feature as an unremovable anonymous holder");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Run REMOVE (exclusions + originals) then ADD over a fresh copy of {@code originalInfo}
+     * and return how many anonymous holders the remap injected. Anonymous = no ResourceKey =
+     * built by {@link AddPhase}, mirroring the counting idiom in
+     * {@link #oreRemapReflectedInBiome}.
+     */
+    private static int runRemapAndCountInjected(ModifiableBiomeInfo.BiomeInfo originalInfo,
+                                                 Set<ResourceKey<PlacedFeature>> excludedFeatures) {
+        WorldshapeDescriptor descriptor = WorldshapeDescriptor.builder()
+                .dimension(net.minecraft.world.level.Level.OVERWORLD)
+                .playableRange(PLAYABLE_BAND)
+                .surfaceAnchor(new SurfaceAnchor.WorldSurface())
+                .oreStrategy(new RemapStrategy.Linear())
+                .structureStrategy(new RemapStrategy.Identity())
+                .mobSpawnStrategy(new RemapStrategy.Identity())
+                .defaultStructurePredicate(new SpatialPredicate.Always())
+                .exclusions(new WorldshapeDescriptor.Exclusions(
+                        excludedFeatures, Set.of(), Set.of(), Set.of()))
+                .build();
+
+        var builder = ModifiableBiomeInfo.BiomeInfo.Builder.copyOf(originalInfo);
+        RemovePhase.excludedFeatures(descriptor, builder);
+        RemovePhase.originalsPendingRemap(descriptor, Biomes.PLAINS, builder);
+        AddPhase.remappedOreFeatures(descriptor, Biomes.PLAINS, builder);
+
+        int injected = 0;
+        BiomeGenerationSettingsBuilder gen = builder.getGenerationSettings();
+        for (GenerationStep.Decoration step : GenerationStep.Decoration.values()) {
+            for (Holder<PlacedFeature> h : gen.getFeatures(step)) {
+                if (h.unwrapKey().isPresent()) continue;   // registry ref = not one we injected
+                injected++;
+            }
+        }
+        return injected;
     }
 
     // =====================================================================
