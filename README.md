@@ -173,7 +173,7 @@ Beyond vanilla `count`/`in_square`/`rarity_filter`/etc.:
 Two `Feature<?>` types for the patterns consumers hit constantly:
 
 - **`isekai_api:cluster`** — random-walk BFS blob of N connected blocks. Use for moss patches, dirt veins, fungus spreads, ore clusters.
-- **`isekai_api:pool`** — carves a disc into terrain, lines floor + outer rim with `rim_block`, fills with `fluid`. Dodges the `waterlogged_vegetation_patch` grass→dirt drowning trap.
+- **`isekai_api:pool`** — carves a footprint into terrain, lines the floor with `rim_block`, fills with `fluid` up to ground level. Dodges the `waterlogged_vegetation_patch` grass→dirt drowning trap. `irregularity` (0–1, default 0) bites the outline out of round so the water doesn't read as a compass circle.
 
 ### Structures — set-pieces
 

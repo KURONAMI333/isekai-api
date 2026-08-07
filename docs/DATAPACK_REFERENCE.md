@@ -205,7 +205,34 @@ Geometric placement primitives — use as `type` inside a configured_feature JSO
 | Type | Fields | Effect |
 |---|---|---|
 | `isekai_api:cluster` | `block` (BlockStateProvider), `size` (IntProvider 1–256), `can_replace_solid` (bool, default false) | random-walk BFS from origin, places `size` connected blocks. Use for moss patches, dirt veins, fungus spreads, ore clusters — any "blob of N connected blocks". |
-| `isekai_api:pool` | `fluid` (BlockState), `rim_block` (BlockStateProvider), `xz_radius` (IntProvider 1–8 — flat form `{"type":"minecraft:uniform","min_inclusive":3,"max_inclusive":5}`), `depth` (int 1–4, default 2) | carves a horizontal disc into terrain (interior cleared), lines the floor + outer ring with `rim_block`, fills the carved volume with `fluid`. Avoids `waterlogged_vegetation_patch`'s grass→dirt drowning trap — the rim block is whatever you pass, never drowned grass. |
+| `isekai_api:pool` | `fluid` (BlockState), `rim_block` (BlockStateProvider), `xz_radius` (IntProvider 1–8 — flat form `{"type":"minecraft:uniform","min_inclusive":3,"max_inclusive":5}`), `depth` (int 1–4, default 2), `irregularity` (double 0–1, default 0) | carves a horizontal footprint into terrain (interior cleared), lines the floor with `rim_block`, fills the carved volume with `fluid` up to the natural ground level. Avoids `waterlogged_vegetation_patch`'s grass→dirt drowning trap — the rim block is whatever you pass, never drowned grass. |
+
+### `irregularity` — breaking the circle
+
+`irregularity: 0` (the default) carves an exact circle, which reads as a compass-drawn disc on the ground. Raising it bites into the outline at a set of angles fixed by the world seed and the pool's position, giving a lopsided blob instead. **0.3–0.5 is the useful band**; below 0.2 the pool still reads as round, above 0.6 it starts to look gnawed.
+
+Two consequences worth planning for:
+
+- **The bite only ever removes blocks**, never adds them, so a pool is always inside its nominal `xz_radius` disc. That is deliberate — growing outward would carve cells your placement filter never checked, and the fluid would run off down the slope. The price is that the pool averages roughly `irregularity / 2` smaller than a circle, so **raise `xz_radius` to compensate** (`radius 5–8` at `irregularity 0.4` gives about the same water surface as `radius 4–6` at 0).
+- **The shape is a function of the world seed and the block position**, so it survives chunk regeneration and is identical on every client.
+
+```json
+{
+  "type": "isekai_api:pool",
+  "config": {
+    "fluid": { "Name": "minecraft:water" },
+    "rim_block": {
+      "type": "minecraft:simple_state_provider",
+      "state": { "Name": "minecraft:sand" }
+    },
+    "xz_radius": { "type": "minecraft:uniform", "min_inclusive": 5, "max_inclusive": 8 },
+    "depth": 2,
+    "irregularity": 0.4
+  }
+}
+```
+
+Do **not** try to break the circle from the datapack side by placing two or three `pool` features of different radii at the same spot. Each call resolves its own surface height, so the second one reads the first one's carved floor as ground level, and you get a ring of bare blocks beside the water instead of a wider pool.
 
 ---
 
