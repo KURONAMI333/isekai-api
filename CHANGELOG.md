@@ -59,6 +59,20 @@ so variants written against 1.x / 2.0.0 compile and run unchanged.
 
 ### Fixed
 
+- **`exclusions.features` did not hold.** The REMOVE phase deleted the listed
+  features and the ore-remap ADD phase put them straight back: it re-injected
+  every snapshot feature whose placement exposed a `HeightRangePlacement` —
+  which is not only ores — and did so as an anonymous `Holder.direct`, with no
+  `ResourceKey` for any later pass to match. A world that excluded
+  `minecraft:spring_water` still generated springs, and nothing in the datapack
+  could remove them. Measured on a generated Sky World save: 437 water sources
+  and 18,247 lava sources across 9,409 chunks, all from excluded features.
+  REMOVE and ADD now derive their target set from one function
+  (`impl/RemapTargets.select`), so the two phases cannot drift apart again.
+  Carvers and structures were checked for the same shape and have no equivalent
+  path. `additions.*` is deliberately unchanged: naming the same id in both
+  `additions` and `exclusions` still lets `additions` win, since that is an
+  explicit-versus-explicit conflict rather than an unrequested re-injection.
 - `IsekaiValidator` rejected every non-identity `structure_strategy` while its
   own comment said it warned.
 - The layered-worldshape reader documented a file-level `"transition"` field in
