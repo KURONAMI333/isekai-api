@@ -638,6 +638,30 @@ membership alone makes it decodable and evaluable.
 
 `applies_to` empty = matches no biome (explicit opt-in; prevents cross-dimension leakage). Higher `priority` wins when two descriptors target the same dimension.
 
+### `exclusions` — what it removes, and what it holds back
+
+Everything listed under `exclusions` is gone from the matched biomes. Each list is keyed by registry id:
+
+```jsonc
+{
+  "exclusions": {
+    "features":   ["minecraft:spring_water", "minecraft:spring_lava"],  // placed_feature ids
+    "structures": ["minecraft:village_plains"],                          // structure ids
+    "carvers":    ["minecraft:cave"],                                    // configured_carver ids
+    "mob_spawns": ["minecraft:drowned"]                                  // entity_type ids
+  }
+}
+```
+
+**`exclusions.features` also removes the entry from the Y-remap.** When `ore_strategy` is anything other than `isekai_api:identity`, Isekai rewrites the vertical placement of every height-ranged feature the biome originally had: it deletes the originals and re-injects rebuilt copies at the strategy's Y. A key listed in `exclusions.features` is dropped from that set, so it is removed and never rebuilt. Without this the exclusion would be undone one phase later — the rebuilt copy carries no registry id, so nothing downstream (a second `exclusions` pass, `content_overrides.feature_predicates`) could ever match it again.
+
+Two consequences worth knowing:
+
+* `ore_strategy` is not ore-only. Springs, lakes, geodes and every other feature with a `minecraft:height_range` placement ride the same remap. Exclude them by id if you do not want them at the remapped height.
+* Features whose height cannot be read (no `height_range` placement) are outside the remap entirely — they are neither moved nor removed, and `exclusions.features` is the only way to drop them.
+
+`additions.features` and `additions.carvers` are not filtered against `exclusions`: those name an entry explicitly, so listing the same id in both is a contradiction the descriptor resolves in favour of the addition.
+
 ---
 
 See [`examples/`](../examples/) for complete runnable datapacks, organised by the three worldgen steps: `1_shape/` (the terrain-shape hook — `floating_island/`), `2_placement/` (biome/block selection — `moon_world/`), `3_adaptation/` (worldshape descriptors — `sky_archipelago/`, `flipped/`, `declaration_only/`, `runtime_effects/`). [`examples/templates/`](../examples/templates/) holds annotated copy-paste starting points.
