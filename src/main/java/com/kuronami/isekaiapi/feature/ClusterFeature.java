@@ -35,7 +35,7 @@ import java.util.Set;
  * <p>Use cases consumers compose from this: dirt patches, moss veins, ore clusters, fungus
  * spreads, leaf piles, dropped vegetation.
  *
- * <p>JSON: {@code {"type":"isekai_api:cluster", "block": {...provider...}, "size": {"type":"minecraft:uniform","value":{"min_inclusive":6,"max_inclusive":14}}, "can_replace_solid": false}}.
+ * <p>JSON: {@code {"type":"isekai_api:cluster", "block": {...provider...}, "size": {"type":"minecraft:uniform","min_inclusive":6,"max_inclusive":14}, "can_replace_solid": false}}.
  */
 @ApiStatus.Internal
 public class ClusterFeature extends Feature<ClusterFeature.Config> {
