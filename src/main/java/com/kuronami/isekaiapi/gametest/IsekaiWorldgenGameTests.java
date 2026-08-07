@@ -10,6 +10,7 @@ import com.kuronami.isekaiapi.api.remap.AtmosphereOverride;
 import com.kuronami.isekaiapi.api.remap.RemapStrategy;
 import com.kuronami.isekaiapi.api.remap.SurfaceAnchor;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
+import com.kuronami.isekaiapi.biomemodifier.ApplyWorldshapeBiomeModifier;
 import com.kuronami.isekaiapi.biomemodifier.phase.AddPhase;
 import com.kuronami.isekaiapi.biomemodifier.phase.ModifyPhase;
 import com.kuronami.isekaiapi.biomemodifier.phase.RemovePhase;
@@ -41,6 +42,7 @@ import net.minecraft.world.level.levelgen.placement.PlacementModifier;
 import net.minecraft.world.level.levelgen.structure.BuiltinStructures;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.neoforged.neoforge.common.world.BiomeGenerationSettingsBuilder;
+import net.neoforged.neoforge.common.world.BiomeModifier;
 import net.neoforged.neoforge.common.world.ModifiableBiomeInfo;
 import net.neoforged.neoforge.common.world.ModifiableStructureInfo;
 import net.neoforged.neoforge.common.world.StructureModifier;
@@ -205,14 +207,15 @@ public final class IsekaiWorldgenGameTests {
             return;
         }
 
-        int withoutExclusion = runRemapAndCountInjected(originalInfo, Set.of());
+        Holder<Biome> plainsHolder = biomeLookup.getOrThrow(Biomes.PLAINS);
+        int withoutExclusion = runRemapAndCountInjected(plainsHolder, originalInfo, Set.of());
         if (withoutExclusion == 0) {
             helper.fail("ADD phase injected nothing without exclusions — test precondition unmet");
             return;
         }
         // A feature indexed under several decoration steps is injected once per step.
         int victimInjections = Math.max(1, snapshot.stepsFor(victim).size());
-        int withExclusion = runRemapAndCountInjected(originalInfo, Set.of(victim));
+        int withExclusion = runRemapAndCountInjected(plainsHolder, originalInfo, Set.of(victim));
 
         int expected = withoutExclusion - victimInjections;
         if (withExclusion != expected) {
@@ -226,12 +229,18 @@ public final class IsekaiWorldgenGameTests {
     }
 
     /**
-     * Run REMOVE (exclusions + originals) then ADD over a fresh copy of {@code originalInfo}
+     * Run the real modifier's REMOVE then ADD phase over a fresh copy of {@code originalInfo}
      * and return how many anonymous holders the remap injected. Anonymous = no ResourceKey =
      * built by {@link AddPhase}, mirroring the counting idiom in
      * {@link #oreRemapReflectedInBiome}.
+     *
+     * <p>Driven through {@link ApplyWorldshapeBiomeModifier#modify} rather than the phase
+     * statics so the dispatch itself is covered. {@code apply_worldshape_ref} and the layered
+     * path run the identical switch body over a resolved descriptor, so all three datapack
+     * entry points are locked by this one path.
      */
-    private static int runRemapAndCountInjected(ModifiableBiomeInfo.BiomeInfo originalInfo,
+    private static int runRemapAndCountInjected(Holder<Biome> biome,
+                                                 ModifiableBiomeInfo.BiomeInfo originalInfo,
                                                  Set<ResourceKey<PlacedFeature>> excludedFeatures) {
         WorldshapeDescriptor descriptor = WorldshapeDescriptor.builder()
                 .dimension(net.minecraft.world.level.Level.OVERWORLD)
@@ -241,14 +250,15 @@ public final class IsekaiWorldgenGameTests {
                 .structureStrategy(new RemapStrategy.Identity())
                 .mobSpawnStrategy(new RemapStrategy.Identity())
                 .defaultStructurePredicate(new SpatialPredicate.Always())
+                .appliesTo(Set.of(Biomes.PLAINS))
                 .exclusions(new WorldshapeDescriptor.Exclusions(
                         excludedFeatures, Set.of(), Set.of(), Set.of()))
                 .build();
 
         var builder = ModifiableBiomeInfo.BiomeInfo.Builder.copyOf(originalInfo);
-        RemovePhase.excludedFeatures(descriptor, builder);
-        RemovePhase.originalsPendingRemap(descriptor, Biomes.PLAINS, builder);
-        AddPhase.remappedOreFeatures(descriptor, Biomes.PLAINS, builder);
+        var modifier = new ApplyWorldshapeBiomeModifier(descriptor);
+        modifier.modify(biome, BiomeModifier.Phase.REMOVE, builder);
+        modifier.modify(biome, BiomeModifier.Phase.ADD, builder);
 
         int injected = 0;
         BiomeGenerationSettingsBuilder gen = builder.getGenerationSettings();

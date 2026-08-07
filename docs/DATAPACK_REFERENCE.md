@@ -660,7 +660,7 @@ Two consequences worth knowing:
 * `ore_strategy` is not ore-only. Springs, lakes, geodes and every other feature with a `minecraft:height_range` placement ride the same remap. Exclude them by id if you do not want them at the remapped height.
 * Features whose height cannot be read (no `height_range` placement) are outside the remap entirely — they are neither moved nor removed, and `exclusions.features` is the only way to drop them.
 
-`additions.features` and `additions.carvers` are not filtered against `exclusions`: those name an entry explicitly, so listing the same id in both is a contradiction the descriptor resolves in favour of the addition.
+`additions.features` and `additions.carvers` are not filtered against `exclusions`. If you list the same id in both, the addition currently wins — do not write that combination deliberately, and do not rely on it to re-add an excluded id.
 
 ---
 
