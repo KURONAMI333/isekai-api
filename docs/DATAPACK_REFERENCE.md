@@ -211,24 +211,35 @@ Geometric placement primitives — use as `type` inside a configured_feature JSO
 
 Before writing a single block, `pool` checks every cell just outside the volume it would excavate: below the waterline that cell must be solid (or already the same fluid), above it, it must not be liquid. Any violation and the feature returns without touching the world. This is what stops a pool appearing with an open edge on sloped ground — it does not appear there at all.
 
-The practical rule: **the origin's column must be the lowest surface within `xz_radius + 1` blocks, and there must be at least `depth + 1` blocks of solid ground under it.** Measured requirements (synthetic terrain, 64 seeds each):
+The practical rule: **the origin's column must be the lowest surface within `xz_radius + 1` blocks, and there must be at least `depth + 1` blocks of solid ground under it.**
 
 | | needs |
 |---|---|
-| solid ground below the origin | `depth + 1` blocks (`depth`+1 at `depth` 1–3; a `depth: 2` pool on a 2-block-thin plate never places) |
-| flat ground around the origin | half-width `xz_radius + 1`; one block of drop anywhere inside that square refuses ~90% of seeds and the full square refuses all of them |
+| solid ground below the origin | `depth + 1` blocks. A `depth: 2` pool on a 2-block-thin plate never places, at any seed |
+| flat ground around the origin | half-width `xz_radius + 1`. One block of drop anywhere inside that square refuses ~90% of seeds; a drop right at the edge of the footprint refuses all of them |
 
-Placement rate on rolling terrain, per `in_square` attempt (amplitude = peak-to-mean surface variation, wavelength = how far apart the hills are):
+All figures below are from synthetic terrain (`PoolFeatureTest` covers the two threshold rows; the rate tables were measured the same way), so read them as orders of magnitude, not as promises about your worldgen. Rate = share of `in_square` attempts that place.
 
-| terrain | `xz_radius` 2 | 3 | 4 | 5 |
+| terrain (relief peak-to-peak / hill spacing) | `xz_radius` 2 | 3 | 4 | 5 |
 |---|---|---|---|---|
 | flat | 100% | 100% | 100% | 100% |
-| gentle (amp 1, wl 128) | 91% | 88% | 85% | 81% |
-| rolling (amp 2, wl 64) | 55% | 41% | 27% | 17% |
-| hilly (amp 4, wl 64) | 18% | 8% | 4% | 2% |
-| broken (amp 8, wl 32) | 0.7% | 0.6% | 0.7% | 0.8% |
+| 4 blocks / 128 | 91% | 88% | 85% | 81% |
+| 4 blocks / 32 | 57% | 43% | 30% | 19% |
+| 8 blocks / 64 | 55% | 41% | 27% | 17% |
+| 16 blocks / 64 | 18% | 8% | 4% | 2% |
+| 32 blocks / 32 | 0.7% | 0.6% | 0.7% | 0.8% |
 
-Two consequences for tuning. **`xz_radius` costs placements, `depth` does not** — going from radius 2 to 5 on rolling terrain drops the rate 3x, while depth 1→3 moves it under 2%. And **if you ported a `pool` placement from before 2.1.0, raise its frequency**: on anything but flat terrain the same `rarity_filter` / `count` now yields 2–6x fewer pools at `xz_radius` 3–4. Compensate by lowering `rarity_filter` chance or raising `count`, not by growing the radius.
+Floating islands are the case that looks hostile and is not, as long as the island is thicker than `depth + 1`. Circular island, keel 16 blocks, top domed by `cap` blocks from rim to centre; rate = share of the island's own surface columns that accept a pool:
+
+| island radius | flat top | dome 1 | dome 2 | dome 4 |
+|---|---|---|---|---|
+| 8 | 31% | 17% | 6% | 0.5% |
+| 16 | 62% | 43% | 34% | 17% |
+| 40 | 84% | 70% | 68% | 51% |
+
+(at `xz_radius` 3; a keel of 1–2 blocks under a `depth: 2` pool places nothing anywhere on the island.)
+
+Two consequences for tuning. **`xz_radius` costs placements, `depth` does not** — radius 2→5 on rolling terrain drops the rate 3x, while depth 1→3 moves it under 2%. And **if you carry a `pool` placement over from before 2.1.0, raise its frequency**: on anything but flat terrain the same `rarity_filter` / `count` yields 2–6x fewer pools at `xz_radius` 3–4. Compensate by lowering the `rarity_filter` chance or raising `count` — not by growing the radius, which moves it the wrong way.
 
 ```json
 {
