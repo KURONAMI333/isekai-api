@@ -57,6 +57,23 @@ so variants written against 1.x / 2.0.0 compile and run unchanged.
   delegating to the existing Y-only form.
 - A server-start warning when a rule biome source never received a world seed.
 
+### Changed — `isekai_api:pool` behaviour
+
+`pool` used to carve, floor and fill unconditionally, so a basin that straddled a step
+in the ground ended up with its water surface above the neighbouring ground and drained
+over the lip. It now follows `LakeFeature`'s shape: it **tests the shell for solidity
+before writing anything** and returns without placing a single block when the site
+cannot hold the fluid, it **lines the whole shell** with `rim_block` rather than only
+the floor, and its outline is a **union of several random ellipsoids** instead of a
+mathematical disc. The ice-capping pass is deliberately not ported — it calls
+`getBiome()` up to 15 blocks out, which throws during worldgen.
+
+No codec change: `fluid` / `rim_block` / `xz_radius` / `depth` are untouched and 1.x
+datapacks decode unchanged. **Placement gets rarer on uneven ground** — measured at
+roughly 2–6x fewer successes on rolling terrain, and a wider `xz_radius` costs more
+than a deeper `depth` — so raise the `rarity_filter` chance rather than the radius if a
+world wants the old frequency back.
+
 ### Fixed
 
 - **`exclusions.features` did not hold.** The REMOVE phase deleted the listed
