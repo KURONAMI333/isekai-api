@@ -4,7 +4,7 @@ All notable changes to Isekai API follow this file. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/). Compatibility policy — how datapack
 and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
-## [2.1.0] — 2026-08-05
+## [2.1.0] — 2026-08-08
 
 Three features that the documentation promised but the implementation never
 delivered are now real: biome zones vary with the world seed, `count_scale`
