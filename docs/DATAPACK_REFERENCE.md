@@ -205,7 +205,44 @@ Geometric placement primitives — use as `type` inside a configured_feature JSO
 | Type | Fields | Effect |
 |---|---|---|
 | `isekai_api:cluster` | `block` (BlockStateProvider), `size` (IntProvider 1–256), `can_replace_solid` (bool, default false) | random-walk BFS from origin, places `size` connected blocks. Use for moss patches, dirt veins, fungus spreads, ore clusters — any "blob of N connected blocks". |
-| `isekai_api:pool` | `fluid` (BlockState), `rim_block` (BlockStateProvider), `xz_radius` (IntProvider 1–8 — flat form `{"type":"minecraft:uniform","min_inclusive":3,"max_inclusive":5}`), `depth` (int 1–4, default 2) | carves a horizontal disc into terrain (interior cleared), lines the floor + outer ring with `rim_block`, fills the carved volume with `fluid`. Avoids `waterlogged_vegetation_patch`'s grass→dirt drowning trap — the rim block is whatever you pass, never drowned grass. |
+| `isekai_api:pool` | `fluid` (BlockState), `rim_block` (BlockStateProvider), `xz_radius` (IntProvider 1–64, values above 14 are clamped — flat form `{"type":"minecraft:uniform","min_inclusive":3,"max_inclusive":5}`), `depth` (int 1–32, default 2) | a bounded body of fluid dug into the terrain, using vanilla `LakeFeature`'s algorithm. Outline is the union of 4–7 random ellipsoids, so no two are alike and none is a circle. Lines the whole shell with `rim_block`, not just the floor. **Refuses to place unless the terrain can contain the fluid** — see below. Avoids `waterlogged_vegetation_patch`'s grass→dirt drowning trap: the rim block is whatever you pass, never drowned grass. |
+
+### `pool` — containment, and what it costs you
+
+Before writing a single block, `pool` checks every cell just outside the volume it would excavate: below the waterline that cell must be solid (or already the same fluid), above it, it must not be liquid. Any violation and the feature returns without touching the world. This is what stops a pool appearing with an open edge on sloped ground — it does not appear there at all.
+
+The practical rule: **the origin's column must be the lowest surface within `xz_radius + 1` blocks, and there must be at least `depth + 1` blocks of solid ground under it.** Measured requirements (synthetic terrain, 64 seeds each):
+
+| | needs |
+|---|---|
+| solid ground below the origin | `depth + 1` blocks (`depth`+1 at `depth` 1–3; a `depth: 2` pool on a 2-block-thin plate never places) |
+| flat ground around the origin | half-width `xz_radius + 1`; one block of drop anywhere inside that square refuses ~90% of seeds and the full square refuses all of them |
+
+Placement rate on rolling terrain, per `in_square` attempt (amplitude = peak-to-mean surface variation, wavelength = how far apart the hills are):
+
+| terrain | `xz_radius` 2 | 3 | 4 | 5 |
+|---|---|---|---|---|
+| flat | 100% | 100% | 100% | 100% |
+| gentle (amp 1, wl 128) | 91% | 88% | 85% | 81% |
+| rolling (amp 2, wl 64) | 55% | 41% | 27% | 17% |
+| hilly (amp 4, wl 64) | 18% | 8% | 4% | 2% |
+| broken (amp 8, wl 32) | 0.7% | 0.6% | 0.7% | 0.8% |
+
+Two consequences for tuning. **`xz_radius` costs placements, `depth` does not** — going from radius 2 to 5 on rolling terrain drops the rate 3x, while depth 1→3 moves it under 2%. And **if you ported a `pool` placement from before 2.1.0, raise its frequency**: on anything but flat terrain the same `rarity_filter` / `count` now yields 2–6x fewer pools at `xz_radius` 3–4. Compensate by lowering `rarity_filter` chance or raising `count`, not by growing the radius.
+
+```json
+{
+  "type": "isekai_api:pool",
+  "config": {
+    "fluid": {"Name": "minecraft:water"},
+    "rim_block": {"type": "minecraft:simple_state_provider", "state": {"Name": "minecraft:sand"}},
+    "xz_radius": {"type": "minecraft:uniform", "min_inclusive": 3, "max_inclusive": 5},
+    "depth": 2
+  }
+}
+```
+
+`xz_radius` is an `IntProvider`, so its fields sit **inline** beside `"type"` — there is no `"value"` wrapper. Writing one fails registry load with "Not a number / No key min_inclusive".
 
 ---
 
