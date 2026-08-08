@@ -21,8 +21,10 @@ import org.jetbrains.annotations.ApiStatus;
  * <ul>
  *   <li>{@code isekai_api:cluster} — connected blob of N blocks (geometric primitive for
  *       moss patches, dirt veins, fungus spreads, etc.).</li>
- *   <li>{@code isekai_api:pool} — carved disc of fluid with a {@code rim_block} edge, sidesteps
- *       the {@code waterlogged_vegetation_patch} grass→dirt trap.</li>
+ *   <li>{@code isekai_api:pool} — a bounded body of fluid dug into the terrain (vanilla
+ *       {@code LakeFeature}'s algorithm: ellipsoid-union outline, lined shell, and a containment
+ *       test that refuses terrain it would leak out of), sidesteps the
+ *       {@code waterlogged_vegetation_patch} grass→dirt trap.</li>
  * </ul>
  */
 @ApiStatus.Internal
