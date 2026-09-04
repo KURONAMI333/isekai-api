@@ -110,6 +110,40 @@ class ColumnBandTest {
         return hits / (double) n;
     }
 
+    @Test void resolveYStaysInsideTheBodyAtBothEnds() {
+        // Both anchors name free space: 300 is the air above the body, 180 the air below it, so
+        // the body itself is 181..299. Depth 0.0 and 1.0 must not resolve onto either anchor.
+        ColumnBand band = proportional(0.0, 1.0);
+        assertEquals(299, band.resolveY(300, 180, 0.0));
+        assertEquals(181, band.resolveY(300, 180, 1.0));
+        // Blocks mode overshoots past the far anchor on a body thinner than the reference.
+        assertEquals(199, blocks(0.0, 0.1, 128).resolveY(200, 180, 0.0));
+        assertEquals(181, blocks(0.9, 1.0, 128).resolveY(200, 180, 1.0));
+    }
+
+    @Test void resolveYLeavesInteriorDepthsUntouched() {
+        ColumnBand band = proportional(0.25, 0.75);
+        assertEquals(300 - 30, band.resolveY(300, 180, 0.25));
+        assertEquals(300 - 90, band.resolveY(300, 180, 0.75));
+    }
+
+    @Test void resolveYPassesThroughWhenTheBodyIsThinnerThanOneBlock() {
+        // ColumnRelativeModifier drops these columns before calling; direct callers get the raw
+        // arithmetic rather than an inverted clamp window.
+        ColumnBand band = proportional(0.0, 1.0);
+        assertEquals(200, band.resolveY(200, 199, 0.0));
+        assertEquals(199, band.resolveY(200, 199, 1.0));
+    }
+
+    @Test void collapsedAtAnchorReportsOnlyBandsFlattenedOntoAnAnchor() {
+        assertTrue(proportional(0.0, 0.0).collapsedAtAnchor());
+        assertTrue(proportional(1.0, 1.0).collapsedAtAnchor());
+        // A single-plane band away from both anchors is a legitimate source range, not a collapse.
+        assertFalse(proportional(0.5, 0.5).collapsedAtAnchor());
+        assertFalse(proportional(0.0, 0.25).collapsedAtAnchor());
+        assertFalse(proportional(0.75, 1.0).collapsedAtAnchor());
+    }
+
     @Test void rejectsInvertedBandAndNonPositiveThickness() {
         assertThrows(IllegalArgumentException.class, () -> blocks(0.8, 0.2, 128));
         assertThrows(IllegalArgumentException.class, () -> blocks(0.2, 0.8, 0));
