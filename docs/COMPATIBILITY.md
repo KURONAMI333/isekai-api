@@ -141,7 +141,7 @@ Two account-free distribution routes, both public:
 
 ```gradle
 repositories { maven { url = "https://cursemaven.com" } }
-dependencies { compileOnly "curse.maven:isekai-api-1557389:8581037" }   // 2.0.0
+dependencies { compileOnly "curse.maven:isekai-api-1557389:8810242" }   // 2.2.0
 ```
 
 The trailing number is the CurseForge *file* id, so it changes every release; the
