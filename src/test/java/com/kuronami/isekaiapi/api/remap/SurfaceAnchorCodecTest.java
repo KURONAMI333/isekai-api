@@ -78,4 +78,16 @@ class SurfaceAnchorCodecTest {
         // FixedY ignores the world context, so a null ctx/pos is a valid pure-logic probe.
         assertEquals(150, new SurfaceAnchor.FixedY(150).resolveY(null, null));
     }
+
+    /**
+     * The inherited {@code resolveYBelow} is single-shot: it reports the anchor's own Y when that
+     * lies at or below the ceiling, and nothing otherwise. This is what a variant that does not
+     * override it gets, and it is what keeps such a variant at one body per column.
+     */
+    @Test void resolveYBelow_defaultsToSingleShot() {
+        SurfaceAnchor fixed = new SurfaceAnchor.FixedY(150);
+        assertEquals(150, fixed.resolveYBelow(null, null, 320));
+        assertEquals(150, fixed.resolveYBelow(null, null, 150));   // ceiling is inclusive
+        assertNull(fixed.resolveYBelow(null, null, 149));
+    }
 }

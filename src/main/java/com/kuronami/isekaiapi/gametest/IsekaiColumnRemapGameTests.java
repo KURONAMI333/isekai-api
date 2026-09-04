@@ -38,6 +38,7 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -66,6 +67,14 @@ public final class IsekaiColumnRemapGameTests {
     private static final int THIN_BODY_BOTTOM = 200;
     private static final int THIN_BODY_TOP = 219;
 
+    /** One column holding three separate bodies — the shape the column walk exists for. */
+    private static final int STACK_LOW_BOTTOM = 40;
+    private static final int STACK_LOW_TOP = 79;
+    private static final int STACK_MID_BOTTOM = 160;
+    private static final int STACK_MID_TOP = 199;
+    private static final int STACK_TOP_BOTTOM = 240;
+    private static final int STACK_TOP_TOP = 279;
+
     private static final int CLEAR_FROM = 30;
     private static final int CLEAR_TO = 300;
 
@@ -73,6 +82,11 @@ public final class IsekaiColumnRemapGameTests {
 
     private static final VerticalRange COSMOS_COAL = new VerticalRange(51, 62, HeightDistribution.UNIFORM);
     private static final VerticalRange COSMOS_DIAMOND = new VerticalRange(-63, -48, HeightDistribution.UNIFORM);
+    /**
+     * Vanilla's {@code ore_andesite_upper}: entirely above the default reference surface, so
+     * {@code ColumnLocal.depthOf} clamps both ends onto depth 0 and the band collapses.
+     */
+    private static final VerticalRange ANDESITE_UPPER = new VerticalRange(64, 128, HeightDistribution.UNIFORM);
 
     private static final RemapContext CTX = new RemapContext(
             new VerticalRange(-64, 320, HeightDistribution.UNIFORM), -64, 319);
@@ -259,6 +273,148 @@ public final class IsekaiColumnRemapGameTests {
     }
 
     // =====================================================================
+    // Every body in the column, not just the topmost one.
+    // =====================================================================
+
+    /**
+     * A column of floating terrain holds more than one island, and each of them is terrain the
+     * band describes. Before the column walk, the two anchors always bracketed the <i>topmost</i>
+     * body — the heightmap by definition, and world_floor by scanning down from it — so an island
+     * with anything floating above it received no ore at all. That is the mechanism behind Sky
+     * World issue #2: the probe found andesite, granite, diorite, coal, iron and copper at exactly
+     * 0 in the lower band, in a region where 29 of 29 lower-island chunks also carried an upper
+     * island.
+     *
+     * <p>Pins the pair of defects together as well: a band that {@code collapsedAtAnchor()} (the
+     * 2.1.0 clamp) must land in solid ground in <i>every</i> body, not in air and not only in the
+     * topmost one.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void columnRemapReachesEveryBody(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        // Arenas sit 8 blocks apart along X, so an X offset of 14 or more reaches into the next
+        // test's working columns. Separate along Z instead — rows are 9 apart, and every other
+        // test in this class works at Z+6.
+        int x = origin.getX() + 6;
+        int z = origin.getZ() + 8;
+
+        int[][] bodies = {{STACK_TOP_BOTTOM, STACK_TOP_TOP},
+                          {STACK_MID_BOTTOM, STACK_MID_TOP},
+                          {STACK_LOW_BOTTOM, STACK_LOW_TOP}};
+        buildStack(level, x, z, bodies);
+        if (!surfaceIs(helper, level, x, z, STACK_TOP_TOP + 1)) return;
+
+        PlacementContext ctx = placementContext(level);
+        BlockPos pos = new BlockPos(x, 0, z);
+
+        // The heightmap read and the block walk must agree on the topmost body, or the first
+        // body and the rest would drift apart on any column their predicates disagree about.
+        Integer viaHeightmap = SurfaceAnchor.WorldSurface.INSTANCE.resolveY(ctx, pos);
+        Integer viaWalk = SurfaceAnchor.WorldSurface.INSTANCE
+                .resolveYBelow(ctx, pos, level.getMaxBuildHeight());
+        if (viaHeightmap == null || !viaHeightmap.equals(viaWalk)) {
+            helper.fail("world_surface disagrees with itself: heightmap=" + viaHeightmap
+                    + " walk=" + viaWalk);
+            return;
+        }
+
+        ColumnBand shallow = RemapStrategy.ColumnLocal.DEFAULT.remapToColumn(COSMOS_COAL, CTX).orElseThrow();
+        ColumnBand collapsed = RemapStrategy.ColumnLocal.DEFAULT
+                .remapToColumn(ANDESITE_UPPER, CTX).orElseThrow();
+        if (!collapsed.collapsedAtAnchor()) {
+            helper.fail("the collapsed-band case is no longer collapsed — pick another source range");
+            return;
+        }
+
+        for (ColumnBand band : List.of(shallow, collapsed)) {
+            ColumnRelativeModifier modifier = new ColumnRelativeModifier(band);
+            RandomSource random = RandomSource.create(SEED);
+            for (int i = 0; i < 24; i++) {
+                List<BlockPos> placed = modifier.getPositions(ctx, random, pos).toList();
+                if (placed.size() != bodies.length) {
+                    helper.fail("expected one placement per body (" + bodies.length + "), got "
+                            + placed.size() + ": " + placed);
+                    return;
+                }
+                for (int b = 0; b < bodies.length; b++) {
+                    int y = placed.get(b).getY();
+                    if (y < bodies[b][0] || y > bodies[b][1]) {
+                        helper.fail("placement " + b + " at Y" + y + " is outside body "
+                                + bodies[b][0] + ".." + bodies[b][1]);
+                        return;
+                    }
+                    if (level.getBlockState(new BlockPos(x, y, z)).isAir()) {
+                        helper.fail("placement " + b + " at Y" + y + " landed in air");
+                        return;
+                    }
+                }
+            }
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The regression side of the same change: a column holding one body behaves exactly as it did
+     * before — one position, at the same Y, having drawn the same amount from the random source.
+     * A column holding none still draws nothing at all, or every later placement of that feature
+     * in the chunk would shift.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void columnRemapSingleBodyIsUnchanged(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        int soloX = origin.getX() + 6;
+        int voidX = origin.getX() + 8;
+        int z = origin.getZ() + 10;   // its own Z lane; see columnRemapReachesEveryBody
+
+        buildStack(level, soloX, z, new int[][]{{LOW_BODY_BOTTOM, LOW_BODY_TOP}});
+        buildStack(level, voidX, z, new int[][]{});
+        if (!surfaceIs(helper, level, soloX, z, LOW_BODY_TOP + 1)) return;
+
+        PlacementContext ctx = placementContext(level);
+        ColumnBand band = RemapStrategy.ColumnLocal.DEFAULT.remapToColumn(COSMOS_COAL, CTX).orElseThrow();
+        ColumnRelativeModifier modifier = new ColumnRelativeModifier(band);
+
+        RandomSource actual = RandomSource.create(SEED);
+        RandomSource control = RandomSource.create(SEED);
+        for (int i = 0; i < 24; i++) {
+            List<BlockPos> placed = modifier.getPositions(ctx, actual, new BlockPos(soloX, 0, z)).toList();
+            if (placed.size() != 1) {
+                helper.fail("single-body column emitted " + placed.size() + " positions, want 1");
+                return;
+            }
+            // Free space above the body is TOP+1 and below it BOTTOM-1: the same two anchors the
+            // modifier resolves, computed here without it.
+            int want = band.resolveY(LOW_BODY_TOP + 1, LOW_BODY_BOTTOM - 1, band.sampleDepth(control));
+            if (placed.get(0).getY() != want) {
+                helper.fail("single-body Y moved: got " + placed.get(0).getY() + ", want " + want);
+                return;
+            }
+        }
+        // Identical draw counts, so the rest of the chunk is untouched.
+        if (actual.nextLong() != control.nextLong()) {
+            helper.fail("the single-body path consumed a different amount of randomness");
+            return;
+        }
+
+        RandomSource untouched = RandomSource.create(SEED);
+        RandomSource overVoid = RandomSource.create(SEED);
+        List<BlockPos> none = modifier.getPositions(ctx, overVoid, new BlockPos(voidX, 0, z)).toList();
+        if (!none.isEmpty()) {
+            helper.fail("void column produced " + none);
+            return;
+        }
+        if (untouched.nextLong() != overVoid.nextLong()) {
+            helper.fail("void column consumed randomness");
+            return;
+        }
+        helper.succeed();
+    }
+
+    // =====================================================================
     // Helpers
     // =====================================================================
 
@@ -273,6 +429,42 @@ public final class IsekaiColumnRemapGameTests {
             cursor.set(x, y, z);
             level.setBlock(cursor, Blocks.STONE.defaultBlockState(), 2);
         }
+        reprimeWorldSurface(level, x, z);
+    }
+
+    /**
+     * Re-derive {@code WORLD_SURFACE_WG} for the chunk we just edited.
+     *
+     * <p>That heightmap is a worldgen artefact: a loaded chunk primes it once, on the first read,
+     * and {@code setBlock} never touches it afterwards. Two tests whose columns share a chunk
+     * would otherwise be ordered against each other — whichever reads first freezes the surface
+     * the other one built. Re-priming after every edit makes each test independent of the order
+     * the batch happens to run in.
+     */
+    private static void reprimeWorldSurface(ServerLevel level, int x, int z) {
+        Heightmap.primeHeightmaps(level.getChunk(new BlockPos(x, 0, z)),
+                EnumSet.of(Heightmap.Types.WORLD_SURFACE_WG));
+    }
+
+    /**
+     * Clear the whole column down to the build floor, then fill each {@code {bottom, top}} pair
+     * with stone. Unlike {@link #buildBody} this empties everything below {@code CLEAR_FROM} too,
+     * so the bodies listed here are the only ones in the column and a walk down it has an exact
+     * expected length.
+     */
+    private static void buildStack(ServerLevel level, int x, int z, int[][] bodies) {
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int y = level.getMinBuildHeight(); y <= CLEAR_TO; y++) {
+            cursor.set(x, y, z);
+            level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 2);
+        }
+        for (int[] body : bodies) {
+            for (int y = body[0]; y <= body[1]; y++) {
+                cursor.set(x, y, z);
+                level.setBlock(cursor, Blocks.STONE.defaultBlockState(), 2);
+            }
+        }
+        reprimeWorldSurface(level, x, z);
     }
 
     /** Fail the test (returning false) when the WG heightmap doesn't see the body we built. */
