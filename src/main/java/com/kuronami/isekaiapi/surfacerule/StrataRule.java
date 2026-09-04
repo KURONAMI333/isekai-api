@@ -29,7 +29,10 @@ import java.util.List;
  * handling exactly and adds no access-transformer entries. Neutral: the band blocks are plain
  * {@link BlockState} entries, no species/biome baked in.
  *
- * <p>JSON: {@code {"type":"isekai_api:strata", "bands":[{"block":"...","thickness":3}, ...]}}.
+ * <p>JSON: {@code {"type":"isekai_api:strata", "bands":[{"block":{"Name":"minecraft:stone"},
+ * "thickness":3}, ...]}}. {@code block} is a {@link BlockState}, so it takes the object form
+ * with {@code Name} (and {@code Properties} where the block has any) — a bare block id string
+ * is dropped by the codec and surfaces as {@code "strata: bands must be non-empty"}.
  */
 @ApiStatus.Internal
 public record StrataRule(List<Band> bands, SurfaceRules.RuleSource inner) implements SurfaceRules.RuleSource {
