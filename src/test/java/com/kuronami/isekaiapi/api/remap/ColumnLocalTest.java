@@ -121,6 +121,126 @@ class ColumnLocalTest {
         assertEquals(0.5, pipe.countFactor());
     }
 
+    /**
+     * One island band of Sky World, expressed the way the anchors report it: the body occupies
+     * Y 116..176, so the free space above it is 177 and below it 115.
+     */
+    private static final int ISLAND_TOP_ANCHOR = 177;
+    private static final int ISLAND_BOTTOM_ANCHOR = 115;
+
+    private static ColumnBand proportionalBand(RemapStrategy.ColumnLocal strategy, int minY, int maxY) {
+        return strategy
+                .remapToColumn(new VerticalRange(minY, maxY, HeightDistribution.UNIFORM), CTX)
+                .orElseThrow();
+    }
+
+    private static RemapStrategy.ColumnLocal proportionalStrategy(int surfaceY, int floorY) {
+        return new RemapStrategy.ColumnLocal(
+                SurfaceAnchor.WorldSurface.INSTANCE, SurfaceAnchor.WorldFloor.DEFAULT,
+                ColumnBand.DepthScale.PROPORTIONAL, ColumnBand.VANILLA_THICKNESS, surfaceY, floorY);
+    }
+
+    /**
+     * Vanilla's {@code _upper} stone and ore variants, whose Y ranges lie wholly above the
+     * default reference surface of Y 64. Every one of them clamps to depth 0.0 at both ends.
+     */
+    private static final List<OreRow> UPPER_ORES = List.of(
+            new OreRow("ore_andesite_upper", 64, 128, true, 0, 0),
+            new OreRow("ore_granite_upper", 64, 128, true, 0, 0),
+            new OreRow("ore_diorite_upper", 64, 128, true, 0, 0),
+            new OreRow("ore_coal_upper", 136, 320, true, 0, 0),
+            new OreRow("ore_iron_upper", 80, 384, true, 0, 0));
+
+    @Test void upperOresCollapseOntoTheSurfaceAnchorUnderVanillaReferences() {
+        RemapStrategy.ColumnLocal strategy = proportionalStrategy(64, -64);
+        for (OreRow ore : UPPER_ORES) {
+            ColumnBand band = proportionalBand(strategy, ore.minY(), ore.maxY());
+            assertEquals(band.fromDepth(), band.toDepth(), ore.name() + ": expected zero width");
+            assertTrue(band.collapsedAtAnchor(), ore.name() + ": should report the collapse");
+        }
+    }
+
+    @Test void widerReferenceColumnGivesUpperOresRealWidth() {
+        // surface_y raised past the highest of these ranges: nothing clamps, every band has width.
+        RemapStrategy.ColumnLocal strategy = proportionalStrategy(384, -64);
+        for (OreRow ore : UPPER_ORES) {
+            ColumnBand band = proportionalBand(strategy, ore.minY(), ore.maxY());
+            assertTrue(band.toDepth() - band.fromDepth() > 0.0, ore.name() + ": still zero width");
+            assertFalse(band.collapsedAtAnchor(), ore.name() + ": still collapsed");
+
+            int shallowY = band.resolveY(ISLAND_TOP_ANCHOR, ISLAND_BOTTOM_ANCHOR, band.fromDepth());
+            int deepY = band.resolveY(ISLAND_TOP_ANCHOR, ISLAND_BOTTOM_ANCHOR, band.toDepth());
+            assertTrue(shallowY > deepY, ore.name() + ": band did not span any block");
+            assertInsideBody(ore.name(), shallowY);
+            assertInsideBody(ore.name(), deepY);
+        }
+    }
+
+    @Test void collapsedBandsStillResolveIntoTheBodyNotIntoAir() {
+        // The clamp is the safety net, not the cure: a collapsed band still names one plane, but
+        // that plane is the topmost solid block rather than the air above it.
+        RemapStrategy.ColumnLocal strategy = proportionalStrategy(64, -64);
+        for (OreRow ore : UPPER_ORES) {
+            ColumnBand band = proportionalBand(strategy, ore.minY(), ore.maxY());
+            int y = band.resolveY(ISLAND_TOP_ANCHOR, ISLAND_BOTTOM_ANCHOR, band.fromDepth());
+            assertEquals(ISLAND_TOP_ANCHOR - 1, y, ore.name() + ": resolved outside the body");
+        }
+    }
+
+    /**
+     * Ores whose vanilla range already straddled the reference column. Their depths are the
+     * non-regression contract: nothing about the projection may move for them.
+     */
+    @Test void straddlingOresKeepTheirDepths() {
+        RemapStrategy.ColumnLocal strategy = proportionalStrategy(64, -64);
+        record Row(String name, int minY, int maxY, double from, double to) {}
+        for (Row row : List.of(
+                new Row("ore_andesite_lower", 0, 60, 0.03125, 0.5),
+                new Row("ore_copper", -16, 112, 0.0, 0.625),
+                new Row("ore_gold", -64, 32, 0.25, 1.0),
+                new Row("ore_diamond_medium", -64, -4, 0.53125, 1.0),
+                new Row("ore_lapis", -32, 32, 0.25, 0.75),
+                new Row("ore_coal_lower", 0, 192, 0.0, 0.5))) {
+            ColumnBand band = proportionalBand(strategy, row.minY(), row.maxY());
+            assertEquals(row.from(), band.fromDepth(), row.name() + ": from_depth");
+            assertEquals(row.to(), band.toDepth(), row.name() + ": to_depth");
+            assertFalse(band.collapsedAtAnchor(), row.name() + ": must not be reported as collapsed");
+        }
+    }
+
+    /**
+     * The resolved Y of a straddling ore, on the same island band. Only an endpoint that used
+     * to sit in the air moves, and only by one block; everything between is untouched.
+     */
+    @Test void straddlingOresResolveToTheSameBlocksAsBefore() {
+        RemapStrategy.ColumnLocal strategy = proportionalStrategy(64, -64);
+        record Row(String name, int minY, int maxY, int shallowY, int deepY) {}
+        for (Row row : List.of(
+                // Interior on both ends: identical to the pre-clamp arithmetic.
+                new Row("ore_andesite_lower", 0, 60, 175, 146),
+                new Row("ore_lapis", -32, 32, 161, 130),
+                // Shallow end was the air above the body (177); now the block below it.
+                new Row("ore_copper", -16, 112, 176, 138),
+                new Row("ore_coal_lower", 0, 192, 176, 146),
+                // Deep end was the air under the body (115); now the block above it.
+                new Row("ore_gold", -64, 32, 161, 116),
+                new Row("ore_diamond_medium", -64, -4, 144, 116))) {
+            ColumnBand band = proportionalBand(strategy, row.minY(), row.maxY());
+            assertEquals(row.shallowY(),
+                    band.resolveY(ISLAND_TOP_ANCHOR, ISLAND_BOTTOM_ANCHOR, band.fromDepth()),
+                    row.name() + ": shallow Y");
+            assertEquals(row.deepY(),
+                    band.resolveY(ISLAND_TOP_ANCHOR, ISLAND_BOTTOM_ANCHOR, band.toDepth()),
+                    row.name() + ": deep Y");
+        }
+    }
+
+    private static void assertInsideBody(String name, int y) {
+        assertTrue(y <= ISLAND_TOP_ANCHOR - 1 && y >= ISLAND_BOTTOM_ANCHOR + 1,
+                name + ": resolved to Y " + y + ", outside the body "
+                        + (ISLAND_BOTTOM_ANCHOR + 1) + ".." + (ISLAND_TOP_ANCHOR - 1));
+    }
+
     @Test void rejectsInvertedReferenceColumn() {
         assertThrows(IllegalArgumentException.class, () -> new RemapStrategy.ColumnLocal(
                 SurfaceAnchor.WorldSurface.INSTANCE, SurfaceAnchor.WorldFloor.DEFAULT,

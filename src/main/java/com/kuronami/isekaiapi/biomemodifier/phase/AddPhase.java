@@ -2,6 +2,7 @@ package com.kuronami.isekaiapi.biomemodifier.phase;
 
 import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.api.query.PlacedFeatureInfo;
+import com.kuronami.isekaiapi.api.remap.ColumnBand;
 import com.kuronami.isekaiapi.api.remap.RemapStrategy;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
 import com.kuronami.isekaiapi.impl.IsekaiInternal;
@@ -152,6 +153,7 @@ public final class AddPhase {
                     snapshot.worldBottom(), snapshot.worldTop());
             PlacedFeature rebuilt;
             if (band.isPresent()) {
+                warnCollapsedBandOnce(descriptor, info.key(), band.get());
                 rebuilt = PlacedFeatureRebuilder.withColumnBand(original.value(), band.get());
             } else {
                 var newRange = RemapEngine.apply(strategy, info.range(), playable,
@@ -173,5 +175,33 @@ public final class AddPhase {
                     added, biomeKey.location(), descriptor.dimension().location(),
                     strategy.getClass().getSimpleName(), playable);
         }
+    }
+
+    /** Feature keys already reported per dimension, so the notice fires once per pair. */
+    private static final Set<String> COLLAPSED_WARNED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * Report exactly once per (dimension, feature) when a terrain-relative projection has
+     * collapsed onto one of its anchors — see {@link ColumnBand#collapsedAtAnchor()}. The
+     * feature still generates, at the single depth the collapsed band names, so nothing here
+     * throws or drops it; but every sample lands on the same plane at the very edge of the
+     * body, which for an ore is indistinguishable from "this ore does not spawn". The strategy
+     * cannot say which reference levels the author meant, and the author cannot see the band —
+     * only the source Y range and the resulting stone that never appears — so the log line
+     * names both ends of the mismatch, which is the whole diagnosis.
+     */
+    private static void warnCollapsedBandOnce(WorldshapeDescriptor descriptor,
+                                              ResourceKey<PlacedFeature> key,
+                                              ColumnBand band) {
+        if (!band.collapsedAtAnchor()) return;
+        String dim = descriptor.dimension().location().toString();
+        if (!COLLAPSED_WARNED.add(dim + "|" + key.location())) return;
+        IsekaiApi.LOGGER.warn(
+                "[Isekai] {}: {} remapped to a zero-width band at depth {} — its whole vanilla Y "
+                        + "range lies outside the ore_strategy's reference column, so every sample "
+                        + "resolves to the same plane at the edge of the terrain and the feature is "
+                        + "effectively absent. Widen surface_y/floor_y in the worldshape's "
+                        + "ore_strategy to cover this feature's Y range.",
+                dim, key.location(), band.fromDepth());
     }
 }

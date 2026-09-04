@@ -136,17 +136,66 @@ public record ColumnBand(
     }
 
     /**
+     * Whether this band has collapsed onto one of the two normalized anchors — zero width at
+     * depth {@code 0.0} or {@code 1.0}. That is the signature of a source range that lay
+     * entirely outside the strategy's vanilla reference column and was flattened by the clamp
+     * in {@code ColumnLocal.depthOf}, e.g. vanilla's {@code ore_andesite_upper} (Y 64..128)
+     * read against the default reference surface of Y 64: both ends clamp to depth 0.0 and the
+     * band names a single plane instead of a span.
+     *
+     * <p>A zero-width band <i>away</i> from both anchors is legitimate — a source range whose
+     * min and max are the same Y is one plane by construction — so it is not reported here.
+     *
+     * @since 2.1.0
+     */
+    public boolean collapsedAtAnchor() {
+        if (toDepth - fromDepth > DEPTH_EPSILON) {
+            return false;
+        }
+        return fromDepth <= DEPTH_EPSILON || fromDepth >= 1.0 - DEPTH_EPSILON;
+    }
+
+    /**
+     * Depth widths at or below this are arithmetic collapse, not a thin band. Deliberately far
+     * below one block's worth of depth for any plausible body (1/4096), so a genuinely thin
+     * band is never mistaken for a collapsed one.
+     */
+    private static final double DEPTH_EPSILON = 1.0e-9;
+
+    /**
      * Resolve a normalized {@code depth} to an absolute Y for a column whose free space above
      * the body is at {@code topY} and below it at {@code bottomY}. Pure arithmetic — the
      * anchors are resolved by the caller.
+     *
+     * <p>The result is clamped into the body itself, {@code bottomY + 1 .. topY - 1}. Both
+     * anchors name <i>free space</i>, not terrain: {@link SurfaceAnchor.WorldSurface} reports
+     * the first air block above the body, so depth {@code 0.0} lands one block too high and
+     * depth {@code 1.0} (under {@link DepthScale#PROPORTIONAL}, which resolves to exactly
+     * {@code bottomY}) one block too low. Before 2.1.0 both ends were returned unclamped, and a
+     * band that had collapsed onto an anchor (see {@link #collapsedAtAnchor()}) therefore aimed
+     * every one of its samples at air. Ore features rooted in air place nothing, which is what
+     * made vanilla's {@code _upper} stone variants absent from Sky World's islands.
+     *
+     * <p>Only the endpoints move, and only by one block: a depth that already resolved inside
+     * the body resolves to the same Y as before.
+     *
+     * <p>When the body is thinner than one block the clamp window inverts, and the raw value is
+     * returned instead. {@code ColumnRelativeModifier} already drops such columns before
+     * calling here ({@code topY - bottomY < 2}), so that branch exists for direct callers only.
+     *
      * @since 2.0.0
      */
     public int resolveY(int topY, int bottomY, double depth) {
-        if (scale == DepthScale.PROPORTIONAL) {
-            return topY - (int) Math.round(depth * (topY - bottomY));
+        int y = scale == DepthScale.PROPORTIONAL
+                ? topY - (int) Math.round(depth * (topY - bottomY))
+                : anchoredToTop()
+                        ? topY - (int) Math.round(depth * referenceThickness)
+                        : bottomY + (int) Math.round((1.0 - depth) * referenceThickness);
+        int highestSolid = topY - 1;
+        int lowestSolid = bottomY + 1;
+        if (highestSolid < lowestSolid) {
+            return y;
         }
-        return anchoredToTop()
-                ? topY - (int) Math.round(depth * referenceThickness)
-                : bottomY + (int) Math.round((1.0 - depth) * referenceThickness);
+        return Math.max(lowestSolid, Math.min(highestSolid, y));
     }
 }
