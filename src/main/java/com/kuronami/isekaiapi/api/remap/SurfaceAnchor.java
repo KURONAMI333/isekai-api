@@ -37,6 +37,31 @@ public interface SurfaceAnchor {
      */
     @Nullable Integer resolveY(PlacementContext ctx, BlockPos pos);
 
+    /**
+     * Resolve this anchor against the part of the column at or below {@code ceiling}, so that a
+     * caller walking a column of several separate bodies can ask for the next one down.
+     *
+     * <p>A column of floating terrain holds more than one body. {@link #resolveY} answers for the
+     * topmost of them by construction — {@link WorldSurface} reads the heightmap, and
+     * {@link WorldFloor} stops at the first free space under whatever that found. This method is
+     * how the rest of the column is reached: given the free space under the body just handled,
+     * {@link WorldSurface} reports the free space above the next body down, and
+     * {@link WorldFloor} the free space under the body whose top is {@code ceiling}.
+     *
+     * <p>The default is single-shot: the anchor's own Y when it lies at or below {@code ceiling},
+     * otherwise {@code null}. A variant that names one absolute Y ({@link FixedY}) or one feature
+     * of the whole column ({@link BelowFluid}) has nothing further down to report, and a
+     * third-party variant that does not override this inherits the same behaviour — one body per
+     * column, exactly as before this method existed.
+     *
+     * @param ceiling inclusive upper bound; the returned Y is never above it
+     * @since 2.2.0
+     */
+    default @Nullable Integer resolveYBelow(PlacementContext ctx, BlockPos pos, int ceiling) {
+        Integer y = resolveY(ctx, pos);
+        return y != null && y <= ceiling ? y : null;
+    }
+
     /** Dispatching codec keyed on a {@code "type"} field, backed by the SurfaceAnchor registry. */
     Codec<SurfaceAnchor> CODEC = IsekaiDispatch.dispatchCodec(
             IsekaiSpiTypes.SURFACE_ANCHOR_REGISTRY, SurfaceAnchor::codec, "SurfaceAnchor");
@@ -49,6 +74,25 @@ public interface SurfaceAnchor {
         @Override public MapCodec<? extends SurfaceAnchor> codec() { return MAP_CODEC; }
         @Override public Integer resolveY(PlacementContext ctx, BlockPos pos) {
             return ctx.getHeight(Heightmap.Types.WORLD_SURFACE_WG, pos.getX(), pos.getZ());
+        }
+
+        /**
+         * The free space above the topmost non-air block at or below {@code ceiling}. The
+         * heightmap only knows the topmost body, so this walks the column instead; the two agree
+         * on a column whose bodies all lie below the ceiling, because {@code WORLD_SURFACE_WG}
+         * tests the same "not air" predicate. @since 2.2.0
+         */
+        @Override public @Nullable Integer resolveYBelow(PlacementContext ctx, BlockPos pos, int ceiling) {
+            WorldGenLevel level = ctx.getLevel();
+            int bottom = level.getMinBuildHeight();
+            BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+            for (int y = Math.min(ceiling - 1, level.getMaxBuildHeight() - 1); y >= bottom; y--) {
+                cursor.set(pos.getX(), y, pos.getZ());
+                if (!level.getBlockState(cursor).isAir()) {
+                    return y + 1;
+                }
+            }
+            return null;  // nothing but air below the ceiling
         }
     }
 
@@ -109,6 +153,21 @@ public interface SurfaceAnchor {
         @Override public @Nullable Integer resolveY(PlacementContext ctx, BlockPos pos) {
             Integer from = start.resolveY(ctx, pos);
             if (from == null) return null;
+            return scanDown(ctx, pos, from);
+        }
+
+        /**
+         * The free space under the body whose top is at {@code ceiling}. {@link #start} is
+         * deliberately ignored here: it means "where to begin looking for the topmost body", and
+         * a caller walking the column has already established where this body begins.
+         * @since 2.2.0
+         */
+        @Override public @Nullable Integer resolveYBelow(PlacementContext ctx, BlockPos pos, int ceiling) {
+            return scanDown(ctx, pos, ceiling);
+        }
+
+        /** Descend from {@code from}, cross at most {@code maxScan} blocks, report the first free space under the body. */
+        private @Nullable Integer scanDown(PlacementContext ctx, BlockPos pos, int from) {
             WorldGenLevel level = ctx.getLevel();
             int bottom = level.getMinBuildHeight();
             int y = Math.min(from, level.getMaxBuildHeight() - 1);
