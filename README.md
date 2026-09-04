@@ -8,7 +8,7 @@ repositories {
     maven { url = "https://raw.githubusercontent.com/KURONAMI333/isekai-api/maven" }
 }
 dependencies {
-    compileOnly "com.kuronami.isekaiapi:isekai_api:2.0.0"
+    compileOnly "com.kuronami.isekaiapi:isekai_api:2.2.0"
 }
 ```
 
