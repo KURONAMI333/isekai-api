@@ -98,6 +98,38 @@ default returns `this`, it will not pass the world seed down to the zones it wra
 noise zone nested inside it stays on the unbound pattern. Override `withWorldSeed` to rebuild
 around `child.withWorldSeed(worldSeed)` if your variant holds children.
 
+## Datapack behavior change (unreleased) — a column's lower bodies receive ore
+
+`isekai_api:column_relative` used to place into the topmost body of a column and nothing else.
+Both default anchors resolve against that body by construction: `world_surface` is the heightmap,
+and `world_floor` scans down from whatever it found. In terrain that stacks — floating islands,
+orbiting planets — every body but the highest was skipped entirely. It now emits one position per
+body, at the same normalized depth.
+
+The schema is untouched, and a column holding a single body places exactly what it placed before,
+at the same Y, having consumed the same amount of randomness. What moves is ore in worlds whose
+columns stack: those bodies used to be bare and are not any more. Existing worlds keep their
+already-generated chunks and pick the change up in newly explored ones.
+
+## Java API compatibility (unreleased)
+
+`SurfaceAnchor` gained one element, additive:
+
+- `default Integer resolveYBelow(PlacementContext, BlockPos, int ceiling)` — the anchor's Y within
+  the part of the column at or below `ceiling`. The default is single-shot: it reports
+  `resolveY`'s answer when that lies at or below the ceiling and `null` otherwise, which ends a
+  caller's walk after one body. Third-party variants written against 1.x, 2.0.0 or 2.1.0 inherit
+  it and keep compiling and behaving as before.
+
+Two points worth checking if you ship your own variant:
+
+- A variant that *wraps* another (as `world_floor` wraps its `start`) does not pass
+  `resolveYBelow` down to its child under the default, so a built-in anchor nested inside it stays
+  on single-shot semantics. Override `resolveYBelow` to delegate if your variant holds children.
+- `WorldFloor.resolveYBelow` deliberately ignores its own `start`. That field means "where to
+  begin looking for the topmost body", and a caller asking about a body further down has already
+  established where that body begins.
+
 ## Depending on Isekai API
 
 Isekai is a `compileOnly` worldgen library: you compile against its `api` package, and the

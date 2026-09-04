@@ -4,6 +4,39 @@ All notable changes to Isekai API follow this file. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/). Compatibility policy — how datapack
 and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
+## [Unreleased]
+
+**No Java API breaks.** The one addition is a `default` method, so `SurfaceAnchor` variants
+written against 1.x / 2.0.0 / 2.1.0 compile and run unchanged. The datapack schema is untouched;
+what changes is where ore lands in a column that holds more than one body.
+
+### Fixed — datapack behaviour
+
+- **`isekai_api:column_relative` reaches every body in a column, not just the topmost one.**
+  A column of floating terrain can hold several islands stacked above one another, and both
+  default anchors resolved against the highest of them by construction — `world_surface` reads
+  the heightmap, and `world_floor` scans down from whatever that found. An island with anything
+  floating above it therefore received no ore at all. It now emits one position per body, at the
+  same normalized depth, so an island's ore no longer depends on what happens to float above it.
+  Measured on Sky World: andesite, granite, diorite, coal, iron and copper were all exactly 0
+  through the lower island band, in a region where 29 of 29 lower-island chunks also carried an
+  upper island.
+- A body too thin for the band is skipped on its own instead of ending the column, so a thin
+  island no longer hides the ones below it.
+- **A column holding one body places exactly what it placed before**, at the same Y, having drawn
+  the same amount from the random source — the depth is drawn once per placement however many
+  bodies the column turns out to hold, and a column that yields nothing still draws nothing.
+  Worlds whose terrain never stacks generate identically.
+
+### Added — Java API
+
+- **`SurfaceAnchor.resolveYBelow(PlacementContext, BlockPos, int)`** — resolve an anchor against
+  the part of a column at or below a ceiling, which is how the walk reaches the second body and
+  the ones under it. It is a `default` method with single-shot semantics (the anchor's own Y when
+  that lies at or below the ceiling, otherwise nothing), so a variant that does not override it
+  keeps reporting one body per column exactly as before. `world_surface` and `world_floor`
+  override it; see [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
+
 ## [2.1.0] — 2026-08-08
 
 Three features that the documentation promised but the implementation never

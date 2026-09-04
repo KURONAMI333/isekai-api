@@ -191,7 +191,7 @@ Go in a placed feature's modifier list.
 | `isekai_api:spatial_predicate` | `predicate` (SpatialPredicate) | place only where the predicate holds |
 | `isekai_api:scatter` | `count` (IntProvider), `radius` (int 1–32, default 8), `min_spacing` (int 0–32, default 0), `max_attempts_multiplier` (int 1–8, default 3) | jitter the input into `count` XZ samples within `radius`; if `min_spacing > 0`, reject samples within `min_spacing` blocks of an already-accepted one. Pair with a heightmap/Y-anchor modifier downstream. Use over `count + in_square` whenever you want clustered features that don't stack on each other. |
 | `isekai_api:fluid_edge` | `fluid` (fluid id / list / `#tag`), `max_distance` (int 1–16, default 4), `mode` (`near`\|`far`, default `near`) | accept positions where a matching fluid is (`near`) or isn't (`far`) within `max_distance` blocks in XZ. Geometric distance filter — pure membership test, no theme. |
-| `isekai_api:column_relative` | `top` / `bottom` (SurfaceAnchor, default `world_surface` / `world_floor`), `from_depth` / `to_depth` (double), `scale` (`blocks`\|`proportional`, default `blocks`), `reference_thickness` (int 1–4096, default 128), `distribution` (HeightDistribution, default `uniform`) | place at a **depth into the column's own terrain** instead of an absolute Y. `0.0` is the free space above the body, `1.0` the free space below it. `blocks` measures a fixed block distance from whichever end the band is nearer to (so an ore keeps its distance from the surface whatever the body's size); `proportional` measures a fraction of the body's own thickness (so the layout stretches with it). Normally emitted by `isekai_api:column_local` rather than written by hand. |
+| `isekai_api:column_relative` | `top` / `bottom` (SurfaceAnchor, default `world_surface` / `world_floor`), `from_depth` / `to_depth` (double), `scale` (`blocks`\|`proportional`, default `blocks`), `reference_thickness` (int 1–4096, default 128), `distribution` (HeightDistribution, default `uniform`) | place at a **depth into the column's own terrain** instead of an absolute Y. `0.0` is the free space above the body, `1.0` the free space below it. `blocks` measures a fixed block distance from whichever end the band is nearer to (so an ore keeps its distance from the surface whatever the body's size); `proportional` measures a fraction of the body's own thickness (so the layout stretches with it). A column that holds several separate bodies gets one placement in each of them, at the same depth. Normally emitted by `isekai_api:column_local` rather than written by hand. |
 | `isekai_api:slope_filter` | `min_slope` / `max_slope` (double 0–1, defaults 0/1), `sample_radius` (int 1–8, default 2), `heightmap` (Heightmap type, default `WORLD_SURFACE_WG`) | accept positions where the local heightmap slope (max neighbour-height-delta over `sample_radius`, normalised) falls within `[min_slope, max_slope]`. 0 = flat, 1 ≈ 45°+ cliff. |
 
 (`IntProvider` = a vanilla int provider: a bare int like `5`, or `{"type":"minecraft:uniform","min_inclusive":0,"max_inclusive":8}` — flat fields, no `value:` wrapper in 1.21.1.)
@@ -522,6 +522,11 @@ often a structure spawns. Use them in `ore_strategy` / `mob_spawn_strategy` inst
 returns the first free space *below* the terrain — the underside of a floating body. It resolves
 to nothing when no body is found within `max_scan`, and equally when the body never ends, so in
 solid ground-to-bedrock terrain it simply skips the placement.
+
+Both anchors answer for the **topmost** body in the column. `isekai_api:column_relative` walks
+past it to reach the ones underneath, so a column of stacked islands receives a placement in each
+of them; anywhere an anchor is used on its own (`isekai_api:surface_relative`, for instance) it is
+the topmost body that is meant.
 
 ```json
 {
