@@ -1,19 +1,19 @@
 # Isekai Consumer Roadmap
 
 Internal reference — assessment of each planned consumer mod's
-implementability against Isekai API v1.0.0.
+implementability against Isekai API v2.1.0.
 
 | ID | Concept | Difficulty | Status | Gap |
 |---|---|---|---|---|
 | mod-030 sky-world      | Aether-style floating islands Y=120..220                  | Easy       | **shipped 1.0.0, runtime-verified** | none |
 | mod-031 mountain-world | All-mountain overworld, Y=80..300                         | Easy       | **shipped 1.0.0**                  | none |
 | mod-032 deep-sea-world | Submerged overworld; oceanic structures primary           | Easy       | **shipped 1.0.0**                  | none |
-| mod-033 hollow-earth   | Stacked overworlds: inverted Y=0..60 + normal Y=80..200   | Medium     | skeleton                           | `LayeredDescriptor` is loaded into the Java-side IsekaiRemap registry but no biome_modifier currently dispatches per-layer. Implementable today via two single-layer biome_modifiers split by Y range + a more complex noise_settings overlay. |
+| mod-033 hollow-earth   | Stacked overworlds: inverted Y=0..60 + normal Y=80..200   | Medium     | skeleton                           | none. Per-layer dispatch landed in 2.1.0: `ApplyWorldshapeRefBiomeModifier` and `ApplyWorldshapeStructuresRefStructureModifier` read `getActiveLayers`, and `LayerResolver` evaluates Hard / Blend / Gap at each seam. mod-033 is the first real layered-config user. |
 | mod-034 supercontinent | Single massive landmass, near-zero ocean                  | Easy       | **shipped 1.0.0**                  | none |
 | mod-035 island-world   | Tiled scattered islands                                   | Easy-Med   | **shipped 1.0.0**                  | none (`repeat` validates as expected) |
 | mod-036 canyon-world   | Plateaus Y=60..180 + canyons Y=0..30                      | Easy       | **shipped 1.0.0**                  | none |
 | mod-037 flipped-world  | Y axis fully inverted                                     | Easy-Med   | **shipped 1.0.0**                  | bedrock not flipped (surface_rule is out of scope for Isekai); documented in mod README |
-| mod-038 three-layered  | Three stacked overworlds with two void gaps               | Med-Hard   | skeleton                           | depends on mod-033's layered application pattern landing first |
+| mod-038 three-layered  | Three stacked overworlds with two void gaps               | Med-Hard   | skeleton                           | none. Composes the layered pattern that mod-033 exercises first. |
 
 ## Recommended build order (completed → pending)
 
@@ -28,7 +28,7 @@ Done (1.0.0 build green):
 - **035 island-world** — `repeat` (XZ tiling) + `distance` + `step` for archipelago
 - **037 flipped-world** — `scale_coord(sy=-1)` + `translate(dy=-256)` for Y mirror
 
-Remaining (require `LayeredDescriptor` machinery — biome_modifier-level extension to apply per-layer would simplify, but a workaround via two single-layer modifiers is possible today):
+Remaining (the `LayeredDescriptor` machinery they need is in place as of 2.1.0):
 - **033 hollow-earth** — 2 stacked overworlds + void gap; first real layered-config user
 - **038 three-layered** — capstone composing sky + middle + hollow patterns
 
