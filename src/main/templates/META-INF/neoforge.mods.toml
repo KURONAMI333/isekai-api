@@ -1,7 +1,7 @@
 modLoader="javafml"
 loaderVersion="${loader_version_range}"
 license="${mod_license}"
-issueTrackerURL="https://github.com/KURONAMI333/isekai-api/issues"
+issueTrackerURL="https://x.com/kuronami333"
 
 [[mods]]
 modId="${mod_id}"

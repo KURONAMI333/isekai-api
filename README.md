@@ -323,17 +323,16 @@ All subcommands require permission level 2 (operators).
 ./gradlew build
 ```
 
-Produces `build/libs/isekai_api-2.0.0.jar` plus matching `-sources` and `-javadoc` jars.
+Produces `build/libs/isekai_api-<version>.jar` plus matching `-sources` and `-javadoc` jars.
 
 To depend on Isekai from another mod, add it as a `compileOnly` dependency:
 
 ```gradle
 repositories { maven { url = "https://raw.githubusercontent.com/KURONAMI333/isekai-api/maven" } }
-dependencies { compileOnly "com.kuronami.isekaiapi:isekai_api:2.0.0" }
+dependencies { compileOnly "com.kuronami.isekaiapi:isekai_api:2.2.0" }
 ```
 
-[Cursemaven](https://cursemaven.com) works too once the CurseForge file for that version is
-approved. Full coordinates and the compatibility contract are in
+Full coordinates and the compatibility contract are in
 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md#depending-on-isekai-api).
 
 ## Examples
@@ -374,3 +373,11 @@ Isekai ships neutral mathematical primitives instead of named helpers. Every con
 ## Credits
 
 - Author: KURONAMI
+
+## Downloads and support
+
+Downloads: [CurseForge](https://www.curseforge.com/minecraft/mc-mods/isekai-api) · [GitHub Releases](https://github.com/KURONAMI333/isekai-api/releases/tag/v2.2.0).
+
+For bugs and questions, comment on the [CurseForge page](https://www.curseforge.com/minecraft/mc-mods/isekai-api) or DM [@kuronami333 on X](https://x.com/kuronami333).
+
+[Source](https://github.com/KURONAMI333/isekai-api) · [License](LICENSE)

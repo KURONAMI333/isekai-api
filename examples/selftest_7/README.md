@@ -30,14 +30,13 @@ field on the noise_settings (the hooked preset makes the whole document ~30 line
 copy — asserted `sea_level == 200`), but genuine flooding needs the aquifer fluid router axes
 (`barrier`, `fluid_level_floodedness`, `fluid_level_spread`, `lava`) filled with vanilla noise —
 and those have no standalone density_function file to reference, so they must be inlined by the
-consumer. The hook covers terrain *shape* (`final_density`), not the *fluid* router. This matches
-the v1 verdict (consumer責務) and confirms SPEC §0: Isekai's value is adaptation automation, not
-owning every noise_settings field.
+consumer. The hook covers terrain *shape* (`final_density`), not the *fluid* router. The worldshape
+consumer must supply those fluid-router axes.
 
 ## Item 6 (✓*) — mechanically expressible, aesthetically constrained
 
 `band_density(invert)` and `scale_coord(sy=-1)` both express a mirrored/ceiling world, and the
 gametest proves the signature (solid ceiling terrain). The caveat is aesthetic, not expressive:
-a *playable* literal upside-down world is janky because Minecraft's surface rules, water, and
-gravity all assume "up = sky" (this is why the mod-037 flipped consumer was shelved). The API
+a *playable* literal upside-down world is difficult because Minecraft's surface rules, water, and
+gravity all assume "up = sky". The API
 expresses the shape; making it a pleasant world to play is a content/gameplay concern outside v2.

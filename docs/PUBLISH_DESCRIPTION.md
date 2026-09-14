@@ -42,6 +42,6 @@ Isekai isn't tied to any one world or author. **However you want to use it, you'
 - **Datapack authors:** the [Datapack Reference](https://github.com/KURONAMI333/isekai-api/blob/main/docs/DATAPACK_REFERENCE.md) lists every key with its JSON shape; copy a runnable skeleton from [`examples/`](https://github.com/KURONAMI333/isekai-api/tree/main/examples) — shape, placement, and adaptation each have their own folder.
 - **Java modders:** add `isekai_api` as a `compileOnly` Gradle dependency (Cursemaven, or the repo's own maven branch — see [COMPATIBILITY](https://github.com/KURONAMI333/isekai-api/blob/main/docs/COMPATIBILITY.md)) and use the `Isekai` facade. Everything outside the `api` package is internal, so the public surface stays small and stable. Sources and javadoc jars ship with every release.
 - **Extend the library itself:** the five dispatch interfaces — spatial predicates, remap strategies, biome zones, surface anchors, transition rules — are registry-backed extension points. Register your own variant from your own mod id and use it in JSON alongside the built-ins. No fork, no PR.
-- **Questions, ideas, bugs:** [open an issue](https://github.com/KURONAMI333/isekai-api/issues). Built a world with Isekai? Share it — I'd love to see what people make.
+- **Questions, ideas, bugs:** [DM @kuronami333 on X](https://x.com/kuronami333). Built a world with Isekai? Share it — I'd love to see what people make.
 
 MIT · [Source & docs](https://github.com/KURONAMI333/isekai-api). *Unrelated to the "Isekai Adventure" modpack.*

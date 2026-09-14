@@ -191,7 +191,7 @@ class PoolFeatureTest {
     @Test
     void oneBlockLedgeInsideTheFootprintPlacesNothing() {
         // Origin on top of a 3x3 plateau one block above everything around it: the pool's
-        // surface would hang over the drop. This is the shape KURONAMI333 rejected six times.
+        // surface would hang over the drop. This is the shape was rejected in review six times.
         for (long seed = 0; seed < 16; seed++) {
             assertFalse(place(plateau(1, 1), 4, 2, seed), "seed " + seed);
         }
