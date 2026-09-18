@@ -56,8 +56,6 @@ fabric-1.20.1/
 branding/
 
 ### Internal handoff / gap tracking — never published ###
-GAP_LOG.md
-_handoff/
 
 ### Python (repo tooling) ###
 __pycache__/
