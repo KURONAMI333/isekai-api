@@ -49,7 +49,7 @@ Drop these anywhere a vanilla density function is expected. Compose them with ea
 | `isekai_api:translate` | `f` (density), `dx`, `dy`, `dz` (double) | f sampled at a shifted position |
 | `isekai_api:scale_coord` | `f` (density), `sx`, `sy`, `sz` (double) | f sampled at a scaled position (negative = mirror axis) |
 | `isekai_api:repeat` | `f` (density), `period_x`, `period_z` (double) | f tiled on the XZ plane |
-| `isekai_api:mask_y_range` | `min_y`, `max_y` (int), `inside`, `outside` (density) | `inside` within the Y band, else `outside` |
+| `isekai_api:mask_y_range` | `ymin`, `ymax` (int), `inside`, `outside` (density) | `inside` within the Y band, else `outside` |
 | `isekai_api:quarter_negative` | `argument` (density) | `v > 0 ? v : v × 0.25` — vanilla's `quarter_negative` re-exposed (the underlying `Mapped.Type` enum is package-private). Used inside the proven non-terraced terrain formula `add(mul(4, quarter_negative(mul(depth, factor))), base_3d_noise)`. |
 
 ### Worldshape composers
@@ -82,6 +82,8 @@ A standard floating-island `final_density` wraps `band_density` in `blend_densit
   }
 }
 ```
+
+**Two traps.** `band_density`'s outside is a fixed, shallow negative constant — do not assume it stays below the solid threshold once other densities are layered on top. Pin the band with `isekai_api:mask_y_range` (`ymin`/`ymax`, both inclusive; `outside` = a `minecraft:constant` negative value such as `-1.0`), then wrap that in `isekai_api:squeeze` / `minecraft:blend_density` / `minecraft:interpolated`. Air below `sea_level` also becomes water even with `aquifers_enabled: false` (`Aquifer.createDisabled` returns water for `y < sea_level`), so lower `sea_level` to the band's floor (e.g. `noise.min_y`) when the void must stay dry.
 
 ---
 
@@ -176,6 +178,7 @@ Go in `noise_settings.surface_rule` (inside a `minecraft:sequence`). Both read p
 | `isekai_api:worldshape_default_block` | `dimension` (dimension key) | replaces the default (stone) fill of matched biomes (`block_overrides.default_block`). Put it **last** (after vanilla rules). |
 | `isekai_api:strata` | `bands` (list of `{ block: BlockState, thickness: int ≥ 1 }`) | ordered downward stack — band 1 covers depths 0…t1−1, band 2 covers t1…t1+t2−1, etc. Emits null below the last band so the surrounding sequence handles deeper fill. Collapses an N-layer nested `stone_depth` sequence into one flat list. |
 | `isekai_api:vanilla_overworld_surface` | — | the entire vanilla overworld surface (grass/dirt/sand/badlands bands/snow caps/…), so a noise_settings can write `{ "type": "isekai_api:vanilla_overworld_surface" }` instead of copying the expanded ~30 KB `surface_rule`. Reconstructed from runtime worldgen factories, so it is safe even inside a replaced `minecraft:overworld`. Wrap it in a `minecraft:sequence` with `worldshape_surface_top` first and `worldshape_default_block` last to layer worldshape block overrides on top. |
+| `isekai_api:vanilla_nether_surface` | — | the entire vanilla nether surface: bedrock floor/roof (with roof holes), netherrack, basalt deltas, soul sand valley, lava sea, warped/crimson nylium, soul sand and gravel patches. The `hooked_nether` preset already wires it. |
 
 ---
 
@@ -193,6 +196,7 @@ Go in a placed feature's modifier list.
 | `isekai_api:fluid_edge` | `fluid` (fluid id / list / `#tag`), `max_distance` (int 1–16, default 4), `mode` (`near`\|`far`, default `near`) | accept positions where a matching fluid is (`near`) or isn't (`far`) within `max_distance` blocks in XZ. Geometric distance filter — pure membership test, no theme. |
 | `isekai_api:column_relative` | `top` / `bottom` (SurfaceAnchor, default `world_surface` / `world_floor`), `from_depth` / `to_depth` (double), `scale` (`blocks`\|`proportional`, default `blocks`), `reference_thickness` (int 1–4096, default 128), `distribution` (HeightDistribution, default `uniform`) | place at a **depth into the column's own terrain** instead of an absolute Y. `0.0` is the free space above the body, `1.0` the free space below it. `blocks` measures a fixed block distance from whichever end the band is nearer to (so an ore keeps its distance from the surface whatever the body's size); `proportional` measures a fraction of the body's own thickness (so the layout stretches with it). A column that holds several separate bodies gets one placement in each of them, at the same depth. Normally emitted by `isekai_api:column_local` rather than written by hand. |
 | `isekai_api:slope_filter` | `min_slope` / `max_slope` (double 0–1, defaults 0/1), `sample_radius` (int 1–8, default 2), `heightmap` (Heightmap type, default `WORLD_SURFACE_WG`) | accept positions where the local heightmap slope (max neighbour-height-delta over `sample_radius`, normalised) falls within `[min_slope, max_slope]`. 0 = flat, 1 ≈ 45°+ cliff. |
+| `isekai_api:dimension_guard` | `dimension` (any dimension id — vanilla or modded) | place only in that dimension. Prepended automatically to every feature `apply_worldshape` injects; write it by hand when a placed feature is shared across dimensions and must not run in one of them. |
 
 (`IntProvider` = a vanilla int provider: a bare int like `5`, or `{"type":"minecraft:uniform","min_inclusive":0,"max_inclusive":8}` — flat fields, no `value:` wrapper in 1.21.1.)
 
@@ -691,9 +695,26 @@ membership alone makes it decodable and evaluable.
 
 `applies_to` empty = matches no biome (explicit opt-in; prevents cross-dimension leakage). Higher `priority` wins when two descriptors target the same dimension.
 
+### Scope by key
+
+A descriptor governs its own `dimension`. Biome attributes are the exception: they live on the
+shared biome. The schema is unchanged from 2.x — an existing pack loads as-is, but its feature,
+structure, mob spawn and carver rules now apply only in the descriptor's dimension.
+
+| Key | Applies to | Enforced at |
+|---|---|---|
+| `exclusions.features`, the originals remapped by `ore_strategy`, the originals replaced by `content_overrides.feature_predicates` | the descriptor's dimension | decoration time (`DimensionFeatureScope`), with a final veto in `PlacedFeature#placeWithContext` |
+| `additions.features`, remap copies, predicated copies | the descriptor's dimension | `isekai_api:dimension_guard` on each injected feature |
+| `exclusions.structures` | the descriptor's dimension | generation-point search; `/place structure` is not blocked |
+| `exclusions.mob_spawns`, `additions.mob_spawns`, `mob_spawn_strategy`, `mob_spawn_strategy_by_category` | the descriptor's dimension, for the matched biomes | runtime spawn-list read; exclusions also at `FinalizeSpawnEvent` |
+| `exclusions.carvers`, `additions.carvers` | the descriptor's dimension **on `NoiseBasedChunkGenerator`**; biome-wide on other generators | `NoiseBasedChunkGenerator#applyCarvers` |
+| `atmosphere` climate/effects, `creature_generation_probability`, `mob_spawn_costs` | the shared biome — cannot differ by dimension | biome modifier |
+| `content_overrides.block_overrides` | the descriptor's dimension | the surface rule's `dimension` key |
+
 ### `exclusions` — what it removes, and what it holds back
 
-Everything listed under `exclusions` is gone from the matched biomes. Each list is keyed by registry id:
+Feature, structure, mob spawn and (on noise-based dimensions) carver exclusions are scoped to the
+descriptor's dimension; climate and effects are not. Each list is keyed by registry id:
 
 ```jsonc
 {
@@ -706,7 +727,7 @@ Everything listed under `exclusions` is gone from the matched biomes. Each list 
 }
 ```
 
-**`exclusions.features` also removes the entry from the Y-remap.** When `ore_strategy` is anything other than `isekai_api:identity`, Isekai rewrites the vertical placement of every height-ranged feature the biome originally had: it deletes the originals and re-injects rebuilt copies at the strategy's Y. A key listed in `exclusions.features` is dropped from that set, so it is removed and never rebuilt. Without this the exclusion would be undone one phase later — the rebuilt copy carries no registry id, so nothing downstream (a second `exclusions` pass, `content_overrides.feature_predicates`) could ever match it again.
+**`exclusions.features` also removes the entry from the Y-remap, in the declaring dimension.** When `ore_strategy` is anything other than `isekai_api:identity`, Isekai re-injects rebuilt copies of every height-ranged feature the biome originally had at the strategy's Y. A key listed in `exclusions.features` is dropped from that set, so no rebuilt copy is made and the original is skipped where the descriptor applies. The original is never deleted from the shared biome: `isekai_api` filters it at decoration time per dimension, so another dimension that reuses the biome keeps generating it. The same is true of `content_overrides.feature_predicates` — the original stays and a guarded, predicated copy runs in the declaring dimension.
 
 Two consequences worth knowing:
 
@@ -714,6 +735,43 @@ Two consequences worth knowing:
 * Features whose height cannot be read (no `height_range` placement) are outside the remap entirely — they are neither moved nor removed, and `exclusions.features` is the only way to drop them.
 
 `additions.features` and `additions.carvers` are not filtered against `exclusions`. If you list the same id in both, the addition currently wins — do not write that combination deliberately, and do not rely on it to re-add an excluded id.
+
+**Feature scoping is installed by the biome modifier.** The ADD phase records what it took over for
+this (dimension, biome) pair, and decoration drops exactly that set. A generator that overrides
+`applyBiomeDecoration` entirely is still covered by the `PlacedFeature#placeWithContext` veto. A
+worldshape JSON that no `neoforge/biome_modifier` entry references therefore changes no features —
+the same rule as `additions`, `carvers`, mob spawns and atmosphere. It is recorded once at server
+start, so a `/reload` does not add or remove feature rules; it also means the drop and the injected
+copy can never disagree.
+
+**Additions carry a dimension guard.** Every feature the ADD phase injects (explicit `additions.features`, remap copies, predicated copies) is a copy with `isekai_api:dimension_guard` first in its modifier list, so it places only in the descriptor's `dimension`. Without it a nether addition would also spawn in any modded dimension that reuses the same nether biome.
+
+**Another mod's feature on a declared biome follows the scope.** The reconcile removes the original
+holder from the shared biome and re-injects a guarded copy for the declaring dimension. That keeps
+the feature in the declaring dimension even when it was added by a biome modifier that runs after
+Isekai's, but a dimension that reuses the biome without declaring the worldshape no longer receives
+it (`ForeignFeatureReconciler`).
+
+**`exclusions.structures` is dimension-scoped.** It is enforced while the structure searches for a
+generation point, against the dimension the structure is actually generating in — the structure's
+shared biome filter is never mutated. Excluding `minecraft:fortress` in a nether worldshape
+therefore leaves it intact in any other dimension that reuses nether biomes. During chunk
+generation the dimension comes from `ChunkDimensionIndex`; `/locate` and `/place` use the level
+directly. An implementation that passes only a `LevelHeightAccessor` is not indexed and falls back
+to `BiomeSource` matching, which is ambiguous when two dimensions share one source. This also means
+`/place structure` (which skips the generation-point search) is not blocked by an exclusion.
+
+**Mob spawn changes are dimension-scoped.** `exclusions.mob_spawns` / `additions.mob_spawns` and
+the optional per-category strategy are recorded per (dimension, biome) and applied when
+`NaturalSpawner` reads the list (`mobsAt`, chunk-generation spawn). Exclusions also cancel at
+`FinalizeSpawnEvent`, so patrols, spawners, spawn eggs and `/summon` are covered; a custom mob that
+calls `addFreshEntity` without `finalizeSpawn` is not. A different dimension reusing the biome keeps
+its original list.
+
+**Carver changes are dimension-scoped on `NoiseBasedChunkGenerator`.** `exclusions.carvers` /
+`additions.carvers` are applied in `NoiseBasedChunkGenerator#applyCarvers` per (dimension, biome).
+A dimension using another generator, or a `NoiseBasedChunkGenerator` subclass that overrides
+`applyCarvers` without calling super, keeps the old biome-wide add/remove.
 
 ---
 
@@ -728,7 +786,11 @@ Isekai ships two things so you never hand-copy vanilla's `noise_settings`:
 | Preset | What it is | Use |
 |---|---|---|
 | `isekai_api:hooked_overworld` | a complete `noise_settings` whose `final_density` is the `isekai_api:hook/final_density` hook and whose `surface_rule` is the `vanilla_overworld_surface` delegate (aquifers/veins off) | point a **new** dimension's `generator.settings` at it; override the hook to set your shape |
-| `isekai_api:hook/final_density` | a `density_function` — the hook. Default = vanilla terrain shape (`minecraft:overworld/sloped_cheese` reference) | **override** it at `data/isekai_api/worldgen/density_function/hook/final_density.json` in your **datapack** to reshape every world using the preset |
+| `isekai_api:hook/final_density` | a `density_function` — the overworld hook. Default = vanilla terrain shape (`minecraft:overworld/sloped_cheese` reference) | **override** it at `data/isekai_api/worldgen/density_function/hook/final_density.json` in your **datapack** to reshape every world using the preset |
+| `isekai_api:hooked_nether` | the nether twin: `min_y 0`, `height 128`, sea level 32, netherrack/lava defaults, legacy random source, `final_density` = `isekai_api:hook/final_density_nether`, `surface_rule` = worldshape hooks + `vanilla_nether_surface` | point a **new** nether-shaped dimension's `generator.settings` at it, or override `data/minecraft/worldgen/noise_settings/nether.json` with it to replace `minecraft:the_nether` itself |
+| `isekai_api:hook/final_density_nether` | the nether hook — vanilla nether composition (`minecraft:nether/base_3d_noise` + the two Y gradients), **separate id** so overworld overrides of `hook/final_density` do not touch the nether | override it in your datapack to reshape only nether-preset worlds |
+
+The nether preset keeps vanilla's `temperature`/`vegetation` shifted-noise axes inline, so multi-noise biome placement in `minecraft:the_nether` keeps working; the other axes are `0.0` and `initial_density_without_jaggedness` is `0.0`, exactly as vanilla nether. Its two worldshape surface hooks name `minecraft:the_nether` — retarget them if you point a *new* dimension at the preset. Worldshape bounds (`min_y`/`height`) resolve per dimension, so the same worldshape can carry separate overworld and nether envelopes via `worldshape_surface_top` / `worldshape_default_block` for `minecraft:the_nether`.
 
 **Override physics.** The hook wins because your datapack loads *above* the mod jar (`RegistryDataLoader` takes the highest-priority pack's copy of each id). This is deterministic for a datapack; a second *mod* shipping the same file is mod-vs-mod load order (undefined) — so ship shape overrides as a datapack, and treat a preset as **single-owner per world** (two packs overriding the same hook conflict, exactly like two mods replacing `minecraft:overworld`). Overriding the hook takes effect on **world create**, not `/reload` (the noise_settings resolves its density references once at world load).
 

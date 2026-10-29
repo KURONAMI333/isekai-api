@@ -38,7 +38,7 @@ A deprecated element is kept working for **one full major version** after the re
 deprecates it, then removed in the next major. Deprecated datapack keys log a one-time warning
 at load; deprecated Java elements carry `@Deprecated` + `@since`/`@deprecated` javadoc.
 
-Currently deprecated (removed in 3.0.0):
+Currently deprecated (still accepted in 3.0.0; removal in a future major):
 
 - **Bare `isekai:` dispatch prefix** — the canonical prefix is `isekai_api:`. `"type":
   "isekai:y_in_range"` still decodes but warns once per id. Rewrite to `isekai_api:`.
@@ -129,6 +129,94 @@ Two points worth checking if you ship your own variant:
 - `WorldFloor.resolveYBelow` deliberately ignores its own `start`. That field means "where to
   begin looking for the topmost body", and a caller asking about a body further down has already
   established where that body begins.
+
+## 3.0.0 — dimension-scoped worldshapes and the nether preset
+
+**Datapack behaviour.** A worldshape now governs one dimension. Feature add/remove, structure
+exclusion, mob spawn changes and (on noise-based generators) carver changes apply only in the
+descriptor's `dimension`; the same biome in another dimension keeps its original rules. The JSON
+schema is unchanged and 2.x packs load, but a pack that relied on the old cross-dimension leak
+must declare a descriptor for the other dimension.
+
+**Worldshape bounds resolve per dimension**, from its `LevelStem`/`DimensionType`, so a descriptor
+whose `dimension` is `minecraft:the_nether` (or any non-overworld dimension) gets that dimension's
+`min_y`/`height` and ore is projected into the right Y band. Overworld behaviour is unchanged. Only
+a level with no `LevelStem` entry falls back to the overworld envelope.
+
+**Breaking behaviour: feature edits are dimension-scoped.** `exclusions.features`, the originals
+taken over by `ore_strategy`, and the originals replaced by `content_overrides.feature_predicates`
+used to be edited in the biome's generation settings inside a NeoForge `BiomeModifier` — which has
+no dimension context, so a nether worldshape rewrote every dimension that reused nether biomes.
+They are now dropped at decoration time (`DimensionFeatureScope`) by the id of the level generating
+the chunk, so the overworld, the nether, the end, datapack dimensions and other mods' dimensions
+are all first-class; no vanilla id is special-cased. A custom generator that bypasses
+`applyBiomeDecoration` is covered by a final veto at `PlacedFeature#placeWithContext`.
+`/isekai validate dimension` reports the resolved descriptor per dimension.
+
+**Breaking behaviour: structure exclusions.** `exclusions.structures` used to empty the structure's
+biome filter in a NeoForge `StructureModifier`, a global mutation, so excluding it for the nether
+also removed it from every dimension sharing those biomes. Exclusions now veto generation-point
+search in the generating dimension. During chunk generation the dimension comes from
+`ChunkDimensionIndex` (a weak `ProtoChunk` → dimension index), not from `BiomeSource` matching;
+`/locate` and `/place` use the level directly. An implementation that passes only a
+`LevelHeightAccessor` is not indexed and still falls back to `BiomeSource` matching, which is
+ambiguous if two dimensions share one source. `/place structure` skips generation-point search and
+is not blocked.
+
+**Breaking behaviour: mob spawns are dimension-scoped.** `exclusions.mob_spawns`,
+`additions.mob_spawns`, `mob_spawn_strategy` and `mob_spawn_strategy_by_category` used to rewrite
+the shared biome's spawn builder. They are now recorded per (dimension, biome) and filtered where
+the list is read (`NaturalSpawner#mobsAt`, chunk-generation spawn). Exclusions also cancel at
+`FinalizeSpawnEvent`, covering paths that never read a list: patrols, spawners, spawn eggs and
+`/summon`. A custom mob that calls `addFreshEntity` without `finalizeSpawn` is not covered.
+
+**Breaking behaviour: carvers are dimension-scoped on noise-based generators.**
+`exclusions.carvers` / `additions.carvers` are applied in
+`NoiseBasedChunkGenerator#applyCarvers` per (dimension, biome). A dimension with another generator,
+or a `NoiseBasedChunkGenerator` subclass that overrides `applyCarvers` without calling super, keeps
+the old biome-wide edit.
+
+**Terrain replacement is limited to noise-based generators.** Swapping a worldshape's density
+functions or a `noise_settings` entry only affects dimensions that use `NoiseBasedChunkGenerator`;
+a dimension with its own `ChunkGenerator` is out of scope.
+
+**Breaking behaviour: other mods' features follow the scope.** A feature another mod adds to a
+declared biome is removed from the shared biome and re-injected as a guarded copy for the declaring
+dimension (`ForeignFeatureReconciler`). A dimension that reuses the biome without declaring that
+worldshape no longer receives the feature.
+
+**Java API (additive).** `DimensionProfile` (`api/query`) and
+`IsekaiQuery.getDimensionProfile(ResourceKey<Level>)` expose a dimension's vertical bounds, sea
+level, default block/fluid and `DimensionType` flags *before* `ServerLevel` exists — which is when
+NeoForge runs biome modifiers.
+
+**Internal signatures changed** (`@ApiStatus.Internal`, no compatibility promise):
+`ModifyPhase.mobSpawnStrategy(WorldshapeDescriptor, Holder<Biome>)`,
+`RemovePhase.excludedCarvers(WorldshapeDescriptor, ResourceKey<Biome>, …)` and
+`AddPhase.additionalCarvers(WorldshapeDescriptor, ResourceKey<Biome>, …)`.
+
+**Reload.** NeoForge runs biome modifiers once at server start, so `/reload` does not change
+worldgen rules. The drop set and the injected copies are recorded in the same ADD pass, which keeps
+them consistent: re-deriving the drop from the live declaration would make a feature added to
+`feature_predicates` by a reload vanish and one removed generate twice.
+
+**New presets.** `isekai_api:hooked_nether` + `isekai_api:hook/final_density_nether` (a separate
+hook id, so overworld overrides of `hook/final_density` never touch it) and the
+`isekai_api:vanilla_nether_surface` rule source.
+
+**Known limitations.**
+
+- Climate, visual/sound effects and precipitation are biome attributes and cannot differ by
+  dimension for a shared biome; use `applies_to` to bound which biomes a descriptor edits.
+  `atmosphere.mob_spawn_costs` (no level at `NaturalSpawner#createState`) and
+  `creature_generation_probability` are written to the same shared biome.
+- Carver scoping needs `NoiseBasedChunkGenerator`; other generators keep biome-wide add/remove.
+- Mob exclusion does not cover `addFreshEntity` without `finalizeSpawn`; additions and weight
+  changes apply only where a biome spawn list is read.
+- A declared biome loses other mods' features in every other dimension.
+- `/place structure` is not blocked by `exclusions.structures`.
+- The final feature veto covers the `placeWithContext` route only; the decoration filter is the
+  primary mechanism.
 
 ## Depending on Isekai API
 

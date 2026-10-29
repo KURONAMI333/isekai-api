@@ -14,6 +14,8 @@ Isekai API is a toolbox for the *shape and rules* of a Minecraft world — not a
 
 Think of it the way HTML's `div`/`span` are primitives for any web page, not a tool for one specific site. Isekai gives you a small set of neutral, composable primitives — terrain shape, biome placement, surface blocks, new dimensions, atmosphere, placement control, and re-placement of existing content — and you combine them to express *any* worldshape you can imagine: floating islands, submerged worlds, hollow earths, archipelagos, mesa canyons, fully inverted Y axes, anything.
 
+A worldshape describes **one dimension**. Feature removal and addition, structure exclusion, mob spawn changes and (on noise-based generators) carver changes apply only in the dimension the descriptor names, so the same biome can behave differently in two dimensions. Biome attributes — climate and visual/sound effects — are still written to the shared biome and cannot differ by dimension; use `applies_to` to bound which biomes a descriptor edits.
+
 It ships no biomes, structures, or themes of its own. **Built to be built on — however you want to use it, you're welcome:** datapack worldshapes, full Java mods, modpack glue, quick experiments, total conversions. The same primitives power everything; there's no privileged "first-party" path.
 
 ## Quick start — a floating-island world in 2 files
@@ -53,6 +55,14 @@ README) is [`examples/1_shape/floating_island/`](examples/1_shape/floating_islan
 > The hook override sits in the `isekai_api` namespace because that is how a **datapack** replaces
 > the mod's default hook (datapack resources load above mod-jar resources — deterministic). Ship
 > shape overrides as a datapack, not a second mod jar, and treat a preset as single-owner per world.
+
+**Nether-shaped worlds.** `isekai_api:hooked_nether` is the nether twin: `min_y 0`/`height 128`,
+sea level 32, netherrack/lava defaults, vanilla nether terrain via `hook/final_density_nether`,
+and the `vanilla_nether_surface` delegate (bedrock roof included). It keeps vanilla's
+`temperature`/`vegetation` axes, so existing nether biome layouts still work; override
+`data/isekai_api/worldgen/density_function/hook/final_density_nether.json` to reshape it. The
+separate hook id means overworld and nether overrides never collide. Its two worldshape surface
+hooks name `minecraft:the_nether`; retarget them if you use the preset for a *new* dimension.
 
 **Other entry points.** Three steps, mapped to examples: **shape** → [`1_shape/`](examples/1_shape/)
 · **biome/block placement** → [`2_placement/`](examples/2_placement/) · **adaptation** (ore Y-remap,
@@ -254,9 +264,40 @@ effect at chunk gen:
 ```
 
 The biome modifier's three phases then:
-- **REMOVE** the descriptor's `exclusions` (features / structures / carvers / mob_spawns) plus the original strategy-targeted features pending remap.
-- **ADD** the descriptor's `additions` plus remap-derived variants of the original placed features (with new Y ranges per `ore_strategy`).
-- **MODIFY** mob spawn weights per the (optionally per-category) strategy, and apply any `atmosphere` overrides (temperature, downfall, colors, etc.).
+- **REMOVE** the descriptor's `exclusions.carvers` and record `exclusions.features` / `exclusions.structures`. Feature removal itself happens at decoration time, and structure removal at generation-point search, so neither needs a shared-biome edit.
+- **ADD** the descriptor's `additions`, remap-derived variants of the original placed features (with new Y ranges per `ore_strategy`), and a guarded, predicated copy of every `feature_predicates` entry. Every injected feature carries `isekai_api:dimension_guard`, so it only places in the descriptor's dimension.
+- **MODIFY** record the mob spawn rule (`exclusions.mob_spawns` / `additions.mob_spawns` and the optionally per-category strategy) and apply any `atmosphere` overrides (temperature, downfall, colors, etc.). Mob spawn lists are filtered at runtime, not written into the shared biome.
+
+**Features, structures, mob spawns and carvers are scoped per dimension.** The dimension is the id
+of the level that is generating the chunk, so this is not nether- or overworld-specific: the end, a
+datapack dimension and another mod's dimension behave identically, and two dimensions that share one
+`BiomeSource` still get their own scope. `exclusions.features`, the originals taken over by
+`ore_strategy`, and the originals replaced by `feature_predicates` are dropped only in the
+dimension that declared the worldshape; if a generator bypasses the decoration hook,
+`PlacedFeature#placeWithContext` vetoes the same values. `exclusions.structures` vetoes
+generation-point search in that dimension; chunk generation resolves the dimension through
+`ChunkDimensionIndex`, while `/locate` and `/place` use the level directly. Mob spawn rules are
+enforced where the list is read (`NaturalSpawner#mobsAt`, chunk-generation spawn) and, for
+exclusions, at `FinalizeSpawnEvent`, which also covers patrols, spawners, spawn eggs and
+`/summon`. Carver rules are applied in `NoiseBasedChunkGenerator#applyCarvers`; a dimension with
+another generator keeps the old biome-wide behaviour.
+
+A feature another mod adds to a declared biome is moved to a guarded copy for the declaring
+dimension, so the other dimension that reuses the biome no longer receives it
+(`ForeignFeatureReconciler`). A descriptor no biome modifier references changes nothing.
+Because NeoForge runs biome modifiers once at server start and never on `/reload`, adding or
+removing a rule needs a restart; the drop and the injected copy are recorded together so a reload
+can never make a feature vanish or generate twice.
+
+**Known limits.** Climate and visual/sound effects are biome attributes: they cannot differ by
+dimension for a shared biome, and `atmosphere.mob_spawn_costs` /
+`creature_generation_probability` are written to the same shared biome. Carver scoping needs a
+`NoiseBasedChunkGenerator`; a dimension using another generator, or a subclass that overrides
+`applyCarvers` without calling super, keeps the old biome-wide add/remove. A mob that calls
+`addFreshEntity` without `finalizeSpawn` bypasses exclusion. `/place structure` skips the
+generation-point search, so `exclusions.structures` does not block it. An implementation that
+passes only a `LevelHeightAccessor` is not in the chunk index and falls back to `BiomeSource`
+matching.
 
 Optional descriptor fields (`exclusions`, `additions`, `atmosphere`, …) default to empty. The
 older inline form — `isekai_api:apply_worldshape` with the descriptor embedded in the biome
@@ -309,6 +350,7 @@ omitted from the builder chain.
 | `/isekai query worldshape <dim>` | Inspect a single dimension's declaration |
 | `/isekai query atmosphere <biome>` | Report a biome's resolved sky/fog/water/foliage/grass colors (decimal + hex) |
 | `/isekai validate <namespace>` | Validate every `isekai/*.json` under that namespace |
+| `/isekai validate dimension <dim>` | Runtime diagnosis: LevelStem profile (build height, sea level), `applies_to` that matches no biome, out-of-bounds `playable_range`, features skipped in this dimension |
 | `/isekai preview range <id> [dim]` | Show overworld-resolved + per-dim VerticalRange |
 | `/isekai preview column <dim> <x> <z>` | Sample the base column at (x, z) and dump the block at each playable-band Y |
 | `/isekai dump worldgen` | Write the full snapshot to `<world>/isekai_dump/worldgen.txt` |

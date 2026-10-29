@@ -10,6 +10,17 @@ Aquifers and ore-veins are off (clean coasts). It pairs with a spatial biome sou
 
 Copy to `data/minecraft/worldgen/noise_settings/overworld.json`. For a **new dimension** (not overriding the overworld), prefer the shipped `isekai_api:hooked_overworld` preset instead — see [`../1_shape/floating_island/`](../1_shape/floating_island/).
 
+## Replacing the nether
+
+`data/minecraft/worldgen/noise_settings/nether.json` is the nether counterpart. Rather than
+copying vanilla's ~200-line document, copy the shipped `isekai_api:hooked_nether` preset:
+`min_y 0`, `height 128`, sea level 32, netherrack/lava defaults, `legacy_random_source: true`,
+terrain shape `isekai_api:hook/final_density_nether` (vanilla nether composition), and
+`isekai_api:vanilla_nether_surface` (bedrock roof + holes, lava sea, nether biomes). Vanilla's
+`temperature`/`vegetation` shifted-noise axes are kept inline so multi-noise biome placement still
+works. Override `hook/final_density_nether.json` — not `hook/final_density.json` — to reshape only
+the nether.
+
 ## `world_preset_normal_override.json`
 
 Overrides vanilla's `minecraft:normal` world preset to customise the overworld. **The Nether and End stanzas MUST be re-declared verbatim** — overriding the preset replaces it entirely, and leaving either out silently breaks that dimension. The `IsekaiValidator` world-preset check fires a warning on server start when this happens.
