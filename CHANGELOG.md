@@ -4,6 +4,101 @@ All notable changes to Isekai API follow this file. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/). Compatibility policy — how datapack
 and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
+## [3.0.0] — 2026-10-29
+
+### Breaking changes
+
+- **Mob spawn changes are dimension-scoped.** `exclusions.mob_spawns`, `additions.mob_spawns`,
+  `mob_spawn_strategy` and `mob_spawn_strategy_by_category` used to rewrite the shared biome's
+  spawn builder; they now apply only in the descriptor's dimension. The same biome in another
+  dimension keeps its original list.
+- **Carver exclusions and additions are dimension-scoped on noise-based dimensions.**
+  `exclusions.carvers` and `additions.carvers` now apply only in the declared dimension when its
+  generator is a `NoiseBasedChunkGenerator`. Dimensions with another generator keep the old
+  biome-wide edit (see limitations).
+- **Other mods' features follow the declared scope.** A feature another mod adds to a declared
+  biome is removed from the shared biome and re-injected as a guarded copy for the declaring
+  dimension. Dimensions that do not declare the worldshape no longer receive it
+  (`ForeignFeatureReconciler`).
+- **Internal signatures changed** (`@ApiStatus.Internal`, no compatibility promise):
+  `ModifyPhase.mobSpawnStrategy(WorldshapeDescriptor, Holder<Biome>)`,
+  `RemovePhase.excludedCarvers(WorldshapeDescriptor, ResourceKey<Biome>, …)` and
+  `AddPhase.additionalCarvers(WorldshapeDescriptor, ResourceKey<Biome>, …)`.
+- **2.x datapacks load unchanged, but the scope changes.** The same JSON now affects one dimension
+  instead of every dimension that shares the biome. A pack that relied on the old cross-dimension
+  leak must declare a descriptor for the other dimension.
+
+### Added
+
+- **Per-dimension feature drop at decoration time.** `ChunkGeneratorDecorationMixin` redirects
+  `generationSettingsGetter.apply(biome)` in `ChunkGenerator#applyBiomeDecoration`;
+  `DimensionFeatureScope` removes the recorded takeover set for the dimension generating the
+  chunk. The set is recorded by the ADD phase, so the drop and the injected copy always agree.
+- **Final feature veto for custom generators.** `PlacedFeatureScopeMixin` injects at
+  `PlacedFeature#placeWithContext` HEAD and rejects the same takeover values, so a generator that
+  overrides `applyBiomeDecoration` wholesale also honours `exclusions.features`,
+  `feature_predicates` and `ore_strategy`.
+- **Injected features carry `isekai_api:dimension_guard`.** `additions.features`, remap copies and
+  `feature_predicates` copies place only in the descriptor's dimension.
+- **Structure exclusions are dimension-scoped.** `StructureFindValidGenerationPointMixin` vetoes
+  during generation-point search. During chunk generation the dimension comes from
+  `ChunkDimensionIndex` (a weak `ProtoChunk` → dimension index); `/locate` and `/place` use the
+  level directly; only an index miss falls back to matching the `BiomeSource`.
+- **Mob spawn rules are enforced at the runtime read points.** `MobSpawnScope` holds a
+  per-(dimension, biome) rule. `NaturalSpawner#mobsAt` (RETURN) and
+  `spawnMobsForChunkGeneration` (`getMobs` redirect) filter the list; `MobSpawnVetoHandler`
+  cancels at `FinalizeSpawnEvent` (LOWEST) for paths that never read a list, so an exclusion also
+  covers patrols, spawners, spawn eggs and `/summon`.
+- **Carver rules are enforced at carve time.** `NoiseBasedChunkGeneratorCarverMixin` redirects
+  `ChunkAccess#carverBiome` in `NoiseBasedChunkGenerator#applyCarvers`; `CarverScope` applies the
+  recorded add/remove rule per (dimension, biome).
+- **`/isekai validate dimension <id>`** reports the `LevelStem` profile (build height, sea level,
+  default block, ceiling) and the silent failures: `applies_to` matching no biome, a
+  `playable_range` outside the build height, unresolved biome tags, features skipped in that
+  dimension.
+- **`DimensionProfile`** (`api/query`) and **`IsekaiQuery.getDimensionProfile(ResourceKey<Level>)`**
+  expose a dimension's vertical bounds, sea level, default block/fluid and `DimensionType` flags
+  before a `ServerLevel` exists.
+- **Nether preset.** `isekai_api:hooked_nether` (`min_y 0`, `height 128`, sea level 32,
+  netherrack/lava defaults, legacy random source) with `isekai_api:hook/final_density_nether` and
+  `isekai_api:vanilla_nether_surface`. The separate hook id keeps overworld overrides of
+  `hook/final_density` out of the nether.
+
+### Fixed
+
+- **Worldshape bounds resolve per dimension.** Ore/feature Y-remapping and the `playable_range`
+  envelope used the overworld's `min_y`/`height` for every dimension. They now come from the
+  dimension's `LevelStem`/`DimensionType`, keyed by the descriptor's `dimension`. Only a level with
+  no `LevelStem` entry falls back to the overworld envelope.
+- **No declarations, no cost.** Every hook returns on an empty check before a registry or biome
+  lookup; the reconcile returns immediately when no worldshape is declared.
+
+### Known limitations
+
+- **Biome attributes are shared.** Climate (`temperature`, `downfall`, precipitation) and effects
+  (colors, particles, sounds, music) cannot differ by dimension when a biome is shared; use
+  `applies_to` to limit which biomes a descriptor edits.
+- **`atmosphere.mob_spawn_costs` stays global**, because `NaturalSpawner#createState` has no
+  level. `creature_generation_probability` is written to the same shared biome.
+- **Carvers are dimension-scoped only on `NoiseBasedChunkGenerator`.** A dimension with another
+  generator, or a `NoiseBasedChunkGenerator` subclass that overrides `applyCarvers` without
+  calling super, keeps the old biome-wide add/remove (`CarverScope.hookable`).
+- **Mob exclusions do not reach a custom mob that calls `addFreshEntity` without
+  `finalizeSpawn`.** Additions and weight changes only apply where a biome spawn list is read.
+- **`/reload` does not change worldgen rules.** NeoForge runs biome modifiers once at server
+  start, so adding or removing a rule needs a restart.
+- **A declared biome loses other mods' features in every other dimension.** The reconcile removes
+  the original holder, so a dimension that reuses the biome without declaring it no longer gets
+  that feature.
+- **Structure dimension resolution during generation depends on the chunk being a
+  `ChunkAccess`.** An implementation that passes only a `LevelHeightAccessor` is not in the index
+  and falls back to `BiomeSource` matching, which is ambiguous when two dimensions share one
+  biome source (`ChunkDimensionIndex`, `DimensionResolver`).
+- **`/place structure` is not blocked by `exclusions.structures`** because it skips the
+  generation-point search.
+- **The final feature veto covers the `placeWithContext` route only.** A generator that places a
+  feature by another path can still place it; the decoration filter is the primary mechanism.
+
 ## [2.2.0] — 2026-09-04
 
 **No Java API breaks.** The one addition is a `default` method, so `SurfaceAnchor` variants
