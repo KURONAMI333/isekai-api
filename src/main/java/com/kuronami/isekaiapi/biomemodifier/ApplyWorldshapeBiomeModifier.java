@@ -33,10 +33,15 @@ import org.jetbrains.annotations.ApiStatus;
  * work. Each phase class is independently testable and groups its concerns by lifecycle
  * stage rather than by content kind.
  *
- * <p>Biome scoping (the descriptor's {@code applies_to}) is biome-keyed only. Dimension
- * scoping isn't representable through {@link BiomeModifier} alone since biomes are
- * reusable across dimensions — consumers wanting "only in the overworld" should either
- * list every overworld biome explicitly, or pair this modifier with a biome tag.
+ * <p>Biome scoping (the descriptor's {@code applies_to}) is biome-keyed only, because a
+ * biome is reusable across dimensions. Dimension scoping is applied by the phases instead:
+ * feature additions carry {@code isekai_api:dimension_guard}, feature removals are recorded
+ * here and dropped per dimension at decoration time
+ * ({@code com.kuronami.isekaiapi.impl.DimensionFeatureScope}), and structure exclusions veto
+ * at generation-point search. Mob spawns are recorded as a per-(dimension, biome) rule
+ * ({@code com.kuronami.isekaiapi.impl.MobSpawnScope}) and enforced at spawn time; carvers are
+ * recorded the same way ({@code com.kuronami.isekaiapi.impl.CarverScope}) and applied at
+ * carve time.
  */
 @ApiStatus.Internal
 public record ApplyWorldshapeBiomeModifier(WorldshapeDescriptor worldshape) implements BiomeModifier {
@@ -54,23 +59,25 @@ public record ApplyWorldshapeBiomeModifier(WorldshapeDescriptor worldshape) impl
         if (!BiomeMatcher.matches(worldshape, biome)) {
             return;
         }
-        // Biome key drives the per-biome scoping of ore re-injection in ADD/REMOVE — without
-        // it, every matched biome would receive every snapshot ore (incl. modded ores).
+        // Biome key drives the per-biome scoping of ore re-injection in ADD — without it,
+        // every matched biome would receive every snapshot ore (incl. modded ores).
         ResourceKey<Biome> biomeKey = biome.unwrapKey().orElse(null);
         switch (phase) {
             case REMOVE -> {
-                RemovePhase.excludedFeatures(worldshape, builder);
-                RemovePhase.excludedCarvers(worldshape, builder);
-                RemovePhase.originalsPendingRemap(worldshape, biomeKey, builder);
+                // Feature removals are dimension-scoped at decoration time
+                // (DimensionFeatureScope); carvers are recorded per (dimension, biome) and
+                // applied at carve time (CarverScope), so neither edits the shared biome.
+                RemovePhase.excludedCarvers(worldshape, biomeKey, builder);
             }
             case ADD -> {
+                AddPhase.registerFeatureScope(worldshape, biomeKey);
                 AddPhase.additionalFeatures(worldshape, builder);
-                AddPhase.additionalCarvers(worldshape, builder);
+                AddPhase.additionalCarvers(worldshape, biomeKey, builder);
                 AddPhase.remappedOreFeatures(worldshape, biomeKey, builder);
+                AddPhase.predicatedFeatures(worldshape, biomeKey, builder);
             }
             case MODIFY -> {
-                ModifyPhase.mobSpawnStrategy(worldshape, builder);
-                ModifyPhase.featurePredicates(worldshape, builder);
+                ModifyPhase.mobSpawnStrategy(worldshape, biome);
                 ModifyPhase.atmosphereOverride(worldshape, builder);
             }
             default -> { /* BEFORE_EVERYTHING / AFTER_EVERYTHING — no-op */ }

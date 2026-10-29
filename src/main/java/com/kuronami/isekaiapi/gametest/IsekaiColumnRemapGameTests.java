@@ -10,10 +10,10 @@ import com.kuronami.isekaiapi.api.remap.RemapStrategy;
 import com.kuronami.isekaiapi.api.remap.SurfaceAnchor;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
 import com.kuronami.isekaiapi.biomemodifier.phase.AddPhase;
-import com.kuronami.isekaiapi.biomemodifier.phase.RemovePhase;
 import com.kuronami.isekaiapi.impl.IsekaiInternal;
 import com.kuronami.isekaiapi.impl.VanillaRuleSnapshot;
 import com.kuronami.isekaiapi.placementmodifier.ColumnRelativeModifier;
+import com.kuronami.isekaiapi.placementmodifier.DimensionGuardPlacementModifier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
@@ -200,7 +200,6 @@ public final class IsekaiColumnRemapGameTests {
                 .defaultStructurePredicate(new SpatialPredicate.Always())
                 .build();
 
-        RemovePhase.originalsPendingRemap(descriptor, Biomes.PLAINS, builder);
         AddPhase.remappedOreFeatures(descriptor, Biomes.PLAINS, builder);
 
         int injected = 0;
@@ -209,15 +208,22 @@ public final class IsekaiColumnRemapGameTests {
                 if (h.unwrapKey().isPresent()) continue;   // registry ref = not one we injected
                 injected++;
                 boolean hasColumn = false;
+                boolean hasGuard = false;
                 for (PlacementModifier mod : h.value().placement()) {
                     if (mod instanceof HeightRangePlacement) {
                         helper.fail("injected feature still carries an absolute height_range");
                         return;
                     }
                     if (mod instanceof ColumnRelativeModifier) hasColumn = true;
+                    if (mod instanceof DimensionGuardPlacementModifier) hasGuard = true;
                 }
                 if (!hasColumn) {
                     helper.fail("injected feature has no column_relative modifier");
+                    return;
+                }
+                if (!hasGuard) {
+                    helper.fail("injected feature has no dimension_guard; it could place in "
+                            + "every dimension that reuses plains");
                     return;
                 }
             }

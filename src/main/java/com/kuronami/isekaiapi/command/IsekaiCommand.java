@@ -25,7 +25,8 @@ import org.jetbrains.annotations.ApiStatus;
  *   <li>{@link ReloadCommand}   — {@code /isekai reload}</li>
  *   <li>{@link StatsCommand}    — {@code /isekai stats}</li>
  *   <li>{@link QueryCommand}    — {@code /isekai query dimensions} / {@code worldshape <dim>}</li>
- *   <li>{@link ValidateCommand} — {@code /isekai validate <namespace>}</li>
+ *   <li>{@link ValidateCommand} — {@code /isekai validate <namespace>} (datapack JSON) or
+ *       {@code /isekai validate dimension <id>} (runtime profile + worldshape diagnosis)</li>
  *   <li>{@link PreviewCommand}  — {@code /isekai preview range <id> [dim]}</li>
  *   <li>{@link DumpCommand}     — {@code /isekai dump worldgen} / {@code ore <id>} / {@code structure <id>}</li>
  * </ul>

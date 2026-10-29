@@ -6,7 +6,6 @@ import com.kuronami.isekaiapi.registry.DeprecatedInlineCodec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.Holder;
-import net.minecraft.core.HolderSet;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.biome.MobSpawnSettings;
 import net.minecraft.world.level.levelgen.structure.Structure;
@@ -16,17 +15,14 @@ import org.jetbrains.annotations.ApiStatus;
 
 /**
  * A {@link StructureModifier} that applies an Isekai {@link WorldshapeDescriptor}'s
- * structure-related fields. Two phases:
+ * {@code structureSpawnOverrides} at {@link Phase#MODIFY}: it clears the existing
+ * (structure, category) override when {@code replace=true}, then injects the consumer's
+ * spawn entries with the configured bounding-box scope.
  *
- * <ul>
- *   <li>{@link Phase#REMOVE}: drops every structure in {@code exclusions.structures} by
- *       replacing its biomes filter with {@link HolderSet#empty()} so Minecraft never
- *       finds a matching biome.</li>
- *   <li>{@link Phase#MODIFY}: applies every {@code structureSpawnOverrides} entry that
- *       targets this structure — clears the existing (structure, category) override when
- *       {@code replace=true}, then injects the consumer's spawn entries with the
- *       configured bounding-box scope.</li>
- * </ul>
+ * <p>{@code exclusions.structures} is <strong>not</strong> applied here. A structure
+ * modifier has no dimension context, so emptying the biome filter removed the structure
+ * from every dimension that shares those biomes. Exclusions are vetoed per dimension in
+ * {@code StructureFindValidGenerationPointMixin} instead.
  *
  * <p>Datapack consumers reference this via
  * {@code data/<ns>/neoforge/structure_modifier/foo.json} like:
@@ -51,23 +47,9 @@ public record ApplyWorldshapeStructureModifier(WorldshapeDescriptor worldshape) 
 
     @Override
     public void modify(Holder<Structure> structure, Phase phase, ModifiableStructureInfo.StructureInfo.Builder builder) {
-        if (phase == Phase.REMOVE) {
-            applyExclusion(structure, builder);
-        } else if (phase == Phase.MODIFY) {
+        if (phase == Phase.MODIFY) {
             applySpawnOverrides(structure, builder);
         }
-    }
-
-    private void applyExclusion(Holder<Structure> structure, ModifiableStructureInfo.StructureInfo.Builder builder) {
-        if (!structure.unwrapKey().map(worldshape.exclusions().structures()::contains).orElse(false)) {
-            return;
-        }
-        // Empty biomes HolderSet disables placement entirely — Minecraft tests biome
-        // membership before generating, and an empty set matches no biome.
-        builder.getStructureSettings().setBiomes(HolderSet.empty());
-        IsekaiApi.LOGGER.debug("[Isekai] excluded structure {} via empty biomes (descriptor dim={})",
-                structure.unwrapKey().map(k -> k.location().toString()).orElse("?"),
-                worldshape.dimension().location());
     }
 
     private void applySpawnOverrides(Holder<Structure> structure, ModifiableStructureInfo.StructureInfo.Builder builder) {

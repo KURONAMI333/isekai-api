@@ -65,18 +65,20 @@ public record ApplyWorldshapeRefBiomeModifier(ResourceKey<Level> dimension) impl
         ResourceKey<Biome> biomeKey = biome.unwrapKey().orElse(null);
         switch (phase) {
             case REMOVE -> {
-                RemovePhase.excludedFeatures(worldshape, builder);
-                RemovePhase.excludedCarvers(worldshape, builder);
-                RemovePhase.originalsPendingRemap(worldshape, biomeKey, builder);
+                // Feature removals are dimension-scoped at decoration time
+                // (DimensionFeatureScope); carvers are recorded per (dimension, biome) and
+                // applied at carve time (CarverScope), so neither edits the shared biome.
+                RemovePhase.excludedCarvers(worldshape, biomeKey, builder);
             }
             case ADD -> {
+                AddPhase.registerFeatureScope(worldshape, biomeKey);
                 AddPhase.additionalFeatures(worldshape, builder);
-                AddPhase.additionalCarvers(worldshape, builder);
+                AddPhase.additionalCarvers(worldshape, biomeKey, builder);
                 AddPhase.remappedOreFeatures(worldshape, biomeKey, builder);
+                AddPhase.predicatedFeatures(worldshape, biomeKey, builder);
             }
             case MODIFY -> {
-                ModifyPhase.mobSpawnStrategy(worldshape, builder);
-                ModifyPhase.featurePredicates(worldshape, builder);
+                ModifyPhase.mobSpawnStrategy(worldshape, biome);
                 ModifyPhase.atmosphereOverride(worldshape, builder);
             }
             default -> { /* BEFORE_EVERYTHING / AFTER_EVERYTHING — no-op */ }

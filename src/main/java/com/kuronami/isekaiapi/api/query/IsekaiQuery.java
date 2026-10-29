@@ -72,6 +72,17 @@ public interface IsekaiQuery {
 
     // dimension snapshots
 
+    /**
+     * Shape of one dimension as declared by the loaded datapack — build envelope, ceiling,
+     * skylight, sea level and default block/fluid. Empty when the dimension has no
+     * {@code LevelStem} entry or the snapshot has not been scanned yet.
+     *
+     * <p>Use this instead of assuming the overworld envelope when writing worldshape code:
+     * the nether is {@code 0..255} with a ceiling, the end is {@code 0..255} without one.
+     * @since 3.0.0
+     */
+    Optional<DimensionProfile> getDimensionProfile(ResourceKey<Level> dimension);
+
     /** The worldshape snapshot for a dimension; an empty snapshot if none is declared. @since 1.0.0 */
     WorldshapeSnapshot getSnapshot(ResourceKey<Level> dimension);
 

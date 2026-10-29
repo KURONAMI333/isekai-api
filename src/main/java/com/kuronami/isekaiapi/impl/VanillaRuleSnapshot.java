@@ -1,5 +1,6 @@
 package com.kuronami.isekaiapi.impl;
 
+import com.kuronami.isekaiapi.api.query.DimensionProfile;
 import com.kuronami.isekaiapi.api.query.MobSpawnInfo;
 import com.kuronami.isekaiapi.api.query.PlacedFeatureInfo;
 import com.kuronami.isekaiapi.api.query.StructurePlacementInfo;
@@ -52,7 +53,7 @@ public final class VanillaRuleSnapshot {
 
     public static final VanillaRuleSnapshot EMPTY = new VanillaRuleSnapshot(
             List.of(), List.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(),
-            OVERWORLD_BOTTOM, OVERWORLD_TOP);
+            Map.of(), OVERWORLD_BOTTOM, OVERWORLD_TOP);
 
     private final List<PlacedFeatureInfo> placedFeatures;
     private final List<StructurePlacementInfo> structures;
@@ -85,10 +86,17 @@ public final class VanillaRuleSnapshot {
      * already correct everywhere).
      */
     private final Map<ResourceKey<Level>, Map<ResourceKey<PlacedFeature>, VerticalRange>> perDimRanges;
+    /**
+     * Per-dimension shape read from the {@code LevelStem} registry at scan time. Unlike
+     * {@link #perDimRanges}, this is available before any {@code ServerLevel} exists — the
+     * biome-modifier pass runs earlier than level creation.
+     */
+    private final Map<ResourceKey<Level>, DimensionProfile> dimensionProfiles;
     private final int worldBottom;
     /** Inclusive top Y — the scanner converts {@code getMaxBuildHeight()} (exclusive) by subtracting 1. */
     private final int worldTop;
 
+    /** Backwards-compatible constructor for tests and older call sites: no profiles. */
     VanillaRuleSnapshot(List<PlacedFeatureInfo> placedFeatures,
                         List<StructurePlacementInfo> structures,
                         Map<MobCategory, List<MobSpawnInfo>> mobsByCategory,
@@ -100,6 +108,23 @@ public final class VanillaRuleSnapshot {
                         Map<ResourceKey<Level>, Map<ResourceKey<PlacedFeature>, VerticalRange>> perDimRanges,
                         int worldBottom,
                         int worldTop) {
+        this(placedFeatures, structures, mobsByCategory, mobsByBiome, stepsByFeature,
+                placedFeaturesByTag, structuresByTag, featuresByBiome, perDimRanges, Map.of(),
+                worldBottom, worldTop);
+    }
+
+    VanillaRuleSnapshot(List<PlacedFeatureInfo> placedFeatures,
+                        List<StructurePlacementInfo> structures,
+                        Map<MobCategory, List<MobSpawnInfo>> mobsByCategory,
+                        Map<ResourceKey<Biome>, List<MobSpawnInfo>> mobsByBiome,
+                        Map<ResourceKey<PlacedFeature>, Set<GenerationStep.Decoration>> stepsByFeature,
+                        Map<TagKey<PlacedFeature>, List<PlacedFeatureInfo>> placedFeaturesByTag,
+                        Map<TagKey<Structure>, List<StructurePlacementInfo>> structuresByTag,
+                        Map<ResourceKey<Biome>, Set<ResourceKey<PlacedFeature>>> featuresByBiome,
+                        Map<ResourceKey<Level>, Map<ResourceKey<PlacedFeature>, VerticalRange>> perDimRanges,
+                        Map<ResourceKey<Level>, DimensionProfile> dimensionProfiles,
+                        int worldBottom,
+                        int worldTop) {
         this.placedFeatures = List.copyOf(placedFeatures);
         this.structures = List.copyOf(structures);
         this.mobsByCategory = Map.copyOf(mobsByCategory);
@@ -109,6 +134,7 @@ public final class VanillaRuleSnapshot {
         this.structuresByTag = copyOfListMap(structuresByTag);
         this.featuresByBiome = copyOfSetMap(featuresByBiome);
         this.perDimRanges = copyOfNestedMap(perDimRanges);
+        this.dimensionProfiles = Map.copyOf(dimensionProfiles);
         this.worldBottom = worldBottom;
         this.worldTop = worldTop;
     }
@@ -128,6 +154,29 @@ public final class VanillaRuleSnapshot {
 
     /** Inclusive overworld build-height top captured at scan time. */
     public int worldTop() { return worldTop; }
+
+    /** The dimension's profile, or empty when the datapack had no {@code LevelStem} for it. */
+    public Optional<DimensionProfile> dimensionProfile(ResourceKey<Level> dimension) {
+        return Optional.ofNullable(dimensionProfiles.get(dimension));
+    }
+
+    /** Every dimension profile captured at scan time, keyed by level. */
+    public Map<ResourceKey<Level>, DimensionProfile> dimensionProfiles() {
+        return dimensionProfiles;
+    }
+
+    /**
+     * Bottom build height of {@code dimension}, falling back to the overworld envelope when
+     * the dimension has no profile (unknown level, or a snapshot built without profiles).
+     */
+    public int worldBottom(ResourceKey<Level> dimension) {
+        return dimensionProfile(dimension).map(DimensionProfile::minY).orElse(worldBottom);
+    }
+
+    /** Inclusive top build height of {@code dimension}; same fallback as {@link #worldBottom(ResourceKey)}. */
+    public int worldTop(ResourceKey<Level> dimension) {
+        return dimensionProfile(dimension).map(DimensionProfile::maxY).orElse(worldTop);
+    }
 
     public boolean isEmpty() {
         return placedFeatures.isEmpty() && structures.isEmpty() && mobsByCategory.isEmpty();
@@ -189,6 +238,16 @@ public final class VanillaRuleSnapshot {
         Map<ResourceKey<PlacedFeature>, VerticalRange> dimMap = perDimRanges.get(dimension);
         if (dimMap == null) return Optional.empty();
         return Optional.ofNullable(dimMap.get(feature));
+    }
+
+    /**
+     * {@code true} when {@code info} cannot be represented in {@code dimension} (its anchor
+     * pair inverts there, e.g. {@code above_bottom(300)} in a 256-tall nether). Falls back to
+     * the overworld-resolved sentinel when the dimension has no override.
+     */
+    public boolean isFallbackInDimension(PlacedFeatureInfo info, ResourceKey<Level> dimension) {
+        var range = placedFeatureRangeInDimension(info.key(), dimension);
+        return range.isPresent() ? range.get() == HeightProviderExtraction.FALLBACK_RANGE : isFallback(info);
     }
 
     // -- Defensive-copy helpers ----------------------------------------------------

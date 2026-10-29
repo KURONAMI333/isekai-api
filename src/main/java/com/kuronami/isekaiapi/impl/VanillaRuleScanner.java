@@ -1,6 +1,7 @@
 package com.kuronami.isekaiapi.impl;
 
 import com.kuronami.isekaiapi.IsekaiApi;
+import com.kuronami.isekaiapi.api.query.DimensionProfile;
 import com.kuronami.isekaiapi.api.query.MobSpawnInfo;
 import com.kuronami.isekaiapi.api.query.PlacedFeatureInfo;
 import com.kuronami.isekaiapi.api.query.StructurePlacementInfo;
@@ -66,7 +67,9 @@ final class VanillaRuleScanner {
         }
 
         var placedScan = scanPlacedFeatures(server, overworldBottom, overworldTop);
-        var perDimRanges = scanPerDimensionRanges(server, overworldBottom, overworldTop);
+        var dimensionProfiles = DimensionProfiles.scan(server);
+        var perDimRanges = scanPerDimensionRanges(server, overworldBottom, overworldTop,
+                dimensionProfiles);
         var structScan = scanStructures(server);
         var mobScan = scanMobSpawns(server);
         var biomeFeatureScan = scanBiomeFeatures(server);
@@ -91,18 +94,22 @@ final class VanillaRuleScanner {
                 placedScan.features(), structScan.infos(),
                 mobScan.byCategory(), mobScan.byBiome(),
                 biomeFeatureScan.steps(), placedScan.byTag(), structScan.byTag(),
-                biomeFeatureScan.byBiome(), perDimRanges,
+                biomeFeatureScan.byBiome(), perDimRanges, dimensionProfiles,
                 overworldBottom, overworldTop);
     }
 
     /**
-     * Walk every loaded ServerLevel; for each, re-resolve every PlacedFeature's
-     * HeightProvider against that level's actual build height. Stores only entries that
-     * differ from the overworld-default range (memory optimisation — features with
-     * absolute anchors return identical Y in every dimension).
+     * Re-resolve every PlacedFeature's HeightProvider against every dimension's build
+     * height from the {@code LevelStem} registry. Stores only entries that differ from the
+     * overworld-default range (memory optimisation — features with absolute anchors return
+     * identical Y in every dimension).
+     *
+     * <p>Registry-based on purpose: biome modifiers run before levels are created, so
+     * {@code server.getAllLevels()} can be empty exactly when the remap needs this data.
      */
     private static Map<ResourceKey<Level>, Map<ResourceKey<PlacedFeature>, VerticalRange>> scanPerDimensionRanges(
-            MinecraftServer server, int overworldBottom, int overworldTop) {
+            MinecraftServer server, int overworldBottom, int overworldTop,
+            Map<ResourceKey<Level>, DimensionProfile> profiles) {
         HolderLookup.RegistryLookup<PlacedFeature> lookup =
                 server.registryAccess().lookupOrThrow(Registries.PLACED_FEATURE);
         // Cache HeightProvider per feature once so we don't re-walk placement modifiers per dim.
@@ -114,23 +121,27 @@ final class VanillaRuleScanner {
         });
 
         Map<ResourceKey<Level>, Map<ResourceKey<PlacedFeature>, VerticalRange>> out = new HashMap<>();
-        for (var level : server.getAllLevels()) {
-            int bottom = level.getMinBuildHeight();
-            // Treat top as inclusive throughout the snapshot — Mojang's getMaxBuildHeight is exclusive.
-            int top = level.getMaxBuildHeight() - 1;
+        for (var entry : profiles.entrySet()) {
+            DimensionProfile profile = entry.getValue();
+            int bottom = profile.minY();
+            int top = profile.maxY();
             if (bottom == overworldBottom && top == overworldTop) {
                 // Same bounds as overworld — every resolution is identical to the global list.
                 continue;
             }
             Map<ResourceKey<PlacedFeature>, VerticalRange> dimMap = new HashMap<>();
             for (var e : hpByKey.entrySet()) {
+                VerticalRange global = HeightProviderExtraction.convertHeightProvider(
+                        e.getValue(), overworldBottom, overworldTop);
                 VerticalRange r = HeightProviderExtraction.convertHeightProvider(e.getValue(), bottom, top);
-                if (r != null && r != HeightProviderExtraction.FALLBACK_RANGE) {
+                // Keep FALLBACK entries too: "not representable in this dimension" is exactly
+                // what the remap must know before it tries to re-inject the feature here.
+                if (!r.equals(global)) {
                     dimMap.put(e.getKey(), r);
                 }
             }
             if (!dimMap.isEmpty()) {
-                out.put(level.dimension(), dimMap);
+                out.put(entry.getKey(), dimMap);
             }
         }
         return out;

@@ -28,8 +28,11 @@ public final class ReloadCommand {
                             "Reload complete. NOTE: terrain (noise_settings, density functions, " +
                             "world height) only affects newly-generated chunks. Existing chunks " +
                             "keep their old blocks. Create a new world or move far enough to load " +
-                            "fresh chunks to see worldgen changes. Biome modifiers (atmosphere, " +
-                            "feature predicates, mob spawns) update immediately."), false))
+                            "fresh chunks to see worldgen changes. Worldshape feature edits " +
+                            "(exclusions.features, ore_strategy, feature_predicates) and the " +
+                            "mob spawn / atmosphere overrides are baked into biome modifiers at " +
+                            "server start and need a restart; surface rules, structures and " +
+                            "queries update immediately."), false))
                     .exceptionally(ex -> {
                         IsekaiApi.LOGGER.error("[Isekai] reload failed", ex);
                         ctx.getSource().sendFailure(Component.literal("Reload failed: " + ex.getMessage()));

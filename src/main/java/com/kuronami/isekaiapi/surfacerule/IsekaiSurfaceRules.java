@@ -27,6 +27,8 @@ import org.jetbrains.annotations.ApiStatus;
  *   <li>{@code isekai_api:vanilla_overworld_surface} — the full vanilla overworld surface tree,
  *       so a consumer's noise_settings can reference it in one line instead of copying the
  *       expanded ~30&nbsp;KB {@code surface_rule} JSON.</li>
+ *   <li>{@code isekai_api:vanilla_nether_surface} — the same for the nether (bedrock
+ *       floor/roof, netherrack, lava sea, nether biomes' surface blocks).</li>
  * </ul>
  */
 @ApiStatus.Internal
@@ -47,10 +49,13 @@ public final class IsekaiSurfaceRules {
     public static final Supplier<MapCodec<? extends SurfaceRules.RuleSource>> VANILLA_OVERWORLD_SURFACE =
             CODECS.register("vanilla_overworld_surface", () -> VanillaOverworldSurfaceRule.CODEC);
 
+    public static final Supplier<MapCodec<? extends SurfaceRules.RuleSource>> VANILLA_NETHER_SURFACE =
+            CODECS.register("vanilla_nether_surface", () -> VanillaNetherSurfaceRule.CODEC);
+
     private IsekaiSurfaceRules() {}
 
     public static void register(IEventBus modBus) {
         CODECS.register(modBus);
-        IsekaiApi.LOGGER.info("[Isekai] surface rule sources registered: worldshape_surface_top, worldshape_default_block, strata, vanilla_overworld_surface");
+        IsekaiApi.LOGGER.info("[Isekai] surface rule sources registered: worldshape_surface_top, worldshape_default_block, strata, vanilla_overworld_surface, vanilla_nether_surface");
     }
 }

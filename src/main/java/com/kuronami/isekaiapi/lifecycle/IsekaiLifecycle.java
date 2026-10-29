@@ -157,6 +157,16 @@ public final class IsekaiLifecycle {
         // Clear consumer-declared worldshapes so a Java-side declaration from this world
         // doesn't leak into the next one (JSON declarations re-apply on the next reload).
         IsekaiInternal.clearDeclarations();
+        // Drop the recorded per-dimension feature takeover sets and their filtered settings:
+        // they belong to the modifier pass of the world that is stopping.
+        com.kuronami.isekaiapi.impl.DimensionFeatureScope.clearAll();
+        // Drop the per-(dimension, biome) mob spawn rules and their cached lists for the same
+        // reason: they were recorded during this world's modifier pass.
+        com.kuronami.isekaiapi.impl.MobSpawnScope.clear();
+        // Drop the per-(dimension, biome) carver rules and their resolved settings likewise.
+        com.kuronami.isekaiapi.impl.CarverScope.clearAll();
+        // Drop the chunk -> dimension index recorded for this world's ProtoChunks.
+        com.kuronami.isekaiapi.impl.ChunkDimensionIndex.clear();
         // Reset degraded flag + lenient-drop tally so the next world starts with a clean bill.
         com.kuronami.isekaiapi.impl.IsekaiHealth.reset();
     }

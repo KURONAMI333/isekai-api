@@ -1,6 +1,7 @@
 package com.kuronami.isekaiapi.impl;
 
 import com.kuronami.isekaiapi.IsekaiApi;
+import com.kuronami.isekaiapi.api.query.DimensionProfile;
 import com.kuronami.isekaiapi.api.query.IsekaiQuery;
 import com.kuronami.isekaiapi.api.query.MobSpawnInfo;
 import com.kuronami.isekaiapi.api.query.PlacedFeatureInfo;
@@ -78,7 +79,12 @@ public final class IsekaiQueryImpl implements IsekaiQuery {
         // when the dimension shares overworld bounds (no override stored).
         VanillaRuleSnapshot snap = snapshot.get();
         var override = snap.placedFeatureRangeInDimension(feature, dimension);
-        if (override.isPresent()) return override;
+        if (override.isPresent()) {
+            // A stored FALLBACK means the feature's anchors do not fit this dimension's
+            // height column at all — don't hand the caller the overworld envelope instead.
+            return override.get() == HeightProviderExtraction.FALLBACK_RANGE
+                    ? Optional.empty() : override;
+        }
         return getPlacedFeatureVerticalRange(feature);
     }
 
@@ -128,6 +134,17 @@ public final class IsekaiQueryImpl implements IsekaiQuery {
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * <p>Read from the snapshot's {@code LevelStem} scan, so it is available before any
+     * {@code ServerLevel} exists (the biome-modifier pass runs earlier than level creation).
+     */
+    @Override
+    public Optional<DimensionProfile> getDimensionProfile(ResourceKey<Level> dimension) {
+        return snapshot.get().dimensionProfile(dimension);
+    }
+
+    /**
      * Per-dimension snapshot. Filters the global feature list down to entries whose Y
      * range overlaps the dimension's build height, and pulls the per-dim VerticalRange
      * override (set by {@link VanillaRuleSnapshot#placedFeatureRangeInDimension}) when available.
@@ -141,11 +158,16 @@ public final class IsekaiQueryImpl implements IsekaiQuery {
     @Override
     public WorldshapeSnapshot getSnapshot(ResourceKey<Level> dimension) {
         VanillaRuleSnapshot snap = snapshot.get();
-        List<PlacedFeatureInfo> dimFeatures = snap.placedFeatures().stream().map(info -> {
+        List<PlacedFeatureInfo> dimFeatures = snap.placedFeatures().stream().flatMap(info -> {
             var override = snap.placedFeatureRangeInDimension(info.key(), dimension);
-            return override.isPresent()
-                    ? new PlacedFeatureInfo(info.key(), override.get(), info.count(), info.biomes())
-                    : info;
+            if (override.isEmpty()) return java.util.stream.Stream.of(info);
+            // A stored FALLBACK means "not representable in this dimension" — don't surface
+            // the overworld sentinel as if it were a real range.
+            if (override.get() == HeightProviderExtraction.FALLBACK_RANGE) {
+                return java.util.stream.Stream.empty();
+            }
+            return java.util.stream.Stream.of(
+                    new PlacedFeatureInfo(info.key(), override.get(), info.count(), info.biomes()));
         }).toList();
         return new WorldshapeSnapshot(dimension, dimFeatures, snap.structures(), List.of());
     }

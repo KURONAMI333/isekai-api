@@ -5,6 +5,14 @@
   "minVersion": "0.8.5",
   "refmap": "isekai.refmap.json",
   "mixins": [
+    "ChunkGeneratorDecorationMixin",
+    "ModifiableBiomeInfoAccessor",
+    "NaturalSpawnerChunkGenerationMixin",
+    "NaturalSpawnerMobsAtMixin",
+    "NoiseBasedChunkGeneratorCarverMixin",
+    "PlacedFeatureScopeMixin",
+    "ProtoChunkDimensionMixin",
+    "ServerLifecycleHooksReconcileMixin",
     "StructureFindValidGenerationPointMixin"
   ],
   "client": [],

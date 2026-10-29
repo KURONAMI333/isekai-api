@@ -179,9 +179,10 @@ public record WorldshapeDescriptor(
     }
 
     /**
-     * An extra mob spawn entry to add to matched biomes during the MODIFY phase. Mirrors
-     * vanilla {@code MobSpawnSettings.SpawnerData}: a (type, weight, minCount, maxCount)
-     * tuple plus the MobCategory bucket it lives in.
+     * An extra mob spawn entry for matched biomes in the descriptor's dimension. The MODIFY
+     * phase records it and the runtime spawn read points apply it there. Mirrors vanilla
+     * {@code MobSpawnSettings.SpawnerData}: a (type, weight, minCount, maxCount) tuple plus
+     * the MobCategory bucket it lives in.
      * @since 1.0.0
      */
     public record AdditionalMobSpawn(MobCategory category, EntityType<?> type,

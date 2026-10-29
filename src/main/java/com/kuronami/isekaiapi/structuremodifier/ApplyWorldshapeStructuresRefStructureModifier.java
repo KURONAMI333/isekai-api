@@ -6,7 +6,6 @@ import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.Holder;
-import net.minecraft.core.HolderSet;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
@@ -40,15 +39,16 @@ public record ApplyWorldshapeStructuresRefStructureModifier(ResourceKey<Level> d
 
     @Override
     public void modify(Holder<Structure> structure, Phase phase, ModifiableStructureInfo.StructureInfo.Builder builder) {
-        // Layered dims: structure modification has no Y context, so we apply every layer's
-        // declared exclusion / spawn-override for this structure (union semantics). This is
-        // permissive on purpose — if any layer wants to exclude or re-spawn-override a
-        // structure, honour it. Different from biome modifier (which uses first-match per
-        // biome) because structures don't have a single "claim" the way biomes do.
+        // exclusions.structures is enforced per dimension in the
+        // StructureFindValidGenerationPointMixin; this modifier only carries spawn overrides.
+        if (phase != Phase.MODIFY) return;
+        // Layered dims: structure modification has no Y context, so every layer's
+        // spawn-override for this structure is applied (union semantics). Different from the
+        // biome modifier (first match per biome) because a structure has no single "claim".
         var layers = Isekai.remap().getActiveLayers(dimension);
         if (!layers.isEmpty()) {
             for (var layer : layers) {
-                applyOne(layer.descriptor(), structure, phase, builder);
+                applySpawnOverrides(layer.descriptor(), structure, builder);
             }
             return;
         }
@@ -57,27 +57,7 @@ public record ApplyWorldshapeStructuresRefStructureModifier(ResourceKey<Level> d
             warnMissingOnce(dimension);
             return;
         }
-        applyOne(worldshape, structure, phase, builder);
-    }
-
-    private void applyOne(WorldshapeDescriptor worldshape, Holder<Structure> structure,
-                          Phase phase, ModifiableStructureInfo.StructureInfo.Builder builder) {
-        if (phase == Phase.REMOVE) {
-            applyExclusion(worldshape, structure, builder);
-        } else if (phase == Phase.MODIFY) {
-            applySpawnOverrides(worldshape, structure, builder);
-        }
-    }
-
-    private void applyExclusion(WorldshapeDescriptor worldshape, Holder<Structure> structure,
-                                ModifiableStructureInfo.StructureInfo.Builder builder) {
-        if (!structure.unwrapKey().map(worldshape.exclusions().structures()::contains).orElse(false)) {
-            return;
-        }
-        builder.getStructureSettings().setBiomes(HolderSet.empty());
-        IsekaiApi.LOGGER.debug("[Isekai] excluded structure {} via empty biomes (descriptor dim={}, ref)",
-                structure.unwrapKey().map(k -> k.location().toString()).orElse("?"),
-                worldshape.dimension().location());
+        applySpawnOverrides(worldshape, structure, builder);
     }
 
     private void applySpawnOverrides(WorldshapeDescriptor worldshape, Holder<Structure> structure,

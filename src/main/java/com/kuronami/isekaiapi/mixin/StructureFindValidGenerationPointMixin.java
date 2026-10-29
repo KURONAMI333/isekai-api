@@ -6,6 +6,7 @@ import com.kuronami.isekaiapi.api.predicate.SpatialPredicate;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
 import com.kuronami.isekaiapi.impl.DimensionResolver;
 import com.kuronami.isekaiapi.impl.SpatialPredicateEvaluator;
+import com.kuronami.isekaiapi.impl.StructureExclusion;
 import com.kuronami.isekaiapi.impl.StructureThinning;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -40,12 +41,22 @@ import java.util.Optional;
  * for an entry keyed by this specific structure; if absent, the
  * {@code defaultStructurePredicate} is used.
  *
- * <p>Inject point: {@code @At("RETURN")} with {@code cancellable = true}, so the
- * returned Optional can be replaced with empty when the predicate fails.
+ * <p>This is also where {@code exclusions.structures} is enforced. Emptying the structure's
+ * biome filter (what the {@code StructureModifier} used to do) is a global mutation: NeoForge
+ * runs structure modifiers without a dimension, so a nether exclusion also removed the
+ * structure from every other dimension sharing those biomes. The veto here is scoped to the
+ * dimension the structure is actually generating in, and runs at {@code HEAD} so an excluded
+ * structure never pays for the biome/terrain search.
+ *
+ * <p>Inject points: {@code @At("HEAD")} for the exclusion, {@code @At("RETURN")} for the
+ * predicate and thinning. Both are cancellable.
  *
  * <p>Scope: the predicate applied is the one for the dimension the structure is actually
- * generating in (resolved from the generation context's biome source via
- * {@link com.kuronami.isekaiapi.impl.DimensionResolver}). Dimensions without a declared
+ * generating in, resolved by {@link com.kuronami.isekaiapi.impl.DimensionResolver}: the
+ * context's level when it has one ({@code /locate}, the {@code /place} commands), otherwise
+ * the chunk's {@code ProtoChunk} index entry — the normal path during chunk generation, where
+ * the context carries a {@code ChunkAccess} rather than a level. Only an accessor absent from
+ * that index falls back to the context's biome source. Dimensions without a declared
  * descriptor — and structures whose dimension can't be resolved — skip the check entirely,
  * so a restrictive predicate in one worldshape never suppresses structures in another
  * dimension that happens to reuse the same biomes.
@@ -53,19 +64,41 @@ import java.util.Optional;
 @Mixin(Structure.class)
 public class StructureFindValidGenerationPointMixin {
 
+    @Inject(method = "findValidGenerationPoint", at = @At("HEAD"), cancellable = true)
+    private void isekai$applyStructureExclusion(Structure.GenerationContext context,
+                                                 CallbackInfoReturnable<Optional<Structure.GenerationStub>> cir) {
+        // No declaration means no exclusions: skip the registry key lookup and the dimension
+        // resolution for every structure placement on a server that declares no worldshape.
+        if (Isekai.remap().getDeclaredDimensions().isEmpty()) return;
+        Structure structure = (Structure) (Object) this;
+        ResourceKey<Structure> structureKey = resolveStructureKey(structure);
+        if (structureKey == null) return;
+        ResourceKey<Level> dimKey = DimensionResolver.resolve(
+                context.heightAccessor(), context.biomeSource());
+        if (dimKey == null) return;
+        if (StructureExclusion.isExcluded(dimKey, structureKey)) {
+            IsekaiApi.LOGGER.debug("[Isekai] structure {} excluded in {} (exclusions.structures)",
+                    structureKey.location(), dimKey.location());
+            cir.setReturnValue(Optional.empty());
+        }
+    }
+
     @Inject(method = "findValidGenerationPoint", at = @At("RETURN"), cancellable = true)
     private void isekai$applySpatialPredicate(Structure.GenerationContext context,
                                                CallbackInfoReturnable<Optional<Structure.GenerationStub>> cir) {
+        if (Isekai.remap().getDeclaredDimensions().isEmpty()) return;
         Optional<Structure.GenerationStub> result = cir.getReturnValue();
         if (result == null || result.isEmpty()) return;  // vanilla already said no, leave it
 
         // Apply ONLY the descriptor for the dimension this structure is actually generating
-        // in — resolved from the generation context's biome source. Applying every declared
+        // in — resolved by DimensionResolver (the context's level when it has one, else the
+        // chunk's ProtoChunk index entry, else its biome source). Applying every declared
         // dimension's predicate (as an earlier version did) suppressed structures in dim B
         // whenever dim A declared a restrictive predicate, since biomes are reused across
         // dimensions. If the dimension can't be resolved or has no descriptor, leave vanilla
         // untouched.
-        ResourceKey<Level> dimKey = DimensionResolver.resolveByBiomeSource(context.biomeSource());
+        ResourceKey<Level> dimKey = DimensionResolver.resolve(
+                context.heightAccessor(), context.biomeSource());
         if (dimKey == null) return;
         // Layered worlds: pick the descriptor that covers the structure's chosen position.
         // Single-descriptor dims fall through to getActiveDescriptor inside getDescriptorAt.

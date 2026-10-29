@@ -2,6 +2,7 @@ package com.kuronami.isekaiapi.impl;
 
 import com.kuronami.isekaiapi.api.query.PlacedFeatureInfo;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 
@@ -11,9 +12,11 @@ import org.jetbrains.annotations.ApiStatus;
 
 /**
  * The single definition of "which placed features the strategy remap takes over in this
- * biome". Both halves of the remap read it: the REMOVE phase deletes exactly this set from
- * the biome's generation settings, and the ADD phase re-injects exactly this set with the
- * strategy applied to its vertical range. One function, so the two halves cannot drift.
+ * biome". Both halves of the remap read it: the ADD phase re-injects exactly this set with the
+ * strategy applied to its vertical range and records it, and {@code DimensionFeatureScope}
+ * drops exactly that recorded set at decoration time in this dimension. One function, so the
+ * two halves cannot drift — and the drop is a recorded result rather than a second
+ * computation, so a reload cannot desynchronize them.
  *
  * <p>A key is a target when all four hold:
  * <ul>
@@ -49,12 +52,28 @@ public final class RemapTargets {
     public static Set<ResourceKey<PlacedFeature>> select(VanillaRuleSnapshot snapshot,
                                                           ResourceKey<Biome> biomeKey,
                                                           Set<ResourceKey<PlacedFeature>> excluded) {
+        return select(snapshot, biomeKey, null, excluded);
+    }
+
+    /**
+     * Dimension-aware variant. A feature whose anchors invert in {@code dimension} (for
+     * example {@code above_bottom(300)} in the nether's {@code 0..255} column) is not a
+     * target there even when it resolves fine in the overworld — re-injecting it would
+     * produce a degenerate band instead of terrain.
+     *
+     * @param dimension the worldshape's dimension, or {@code null} to use overworld bounds
+     */
+    public static Set<ResourceKey<PlacedFeature>> select(VanillaRuleSnapshot snapshot,
+                                                          ResourceKey<Biome> biomeKey,
+                                                          ResourceKey<Level> dimension,
+                                                          Set<ResourceKey<PlacedFeature>> excluded) {
         if (snapshot == null || biomeKey == null) return Set.of();
         Set<ResourceKey<PlacedFeature>> inBiome = snapshot.featuresInBiome(biomeKey);
         if (inBiome.isEmpty()) return Set.of();
         Set<ResourceKey<PlacedFeature>> targets = new HashSet<>();
         for (PlacedFeatureInfo info : snapshot.placedFeatures()) {
-            if (snapshot.isFallback(info)) continue;
+            if (dimension == null ? snapshot.isFallback(info)
+                    : snapshot.isFallbackInDimension(info, dimension)) continue;
             if (!inBiome.contains(info.key())) continue;
             if (excluded.contains(info.key())) continue;
             targets.add(info.key());
