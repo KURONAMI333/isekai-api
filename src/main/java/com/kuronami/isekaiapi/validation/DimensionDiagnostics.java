@@ -8,12 +8,18 @@ import com.kuronami.isekaiapi.api.remap.RemapStrategy;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
 import com.kuronami.isekaiapi.impl.IsekaiInternal;
 import com.kuronami.isekaiapi.impl.VanillaRuleSnapshot;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.material.FluidState;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +43,10 @@ import org.jetbrains.annotations.ApiStatus;
  *   <li>a biome tag in {@code applies_to} does not exist or resolves to no biome (WARN)</li>
  *   <li>placed features whose anchors cannot be represented in this dimension (INFO; they
  *       are skipped rather than projected against the overworld envelope)</li>
+ *   <li>the start point is buried, has no footing within 32 blocks, or stands in lava
+ *       (ERROR); it is under water (WARN); the dimension has no loaded level (SKIP, INFO).
+ *       Checked only when a worldshape is declared — that is the terrain Isekai is
+ *       responsible for; an untouched dimension keeps vanilla's own spawn handling.</li>
  * </ul>
  *
  * <p>Read-only: nothing here declares, removes, or reloads a worldshape.
@@ -92,6 +102,8 @@ public final class DimensionDiagnostics {
             return new Report(dimension, Optional.of(profile), issues);
         }
 
+        checkSpawnSafety(server, dimension, issues);
+
         for (WorldshapeDescriptor descriptor : descriptors) {
             checkPlayableRange(descriptor, profile, issues);
             checkAppliesTo(server, descriptor, issues);
@@ -106,6 +118,55 @@ public final class DimensionDiagnostics {
             return layers.stream().map(LayeredDescriptor::descriptor).toList();
         }
         return Isekai.remap().getActiveDescriptor(dimension).map(List::of).orElse(List.of());
+    }
+
+    /**
+     * Reports whether a player can stand at the dimension's start point. The start point is the
+     * overworld's shared spawn; other dimensions have no per-dimension spawn, so the column at
+     * (0,0) is used and named in the line.
+     */
+    private static void checkSpawnSafety(MinecraftServer server,
+                                         ResourceKey<Level> dimension,
+                                         List<Issue> issues) {
+        ServerLevel level = server.getLevel(dimension);
+        if (level == null) {
+            issues.add(new Issue(Severity.INFO,
+                    "spawn SKIP: dimension " + dimension.location() + " is not loaded"));
+            return;
+        }
+
+        BlockPos start;
+        String source;
+        if (dimension.equals(Level.OVERWORLD)) {
+            start = level.getSharedSpawnPos();
+            source = "shared_spawn";
+        } else {
+            start = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, BlockPos.ZERO);
+            source = "heightmap(0,0)";
+        }
+
+        SpawnSafety.Column column = y -> sample(level, start.getX(), y, start.getZ());
+        SpawnSafety.Result result = SpawnSafety.evaluate(column, start.getY(),
+                level.getMinBuildHeight());
+        Severity severity = switch (result.status()) {
+            case ERROR -> Severity.ERROR;
+            case WARN -> Severity.WARN;
+            case OK, SKIP -> Severity.INFO;
+        };
+        issues.add(new Issue(severity, "spawn " + result.status()
+                + " (" + source + " " + start.getX() + "," + start.getY() + "," + start.getZ()
+                + "): " + result.detail()));
+    }
+
+    private static SpawnSafety.Sample sample(ServerLevel level, int x, int y, int z) {
+        BlockPos pos = new BlockPos(x, y, z);
+        BlockState state = level.getBlockState(pos);
+        boolean solid = state.isSolidRender(level, pos);
+        FluidState fluid = state.getFluidState();
+        if (fluid.isEmpty()) {
+            return solid ? SpawnSafety.Sample.SOLID : SpawnSafety.Sample.AIR;
+        }
+        return new SpawnSafety.Sample(solid, true, fluid.is(FluidTags.LAVA));
     }
 
     private static void checkPlayableRange(WorldshapeDescriptor descriptor,

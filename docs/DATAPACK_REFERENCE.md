@@ -806,6 +806,16 @@ The 2-file floating-island world in [`examples/1_shape/floating_island/`](../exa
 
 ---
 
+## Validating a dimension — `/isekai validate dimension <id>`
+
+Prints one line per check, including `spawn OK`/`WARN`/`ERROR`/`SKIP` for a dimension with a
+declared worldshape: buried, no footing within 32 blocks, or lava is an error; standing under
+water is a warning; an unloaded dimension is skipped. The start point is the overworld shared
+spawn, or the (0,0) `MOTION_BLOCKING_NO_LEAVES` heightmap position for other dimensions; the line
+names which one was used.
+
+---
+
 ## World preset overrides — the Nether/End trap
 
 Overriding `data/minecraft/worldgen/world_preset/normal.json` to customise the overworld **also requires re-declaring the Nether and End stanzas verbatim**. The preset map replaces vanilla's preset entirely; if you only list `minecraft:overworld`, Nether and End silently become inaccessible (no warning from vanilla — only Isekai's validator catches it).

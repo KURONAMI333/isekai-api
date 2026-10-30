@@ -59,6 +59,12 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
   default block, ceiling) and the silent failures: `applies_to` matching no biome, a
   `playable_range` outside the build height, unresolved biome tags, features skipped in that
   dimension.
+- **Start-point safety in `/isekai validate dimension <id>`.** For a dimension with a declared
+  worldshape the report adds a `spawn OK`/`WARN`/`ERROR`/`SKIP` line: the first solid block below
+  the start point (max 32 blocks) is the footing, the two blocks above it must be neither solid
+  nor fluid, water is a warning, and lava, a buried start or no footing is an error. The start
+  point is the overworld's shared spawn, or the (0,0) `MOTION_BLOCKING_NO_LEAVES` heightmap
+  position for other dimensions.
 - **`DimensionProfile`** (`api/query`) and **`IsekaiQuery.getDimensionProfile(ResourceKey<Level>)`**
   expose a dimension's vertical bounds, sea level, default block/fluid and `DimensionType` flags
   before a `ServerLevel` exists.
