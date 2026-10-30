@@ -650,7 +650,7 @@ membership alone makes it decodable and evaluable.
 
 ```jsonc
 {
-  "dimension": "<dimension key>",                 // required
+  "dimension": "<dimension key>",                 // required — or the object form below
   "playable_range": { "min_y": <int>, "max_y": <int>, "distribution": "<HeightDistribution>" },
   "surface_anchor": <SurfaceAnchor>,
   "ore_strategy": <RemapStrategy>,
@@ -695,6 +695,19 @@ membership alone makes it decodable and evaluable.
 ```
 
 `applies_to` empty = matches no biome (explicit opt-in; prevents cross-dimension leakage). Higher `priority` wins when two descriptors target the same dimension.
+
+`dimension` also takes an object, which narrows the descriptor to the `dimension_type`s it
+was written for. Use it when your world is a selectable world type: its overworld is
+`minecraft:overworld` by key but not the same world as vanilla's, and without the restriction
+the descriptor would change vanilla worlds too. An empty or omitted list means no restriction
+(the string form above is exactly that).
+
+```jsonc
+  "dimension": {
+    "dimension": "minecraft:overworld",
+    "required_dimension_types": ["my_world:my_type"]   // empty/omitted = every world type
+  },
+```
 
 `client_atmosphere` is resolved by camera Y, so a layered world can give each band its own sky
 and fog. While a descriptor is active, its `client_atmosphere.sky_color` replaces the biome

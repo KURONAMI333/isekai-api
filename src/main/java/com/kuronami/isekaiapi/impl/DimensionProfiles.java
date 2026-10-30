@@ -55,6 +55,8 @@ public final class DimensionProfiles {
         }
         return new DimensionProfile(
                 dimension,
+                stem.type().unwrapKey().orElseThrow(
+                        () -> new IllegalStateException("dimension type has no key: " + stem.type())),
                 type.minY(),
                 type.height(),
                 type.logicalHeight(),

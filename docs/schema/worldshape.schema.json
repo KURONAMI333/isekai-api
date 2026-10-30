@@ -4,45 +4,113 @@
   "title": "Isekai API WorldshapeDescriptor",
   "description": "Body of data/<ns>/isekai/worldshape/<name>.json. See docs/DATAPACK_REFERENCE.md.",
   "type": "object",
-  "required": ["dimension"],
+  "required": [
+    "dimension"
+  ],
   "additionalProperties": false,
   "properties": {
-    "dimension": { "$ref": "#/$defs/resourceKey", "description": "Target dimension key." },
+    "dimension": {
+      "description": "Target dimension key, optionally narrowed to the dimension_type(s) this worldshape was written for. Omit required_dimension_types (or use the string form) to apply in every world that has this dimension key.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/resourceKey"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "dimension": {
+              "$ref": "#/$defs/resourceKey"
+            },
+            "required_dimension_types": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/resourceKey"
+              },
+              "description": "Dimension type IDs. Empty or omitted means no restriction."
+            }
+          },
+          "required": [
+            "dimension"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "playable_range": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["min_y", "max_y"],
+      "required": [
+        "min_y",
+        "max_y"
+      ],
       "properties": {
-        "min_y": { "type": "integer" },
-        "max_y": { "type": "integer" },
-        "distribution": { "$ref": "#/$defs/heightDistribution" }
+        "min_y": {
+          "type": "integer"
+        },
+        "max_y": {
+          "type": "integer"
+        },
+        "distribution": {
+          "$ref": "#/$defs/heightDistribution"
+        }
       }
     },
-    "surface_anchor": { "$ref": "#/$defs/surfaceAnchor" },
-    "ore_strategy": { "$ref": "#/$defs/remapStrategy" },
-    "structure_strategy": { "$ref": "#/$defs/remapStrategy" },
-    "mob_spawn_strategy": { "$ref": "#/$defs/remapStrategy" },
+    "surface_anchor": {
+      "$ref": "#/$defs/surfaceAnchor"
+    },
+    "ore_strategy": {
+      "$ref": "#/$defs/remapStrategy"
+    },
+    "structure_strategy": {
+      "$ref": "#/$defs/remapStrategy"
+    },
+    "mob_spawn_strategy": {
+      "$ref": "#/$defs/remapStrategy"
+    },
     "mob_spawn_strategy_by_category": {
       "type": "object",
-      "additionalProperties": { "$ref": "#/$defs/remapStrategy" }
+      "additionalProperties": {
+        "$ref": "#/$defs/remapStrategy"
+      }
     },
-    "default_structure_predicate": { "$ref": "#/$defs/spatialPredicate" },
+    "default_structure_predicate": {
+      "$ref": "#/$defs/spatialPredicate"
+    },
     "structure_predicates": {
       "type": "object",
-      "additionalProperties": { "$ref": "#/$defs/spatialPredicate" }
+      "additionalProperties": {
+        "$ref": "#/$defs/spatialPredicate"
+      }
     },
-    "applies_to": { "$ref": "#/$defs/biomeSelection" },
-    "exclusions": { "$ref": "#/$defs/contentSet" },
-    "additions": { "$ref": "#/$defs/contentSet" },
-    "atmosphere": { "$ref": "#/$defs/atmosphere" },
+    "applies_to": {
+      "$ref": "#/$defs/biomeSelection"
+    },
+    "exclusions": {
+      "$ref": "#/$defs/contentSet"
+    },
+    "additions": {
+      "$ref": "#/$defs/contentSet"
+    },
+    "atmosphere": {
+      "$ref": "#/$defs/atmosphere"
+    },
     "client_atmosphere": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "sky_color": { "type": "integer", "description": "0xRRGGBB sky colour; vanilla day/night and weather shading still apply." },
-        "fog_color": { "type": "integer" },
-        "fog_near_distance": { "type": "number" },
-        "fog_far_distance": { "type": "number" }
+        "sky_color": {
+          "type": "integer",
+          "description": "0xRRGGBB sky colour; vanilla day/night and weather shading still apply."
+        },
+        "fog_color": {
+          "type": "integer"
+        },
+        "fog_near_distance": {
+          "type": "number"
+        },
+        "fog_far_distance": {
+          "type": "number"
+        }
       }
     },
     "content_overrides": {
@@ -51,20 +119,31 @@
       "properties": {
         "feature_predicates": {
           "type": "object",
-          "additionalProperties": { "$ref": "#/$defs/spatialPredicate" }
+          "additionalProperties": {
+            "$ref": "#/$defs/spatialPredicate"
+          }
         },
-        "structure_spawn_overrides": { "type": "array" },
+        "structure_spawn_overrides": {
+          "type": "array"
+        },
         "block_overrides": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "surface_top": { "type": "object" },
-            "default_block": { "type": "object" }
+            "surface_top": {
+              "type": "object"
+            },
+            "default_block": {
+              "type": "object"
+            }
           }
         }
       }
     },
-    "priority": { "type": "integer", "default": 100 }
+    "priority": {
+      "type": "integer",
+      "default": 100
+    }
   },
   "$defs": {
     "resourceKey": {
@@ -76,17 +155,38 @@
       "pattern": "^#?([a-z0-9_.-]+:)?[a-z0-9_./-]+$"
     },
     "heightDistribution": {
-      "enum": ["uniform", "trapezoid", "triangle", "biased_low", "biased_high"]
+      "enum": [
+        "uniform",
+        "trapezoid",
+        "triangle",
+        "biased_low",
+        "biased_high"
+      ]
     },
     "biomeSelection": {
       "oneOf": [
-        { "type": "array", "items": { "$ref": "#/$defs/resourceOrTag" } },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/resourceOrTag"
+          }
+        },
         {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "keys": { "type": "array", "items": { "$ref": "#/$defs/resourceKey" } },
-            "tags": { "type": "array", "items": { "$ref": "#/$defs/resourceOrTag" } }
+            "keys": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/resourceKey"
+              }
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/resourceOrTag"
+              }
+            }
           }
         }
       ]
@@ -95,123 +195,413 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "features": { "type": "array", "items": { "$ref": "#/$defs/resourceOrTag" } },
-        "structures": { "type": "array", "items": { "$ref": "#/$defs/resourceOrTag" } },
-        "carvers": { "type": "array", "items": { "$ref": "#/$defs/resourceOrTag" } },
-        "mob_spawns": { "type": "array" }
+        "features": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/resourceOrTag"
+          }
+        },
+        "structures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/resourceOrTag"
+          }
+        },
+        "carvers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/resourceOrTag"
+          }
+        },
+        "mob_spawns": {
+          "type": "array"
+        }
       }
     },
     "surfaceAnchor": {
       "type": "object",
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "properties": {
-        "type": { "enum": ["isekai_api:world_surface", "isekai_api:below_fluid", "isekai_api:fixed_y", "isekai_api:world_floor"] }
+        "type": {
+          "enum": [
+            "isekai_api:world_surface",
+            "isekai_api:below_fluid",
+            "isekai_api:fixed_y",
+            "isekai_api:world_floor"
+          ]
+        }
       },
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "isekai_api:below_fluid" } } },
-          "then": { "required": ["fluid"], "properties": { "fluid": { "$ref": "#/$defs/resourceKey" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "isekai_api:below_fluid"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "fluid"
+            ],
+            "properties": {
+              "fluid": {
+                "$ref": "#/$defs/resourceKey"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai_api:fixed_y" } } },
-          "then": { "required": ["y"], "properties": { "y": { "type": "integer" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "isekai_api:fixed_y"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "y"
+            ],
+            "properties": {
+              "y": {
+                "type": "integer"
+              }
+            }
+          }
         }
       ]
     },
     "remapStrategy": {
       "type": "object",
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "properties": {
         "type": {
           "enum": [
-            "isekai_api:identity", "isekai_api:linear", "isekai_api:inverted",
-            "isekai_api:fixed_range", "isekai_api:count_scale", "isekai_api:band_split", "isekai_api:column_local",
+            "isekai_api:identity",
+            "isekai_api:linear",
+            "isekai_api:inverted",
+            "isekai_api:fixed_range",
+            "isekai_api:count_scale",
+            "isekai_api:band_split",
+            "isekai_api:column_local",
             "isekai_api:pipe"
           ]
         }
       },
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "isekai_api:fixed_range" } } },
-          "then": {
-            "required": ["min", "max"],
+          "if": {
             "properties": {
-              "min": { "type": "integer" },
-              "max": { "type": "integer" },
-              "dist": { "$ref": "#/$defs/heightDistribution" }
+              "type": {
+                "const": "isekai_api:fixed_range"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "min",
+              "max"
+            ],
+            "properties": {
+              "min": {
+                "type": "integer"
+              },
+              "max": {
+                "type": "integer"
+              },
+              "dist": {
+                "$ref": "#/$defs/heightDistribution"
+              }
             }
           }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai_api:count_scale" } } },
-          "then": { "required": ["factor"], "properties": { "factor": { "type": "number", "minimum": 0 } } }
-        },
-        {
-          "if": { "properties": { "type": { "const": "isekai_api:band_split" } } },
-          "then": { "required": ["bands"], "properties": { "bands": { "type": "array" } } }
-        },
-        {
-          "if": { "properties": { "type": { "const": "isekai_api:pipe" } } },
+          "if": {
+            "properties": {
+              "type": {
+                "const": "isekai_api:count_scale"
+              }
+            }
+          },
           "then": {
-            "required": ["chain"],
-            "properties": { "chain": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/remapStrategy" } } }
+            "required": [
+              "factor"
+            ],
+            "properties": {
+              "factor": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "isekai_api:band_split"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "bands"
+            ],
+            "properties": {
+              "bands": {
+                "type": "array"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "isekai_api:pipe"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "chain"
+            ],
+            "properties": {
+              "chain": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/$defs/remapStrategy"
+                }
+              }
+            }
           }
         }
       ]
     },
     "spatialPredicate": {
       "type": "object",
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "properties": {
         "type": {
           "enum": [
-            "isekai_api:y_in_range", "isekai_api:solid_floor", "isekai_api:solid_ceiling",
-            "isekai_api:terrain_slope", "isekai_api:near_block", "isekai_api:near_biome",
-            "isekai_api:in_fluid", "isekai_api:always", "isekai_api:never",
-            "isekai_api:and", "isekai_api:or", "isekai_api:not"
+            "isekai_api:y_in_range",
+            "isekai_api:solid_floor",
+            "isekai_api:solid_ceiling",
+            "isekai_api:terrain_slope",
+            "isekai_api:near_block",
+            "isekai_api:near_biome",
+            "isekai_api:in_fluid",
+            "isekai_api:always",
+            "isekai_api:never",
+            "isekai_api:and",
+            "isekai_api:or",
+            "isekai_api:not"
           ]
         }
       },
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "isekai_api:y_in_range" } } },
-          "then": { "properties": { "min": { "type": "integer" }, "max": { "type": "integer" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "isekai_api:y_in_range"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "min": {
+                "type": "integer"
+              },
+              "max": {
+                "type": "integer"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai_api:solid_floor" } } },
-          "then": { "properties": { "min_clearance": { "type": "integer" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "isekai_api:solid_floor"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "min_clearance": {
+                "type": "integer"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai_api:solid_ceiling" } } },
-          "then": { "properties": { "min_clearance": { "type": "integer" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "isekai_api:solid_ceiling"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "min_clearance": {
+                "type": "integer"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai_api:terrain_slope" } } },
-          "then": { "properties": { "min_slope": { "type": "number" }, "max_slope": { "type": "number" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "isekai_api:terrain_slope"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "min_slope": {
+                "type": "number"
+              },
+              "max_slope": {
+                "type": "number"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai_api:near_block" } } },
-          "then": { "required": ["max_distance"], "properties": { "targets": {}, "max_distance": { "type": "integer" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "isekai_api:near_block"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "max_distance"
+            ],
+            "properties": {
+              "targets": {},
+              "max_distance": {
+                "type": "integer"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai_api:near_biome" } } },
-          "then": { "required": ["biome", "max_distance"], "properties": { "biome": { "$ref": "#/$defs/resourceKey" }, "max_distance": { "type": "integer" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "isekai_api:near_biome"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "biome",
+              "max_distance"
+            ],
+            "properties": {
+              "biome": {
+                "$ref": "#/$defs/resourceKey"
+              },
+              "max_distance": {
+                "type": "integer"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai_api:in_fluid" } } },
-          "then": { "required": ["fluid"], "properties": { "fluid": { "$ref": "#/$defs/resourceKey" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "isekai_api:in_fluid"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "fluid"
+            ],
+            "properties": {
+              "fluid": {
+                "$ref": "#/$defs/resourceKey"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai_api:and" } } },
-          "then": { "required": ["all"], "properties": { "all": { "type": "array", "items": { "$ref": "#/$defs/spatialPredicate" } } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "isekai_api:and"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "all"
+            ],
+            "properties": {
+              "all": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/spatialPredicate"
+                }
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai_api:or" } } },
-          "then": { "required": ["any"], "properties": { "any": { "type": "array", "items": { "$ref": "#/$defs/spatialPredicate" } } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "isekai_api:or"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "any"
+            ],
+            "properties": {
+              "any": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/spatialPredicate"
+                }
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "isekai_api:not" } } },
-          "then": { "required": ["inner"], "properties": { "inner": { "$ref": "#/$defs/spatialPredicate" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "isekai_api:not"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "inner"
+            ],
+            "properties": {
+              "inner": {
+                "$ref": "#/$defs/spatialPredicate"
+              }
+            }
+          }
         }
       ]
     },
@@ -219,27 +609,65 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "has_precipitation": { "type": "boolean" },
-        "temperature": { "type": "number" },
-        "downfall": { "type": "number" },
-        "sky_color": { "type": "integer" },
-        "fog_color": { "type": "integer" },
-        "water_color": { "type": "integer" },
-        "water_fog_color": { "type": "integer" },
-        "foliage_color": { "type": "integer" },
-        "grass_color": { "type": "integer" },
-        "creature_generation_probability": { "type": "number" },
-        "mob_spawn_costs": { "type": "object" },
+        "has_precipitation": {
+          "type": "boolean"
+        },
+        "temperature": {
+          "type": "number"
+        },
+        "downfall": {
+          "type": "number"
+        },
+        "sky_color": {
+          "type": "integer"
+        },
+        "fog_color": {
+          "type": "integer"
+        },
+        "water_color": {
+          "type": "integer"
+        },
+        "water_fog_color": {
+          "type": "integer"
+        },
+        "foliage_color": {
+          "type": "integer"
+        },
+        "grass_color": {
+          "type": "integer"
+        },
+        "creature_generation_probability": {
+          "type": "number"
+        },
+        "mob_spawn_costs": {
+          "type": "object"
+        },
         "effects_extras": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "grass_color_modifier": { "enum": ["none", "dark_forest", "swamp"] },
-            "particle": { "type": "object" },
-            "ambient_sound": { "$ref": "#/$defs/resourceOrTag" },
-            "mood_sound": { "type": "object" },
-            "additions_sound": { "type": "object" },
-            "music": { "type": "object" }
+            "grass_color_modifier": {
+              "enum": [
+                "none",
+                "dark_forest",
+                "swamp"
+              ]
+            },
+            "particle": {
+              "type": "object"
+            },
+            "ambient_sound": {
+              "$ref": "#/$defs/resourceOrTag"
+            },
+            "mood_sound": {
+              "type": "object"
+            },
+            "additions_sound": {
+              "type": "object"
+            },
+            "music": {
+              "type": "object"
+            }
           }
         }
       }

@@ -3,6 +3,7 @@ package com.kuronami.isekaiapi.api.query;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.material.Fluid;
 
 import java.util.Optional;
@@ -37,12 +38,14 @@ import java.util.Optional;
  * @param piglinSafe           {@code true} when piglins do not zombify
  * @param hasRaids             {@code true} when raids can start
  * @param seaLevel             the generator's sea level, or {@link Integer#MIN_VALUE} when unknown
+ * @param dimensionType        the {@code dimension_type} this level stem uses
  * @param defaultBlock         the generator's default fill block, if it has one
  * @param defaultFluid         the generator's default fluid, if it has one
  * @since 3.0.0
  */
 public record DimensionProfile(
         ResourceKey<Level> dimension,
+        ResourceKey<DimensionType> dimensionType,
         int minY,
         int height,
         int logicalHeight,

@@ -79,18 +79,40 @@ public final class IsekaiRemapImpl implements IsekaiRemap {
 
     @Override
     public Optional<WorldshapeDescriptor> getActiveDescriptor(ResourceKey<Level> dimension) {
-        return Optional.ofNullable(singleLayer.get(dimension));
+        WorldshapeDescriptor descriptor = singleLayer.get(dimension);
+        return appliesToLevel(descriptor) ? Optional.ofNullable(descriptor) : Optional.empty();
     }
 
     @Override
     public List<LayeredDescriptor> getActiveLayers(ResourceKey<Level> dimension) {
-        return multiLayer.getOrDefault(dimension, List.of());
+        List<LayeredDescriptor> layers = multiLayer.get(dimension);
+        if (layers == null || layers.isEmpty()) return List.of();
+        return layers.stream()
+                .filter(layer -> appliesToLevel(layer.descriptor()))
+                .toList();
+    }
+
+    /**
+     * {@code true} when {@code descriptor} was written for the dimension type this level uses.
+     *
+     * <p>A selectable world type ships its own {@code LevelStem}, so {@code minecraft:overworld}
+     * can be a different world than vanilla's overworld. Descriptors that declare no
+     * {@code required_dimension_types} keep applying everywhere (pre-3.0.0 behaviour), and a
+     * dimension missing from the snapshot fails open rather than silently dropping the shape.
+     */
+    private static boolean appliesToLevel(WorldshapeDescriptor descriptor) {
+        if (descriptor == null || descriptor.scope().isUnrestricted()) return true;
+        var snapshot = IsekaiInternal.currentSnapshot();
+        if (snapshot == null) return true;
+        return snapshot.dimensionProfile(descriptor.dimension())
+                .map(profile -> descriptor.scope().accepts(profile.dimensionType()))
+                .orElse(true);
     }
 
     @Override
     public Optional<WorldshapeDescriptor> getDescriptorAt(ResourceKey<Level> dimension, int y) {
-        List<LayeredDescriptor> layers = multiLayer.get(dimension);
-        if (layers != null && !layers.isEmpty()) {
+        List<LayeredDescriptor> layers = getActiveLayers(dimension);
+        if (!layers.isEmpty()) {
             return LayerResolver.resolveByY(layers, y);
         }
         return getActiveDescriptor(dimension);
@@ -99,8 +121,8 @@ public final class IsekaiRemapImpl implements IsekaiRemap {
     @Override
     public Optional<WorldshapeDescriptor> getDescriptorAt(ResourceKey<Level> dimension,
                                                            int x, int y, int z) {
-        List<LayeredDescriptor> layers = multiLayer.get(dimension);
-        if (layers != null && !layers.isEmpty()) {
+        List<LayeredDescriptor> layers = getActiveLayers(dimension);
+        if (!layers.isEmpty()) {
             // Half-open [minY, maxY) bands, with each layer's TransitionRule applied at the
             // seam it owns. A position in a gap — authored or TransitionRule.Gap-derived —
             // resolves to no descriptor.

@@ -51,7 +51,7 @@ import java.util.Set;
  * @since 1.0.0
  */
 public record WorldshapeDescriptor(
-        ResourceKey<Level> dimension,
+        Scope scope,
         VerticalRange playableRange,
         SurfaceAnchor surfaceAnchor,
         RemapStrategy oreStrategy,
@@ -69,6 +69,7 @@ public record WorldshapeDescriptor(
         int priority
 ) {
     public WorldshapeDescriptor {
+        if (scope == null) throw new IllegalArgumentException("scope is required");
         structurePredicates = Map.copyOf(structurePredicates);
         if (appliesTo == null) appliesTo = BiomeSelection.EMPTY;
         mobSpawnStrategyByCategory = Map.copyOf(mobSpawnStrategyByCategory);
@@ -77,6 +78,11 @@ public record WorldshapeDescriptor(
         if (atmosphere == null) atmosphere = AtmosphereOverride.EMPTY;
         if (clientAtmosphere == null) clientAtmosphere = ClientAtmosphereOverride.EMPTY;
         if (contentOverrides == null) contentOverrides = ContentOverrides.EMPTY;
+    }
+
+    /** Target dimension key. Equivalent to {@code scope().dimension()}. @since 1.0.0 */
+    public ResourceKey<Level> dimension() {
+        return scope.dimension();
     }
 
     // --- Convenience accessors so call sites keep a flat API ---
@@ -265,7 +271,7 @@ public record WorldshapeDescriptor(
 
     /** Fluent builder; see {@link WorldshapeDescriptor#builder()}. @since 1.0.0 */
     public static final class Builder {
-        private ResourceKey<Level> dimension;
+        private Scope scope;
         private VerticalRange playableRange;
         private SurfaceAnchor surfaceAnchor;
         private RemapStrategy oreStrategy;
@@ -285,7 +291,9 @@ public record WorldshapeDescriptor(
         private Builder() {}
 
         /** Target dimension (required). @since 1.0.0 */
-        public Builder dimension(ResourceKey<Level> v) { this.dimension = v; return this; }
+        public Builder dimension(ResourceKey<Level> v) { this.scope = Scope.of(v); return this; }
+        /** Target dimension plus the dimension types the shape was written for. @since 3.0.0 */
+        public Builder scope(Scope v) { this.scope = v; return this; }
         /** Playable Y band the worldshape remaps content into (required). @since 1.0.0 */
         public Builder playableRange(VerticalRange v) { this.playableRange = v; return this; }
         /** What "the surface" means in this worldshape (required). @since 1.0.0 */
@@ -321,7 +329,7 @@ public record WorldshapeDescriptor(
 
         /** Validate required fields and construct the descriptor. @since 1.0.0 */
         public WorldshapeDescriptor build() {
-            if (dimension == null) throw new IllegalStateException("dimension is required");
+            if (this.scope == null) throw new IllegalStateException("scope/dimension is required");
             if (playableRange == null) throw new IllegalStateException("playableRange is required");
             if (surfaceAnchor == null) throw new IllegalStateException("surfaceAnchor is required");
             if (oreStrategy == null) throw new IllegalStateException("oreStrategy is required");
@@ -329,7 +337,7 @@ public record WorldshapeDescriptor(
             if (mobSpawnStrategy == null) throw new IllegalStateException("mobSpawnStrategy is required");
             if (defaultStructurePredicate == null) throw new IllegalStateException("defaultStructurePredicate is required");
             return new WorldshapeDescriptor(
-                    dimension, playableRange, surfaceAnchor,
+                    this.scope, playableRange, surfaceAnchor,
                     oreStrategy, structureStrategy, mobSpawnStrategy,
                     structurePredicates, defaultStructurePredicate,
                     appliesTo, exclusions, mobSpawnStrategyByCategory,
@@ -352,8 +360,8 @@ public record WorldshapeDescriptor(
      * </ul>
      */
     public static final Codec<WorldshapeDescriptor> CODEC = RecordCodecBuilder.create(i -> i.group(
-            ResourceKey.codec(Registries.DIMENSION).fieldOf("dimension")
-                    .forGetter(WorldshapeDescriptor::dimension),
+            Scope.CODEC.fieldOf("dimension")
+                    .forGetter(WorldshapeDescriptor::scope),
             VerticalRange.CODEC.fieldOf("playable_range")
                     .forGetter(WorldshapeDescriptor::playableRange),
             SurfaceAnchor.CODEC.fieldOf("surface_anchor")
