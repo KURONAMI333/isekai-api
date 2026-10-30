@@ -15,7 +15,9 @@
     "ServerLifecycleHooksReconcileMixin",
     "StructureFindValidGenerationPointMixin"
   ],
-  "client": [],
+  "client": [
+    "ClientLevelSkyColorMixin"
+  ],
   "server": [],
   "injectors": {
     "defaultRequire": 1

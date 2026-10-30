@@ -200,14 +200,15 @@ The worldshape descriptor's `atmosphere` field overrides every per-biome `BiomeS
 
 This covers the whole server-side atmosphere surface.
 
-### Client-side rendering — fog overrides
+### Client-side rendering — fog and sky overrides
 
-In addition to the per-biome `atmosphere` field, the worldshape descriptor has a `client_atmosphere` field for **dimension-wide rendering overrides** that apply via NeoForge's `ViewportEvent` hooks at the camera's current position. Currently exposes:
+In addition to the per-biome `atmosphere` field, the worldshape descriptor has a `client_atmosphere` field for **dimension-wide rendering overrides** that apply at the camera's current position. Currently exposes:
 
+- `sky_color` — replaces the biome sky colour (day/night, rain/thunder and lightning shading still apply); on dimensions whose `effects` is `minecraft:overworld`
 - `fog_color` — overrides the rendered fog colour dimension-wide (or per layer, in a layered worldshape, resolved by camera Y)
 - `fog_near_distance` / `fog_far_distance` — fog gradient band, in blocks
 
-Sky / cloud / weather / sun / moon rendering remain hardcoded by vanilla; reaching those requires a `DimensionSpecialEffects` subclass + client mixin (not currently shipped). For sky colour, use the per-biome `atmosphere.sky_color` — same visual effect, biome-driven.
+Clouds, weather, sun/moon rendering and custom skyboxes remain vanilla; reaching those requires a `DimensionSpecialEffects` subclass + client mixin (not shipped). Use the per-biome `atmosphere.sky_color` instead when the colour has to vary by biome inside one dimension.
 
 ### `BiomeSelection` with tag support
 

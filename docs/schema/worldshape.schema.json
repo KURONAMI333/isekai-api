@@ -39,6 +39,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "sky_color": { "type": "integer", "description": "0xRRGGBB sky colour; vanilla day/night and weather shading still apply." },
         "fog_color": { "type": "integer" },
         "fog_near_distance": { "type": "number" },
         "fog_far_distance": { "type": "number" }

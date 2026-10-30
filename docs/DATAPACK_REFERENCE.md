@@ -677,6 +677,7 @@ membership alone makes it decodable and evaluable.
     "creature_generation_probability": <float>, "mob_spawn_costs": { /* per-entity */ }
   },
   "client_atmosphere": {                                                   // optional, client-side rendering
+    "sky_color":         <int>,    // 0xRRGGBB — sky colour; day/night brightness still applies
     "fog_color":         <int>,    // 0xRRGGBB — overrides rendered fog colour dimension-wide
     "fog_near_distance": <float>,  // fog gradient start, in blocks
     "fog_far_distance":  <float>   // fog gradient end, in blocks
@@ -694,6 +695,13 @@ membership alone makes it decodable and evaluable.
 ```
 
 `applies_to` empty = matches no biome (explicit opt-in; prevents cross-dimension leakage). Higher `priority` wins when two descriptors target the same dimension.
+
+`client_atmosphere` is resolved by camera Y, so a layered world can give each band its own sky
+and fog. While a descriptor is active, its `client_atmosphere.sky_color` replaces the biome
+sky colour; use the per-biome `atmosphere.sky_color` when the colour has to vary inside one
+dimension. `sky_color` rides the vanilla sky path (`ClientLevel#getSkyColor`), so it needs a
+dimension whose `effects` is `minecraft:overworld`; dimensions using `the_end` / `the_nether`
+effects render their own sky and ignore it.
 
 ### Scope by key
 

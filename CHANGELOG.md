@@ -27,6 +27,9 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
 - **2.x datapacks load unchanged, but the scope changes.** The same JSON now affects one dimension
   instead of every dimension that shares the biome. A pack that relied on the old cross-dimension
   leak must declare a descriptor for the other dimension.
+- **`ClientAtmosphereOverride` gained a `skyColor` component.** The record is now
+  `(skyColor, fogColor, fogNearDistance, fogFarDistance)`; the three-argument constructor is gone.
+  Source callers pass `Optional.empty()` for `skyColor`, and compiled callers must recompile.
 
 ### Added
 
@@ -63,6 +66,11 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
   netherrack/lava defaults, legacy random source) with `isekai_api:hook/final_density_nether` and
   `isekai_api:vanilla_nether_surface`. The separate hook id keeps overworld overrides of
   `hook/final_density` out of the nether.
+- **Dimension-scoped sky colour.** `client_atmosphere.sky_color` (`0xRRGGBB`) replaces the
+  biome sky colour while the descriptor is active, resolved per camera Y like the fog overrides.
+  Only the sampled base colour changes: vanilla's day/night, rain/thunder and lightning-flash
+  shading still apply. Carried by `ClientLevelSkyColorMixin`, so it exists on the client only, and
+  it applies to dimensions whose `effects` is `minecraft:overworld` (the vanilla sky path).
 
 ### Fixed
 

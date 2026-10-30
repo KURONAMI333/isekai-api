@@ -185,10 +185,15 @@ declared biome is removed from the shared biome and re-injected as a guarded cop
 dimension (`ForeignFeatureReconciler`). A dimension that reuses the biome without declaring that
 worldshape no longer receives the feature.
 
-**Java API (additive).** `DimensionProfile` (`api/query`) and
+**Java API (mostly additive).** `DimensionProfile` (`api/query`) and
 `IsekaiQuery.getDimensionProfile(ResourceKey<Level>)` expose a dimension's vertical bounds, sea
 level, default block/fluid and `DimensionType` flags *before* `ServerLevel` exists — which is when
 NeoForge runs biome modifiers.
+
+The one break is `ClientAtmosphereOverride` (`api/remap`): the record gained a `skyColor`
+component, so its canonical constructor is now four arguments (`skyColor`, `fogColor`,
+`fogNearDistance`, `fogFarDistance`). Code that called the three-argument constructor must pass
+`Optional.empty()` for `skyColor`; already-compiled callers need a recompile.
 
 **Internal signatures changed** (`@ApiStatus.Internal`, no compatibility promise):
 `ModifyPhase.mobSpawnStrategy(WorldshapeDescriptor, Holder<Biome>)`,

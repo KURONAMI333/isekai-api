@@ -6,6 +6,8 @@ import com.kuronami.isekaiapi.api.remap.ClientAtmosphereOverride;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -27,6 +29,10 @@ import org.jetbrains.annotations.ApiStatus;
  *       gradient (camera-near plane).</li>
  *   <li>{@link ClientAtmosphereOverride#fogFarDistance()} sets the end of the fog gradient
  *       (camera-far plane).</li>
+ *   <li>{@link ClientAtmosphereOverride#skyColor()} is applied by
+ *       {@code ClientLevelSkyColorMixin} through
+ *       {@link #activeSkyColor(ResourceKey, double)}, which replaces only the sampled biome
+ *       colour so vanilla's day/night, weather and lightning-flash maths still apply.</li>
  * </ul>
  *
  * <p>Fields not set on the descriptor leave vanilla / biome behaviour untouched.
@@ -39,7 +45,9 @@ public final class IsekaiClientAtmosphere {
 
     @SubscribeEvent
     public static void onComputeFogColor(ViewportEvent.ComputeFogColor event) {
-        ClientAtmosphereOverride client = activeFor(event.getCamera().getPosition().y);
+        ClientLevel level = Minecraft.getInstance().level;
+        if (level == null) return;
+        ClientAtmosphereOverride client = activeFor(level.dimension(), event.getCamera().getPosition().y);
         if (client == null) return;
         client.fogColor().ifPresent(rgb -> {
             event.setRed(((rgb >> 16) & 0xFF) / 255.0f);
@@ -50,22 +58,35 @@ public final class IsekaiClientAtmosphere {
 
     @SubscribeEvent
     public static void onRenderFog(ViewportEvent.RenderFog event) {
-        ClientAtmosphereOverride client = activeFor(event.getCamera().getPosition().y);
+        ClientLevel level = Minecraft.getInstance().level;
+        if (level == null) return;
+        ClientAtmosphereOverride client = activeFor(level.dimension(), event.getCamera().getPosition().y);
         if (client == null) return;
         client.fogNearDistance().ifPresent(event::setNearPlaneDistance);
         client.fogFarDistance().ifPresent(event::setFarPlaneDistance);
     }
 
     /**
+     * Sky colour override active at {@code y} in {@code dimension}, or {@code null} when none
+     * applies. Used by {@code ClientLevelSkyColorMixin}; kept here so the resolution order stays
+     * identical to the fog hooks. The dimension is passed in rather than read from
+     * {@code Minecraft.getInstance()} so a level that is not the current one still resolves
+     * against itself.
+     */
+    public static Integer activeSkyColor(ResourceKey<Level> dimension, double y) {
+        ClientAtmosphereOverride client = activeFor(dimension, y);
+        return client == null ? null : client.skyColor().orElse(null);
+    }
+
+    /**
      * Resolve the {@link ClientAtmosphereOverride} active at the camera's Y. Returns
-     * {@code null} when there's no world, no declared descriptor at that Y, or the
+     * {@code null} when there's no dimension, no declared descriptor at that Y, or the
      * descriptor has no client-atmosphere overrides set — letting the caller short-circuit.
      */
-    private static ClientAtmosphereOverride activeFor(double cameraY) {
-        ClientLevel level = Minecraft.getInstance().level;
-        if (level == null) return null;
+    private static ClientAtmosphereOverride activeFor(ResourceKey<Level> dimension, double cameraY) {
+        if (dimension == null) return null;
         int y = (int) Math.floor(cameraY);
-        WorldshapeDescriptor desc = Isekai.remap().getDescriptorAt(level.dimension(), y).orElse(null);
+        WorldshapeDescriptor desc = Isekai.remap().getDescriptorAt(dimension, y).orElse(null);
         if (desc == null) return null;
         ClientAtmosphereOverride client = desc.clientAtmosphere();
         return client.isNoOp() ? null : client;
