@@ -55,6 +55,11 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
 - **Carver rules are enforced at carve time.** `NoiseBasedChunkGeneratorCarverMixin` redirects
   `ChunkAccess#carverBiome` in `NoiseBasedChunkGenerator#applyCarvers`; `CarverScope` applies the
   recorded add/remove rule per (dimension, biome).
+- **`client_atmosphere` reaches clients on a dedicated server.** The server sends the active
+  Y-bands over the optional `isekai_api:client_atmosphere` channel on login, `/reload` and
+  dimension change; the client applies them before falling back to its own registry, so sky and
+  fog match what the server loaded. Vanilla clients and clients without the channel are
+  unaffected.
 - **`/isekai validate dimension <id>`** reports the `LevelStem` profile (build height, sea level,
   default block, ceiling) and the silent failures: `applies_to` matching no biome, a
   `playable_range` outside the build height, unresolved biome tags, features skipped in that

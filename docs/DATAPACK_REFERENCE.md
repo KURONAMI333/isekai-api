@@ -716,6 +716,11 @@ dimension. `sky_color` rides the vanilla sky path (`ClientLevel#getSkyColor`), s
 dimension whose `effects` is `minecraft:overworld`; dimensions using `the_end` / `the_nether`
 effects render their own sky and ignore it.
 
+On a dedicated server the client cannot read the datapack registry, so the server sends the
+active bands over an optional `isekai_api:client_atmosphere` channel on login, `/reload` and
+dimension change. A client that joins a server using Isekai API therefore renders the server's
+`client_atmosphere`. Vanilla clients and clients without the channel are unaffected.
+
 ### Scope by key
 
 A descriptor governs its own `dimension`. Biome attributes are the exception: they live on the
