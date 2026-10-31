@@ -94,6 +94,21 @@ class AtmosphereSyncPayloadTest {
     }
 
     @Test
+    void codecRejectsEmptyBand() {
+        FriendlyByteBuf buf = buffer();
+        buf.writeResourceLocation(Level.OVERWORLD.location());
+        buf.writeVarInt(1);
+        buf.writeInt(10);
+        buf.writeInt(10);
+        buf.writeBoolean(false);
+        buf.writeBoolean(false);
+        buf.writeBoolean(false);
+        buf.writeBoolean(false);
+
+        assertThrows(DecoderException.class, () -> AtmosphereSyncPayload.STREAM_CODEC.decode(buf));
+    }
+
+    @Test
     void singleLayerSendsOneFullRangeBand() {
         IsekaiRemapImpl remap = new IsekaiRemapImpl();
         remap.declareWorldshape(descriptor(

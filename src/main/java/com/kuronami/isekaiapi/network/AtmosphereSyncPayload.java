@@ -144,6 +144,9 @@ public record AtmosphereSyncPayload(
         for (int i = 0; i < size; i++) {
             int minY = buf.readInt();
             int maxY = buf.readInt();
+            if (minY >= maxY) {
+                throw new DecoderException("client_atmosphere band is empty: " + minY + ".." + maxY);
+            }
             bands.add(new Band(minY, maxY, new ClientAtmosphereOverride(
                     readOptionalInt(buf),
                     readOptionalInt(buf),
