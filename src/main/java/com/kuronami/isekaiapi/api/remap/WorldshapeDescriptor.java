@@ -46,8 +46,11 @@ import java.util.Set;
  * an object with explicit {@code keys} / {@code tags} fields. Tags collapse 35-biome
  * enumerations to a single line.
  *
- * <p>If two consumers register a descriptor for the same dimension, the one with the
- * higher {@link #priority} wins. Ties replace.
+ * <p>Two declarations with the same {@link Scope} compete: the one with the higher
+ * {@link #priority} wins, and an equal or higher priority replaces the earlier one. A
+ * different scope is a separate declaration — descriptors for the same dimension key but
+ * different {@code required_dimension_types} coexist, and the active one is chosen from the
+ * level's actual dimension type (restricted over unrestricted, then higher priority).
  * @since 1.0.0
  */
 public record WorldshapeDescriptor(
@@ -324,7 +327,7 @@ public record WorldshapeDescriptor(
         public Builder clientAtmosphere(ClientAtmosphereOverride v) { this.clientAtmosphere = v; return this; }
         /** Feature predicates, spawn overrides, and block overrides. Defaults to empty. @since 1.0.0 */
         public Builder contentOverrides(ContentOverrides v) { this.contentOverrides = v; return this; }
-        /** Conflict-resolution priority; higher wins per dimension. Defaults to {@link WorldshapeDescriptor#DEFAULT_PRIORITY}. @since 1.0.0 */
+        /** Conflict-resolution priority within one {@link Scope}; higher wins. Defaults to {@link WorldshapeDescriptor#DEFAULT_PRIORITY}. @since 1.0.0 */
         public Builder priority(int v) { this.priority = v; return this; }
 
         /** Validate required fields and construct the descriptor. @since 1.0.0 */

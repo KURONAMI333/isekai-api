@@ -19,7 +19,13 @@ import java.util.Set;
  */
 public interface IsekaiRemap {
 
-    /** Single-layer worldshape. @since 1.0.0 */
+    /**
+     * Single-layer worldshape. A declaration is identified by its {@link Scope}: declaring the
+     * same scope again applies the priority rule (higher wins, equal or higher replaces), while
+     * a different scope for the same dimension key is kept alongside it. The active one is
+     * resolved from the level's dimension type by {@link #getActiveDescriptor(ResourceKey)}.
+     * @since 1.0.0
+     */
     void declareWorldshape(WorldshapeDescriptor descriptor);
 
     /**
@@ -37,7 +43,14 @@ public interface IsekaiRemap {
     /** Withdraw a consumer's declaration. Worldgen reload required. @since 1.0.0 */
     void removeWorldshape(ResourceKey<Level> dimension);
 
-    /** Currently-active single-layer descriptor for the given dimension, if any. @since 1.0.0 */
+    /**
+     * Currently-active single-layer descriptor for the given dimension, if any. When several
+     * scopes are declared for one dimension key, the one that accepts the level's
+     * {@code dimension_type} wins; a restricted descriptor beats an unrestricted one, then the
+     * higher priority wins. If the type cannot be determined and two or more restricted
+     * descriptors are declared, the choice is ambiguous and this returns empty.
+     * @since 1.0.0
+     */
     Optional<WorldshapeDescriptor> getActiveDescriptor(ResourceKey<Level> dimension);
 
     /** Currently-active layered descriptors for the given dimension, if any. @since 1.0.0 */

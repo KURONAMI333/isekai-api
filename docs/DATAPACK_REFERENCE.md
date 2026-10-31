@@ -694,7 +694,13 @@ membership alone makes it decodable and evaluable.
 }
 ```
 
-`applies_to` empty = matches no biome (explicit opt-in; prevents cross-dimension leakage). Higher `priority` wins when two descriptors target the same dimension.
+`applies_to` empty = matches no biome (explicit opt-in; prevents cross-dimension leakage). Two
+descriptors with the same `dimension` and the same `required_dimension_types` compete by
+`priority` (higher wins; an equal or higher priority replaces the earlier one). A different
+`required_dimension_types` list is a separate declaration: descriptors for the same dimension
+key coexist, and the active one is the descriptor whose list contains the level's
+`dimension_type` — a restricted descriptor beats an unrestricted one, then the higher
+`priority` wins.
 
 `dimension` also takes an object, which narrows the descriptor to the `dimension_type`s it
 was written for. Use it when your world is a selectable world type: its overworld is

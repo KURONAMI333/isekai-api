@@ -86,6 +86,14 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
 
 ### Fixed
 
+- **Worldshapes for different dimension types of one dimension key coexist.** Single-layer
+  declarations were stored one-per-dimension key, so a Sky World shape (`sky_world:sky`) and a
+  Tundra World shape (`frozen_world:frozen`) both targeting `minecraft:overworld` replaced each
+  other in load order and one world type got no shape at all. Declarations are now grouped by
+  `Scope`; `getActiveDescriptor` picks the one whose `required_dimension_types` contains the
+  level's actual `dimension_type` (restricted over unrestricted, then higher `priority`). Same-
+  scope declarations keep the old priority rule. If the type is unknown and two restricted
+  declarations exist, the registry returns none rather than guessing.
 - **Worldshape bounds resolve per dimension.** Ore/feature Y-remapping and the `playable_range`
   envelope used the overworld's `min_y`/`height` for every dimension. They now come from the
   dimension's `LevelStem`/`DimensionType`, keyed by the descriptor's `dimension`. Only a level with
