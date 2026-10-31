@@ -18,6 +18,8 @@ import org.jetbrains.annotations.ApiStatus;
  *       exactly when the server-side worldshape registry changes.</li>
  *   <li>{@link PlayerEvent.PlayerChangedDimensionEvent} — the payload is scoped to one
  *       dimension, so a player crossing into another one gets the new bands.</li>
+ *   <li>{@link PlayerEvent.PlayerRespawnEvent} — respawning in another dimension does not
+ *       fire the dimension-change event.</li>
  * </ul>
  *
  * <p>A client that never registered the optional channel (vanilla, or NeoForge without Isekai
@@ -37,6 +39,12 @@ public final class AtmosphereSyncServer {
 
     @SubscribeEvent
     public static void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) sync(player);
+    }
+
+    /** Respawning in another dimension (death, leaving the End) does not fire a dimension change. */
+    @SubscribeEvent
+    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) sync(player);
     }
 
