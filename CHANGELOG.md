@@ -65,6 +65,12 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
   nor fluid, water is a warning, and lava, a buried start or no footing is an error. The start
   point is the overworld's shared spawn, or the (0,0) `MOTION_BLOCKING_NO_LEAVES` heightmap
   position for other dimensions.
+- **Worldshapes can be narrowed to dimension types.** `dimension` also accepts
+  `{ "dimension": "<key>", "required_dimension_types": ["<type>", …] }`; a level whose
+  `dimension_type` is not listed is left alone. This lets a selectable world type keep its
+  worldshape out of vanilla worlds that share the `minecraft:overworld` key. The string form and
+  an empty list mean no restriction (the 2.x behaviour). Java: `Scope` (`api/remap`) on
+  `WorldshapeDescriptor`.
 - **`DimensionProfile`** (`api/query`) and **`IsekaiQuery.getDimensionProfile(ResourceKey<Level>)`**
   expose a dimension's vertical bounds, sea level, default block/fluid and `DimensionType` flags
   before a `ServerLevel` exists.
