@@ -4,6 +4,7 @@ import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.api.Isekai;
 import com.kuronami.isekaiapi.api.remap.ClientAtmosphereOverride;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
+import com.kuronami.isekaiapi.network.AtmosphereSyncCache;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.resources.ResourceKey;
@@ -11,6 +12,7 @@ import net.minecraft.world.level.Level;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ViewportEvent;
 import org.jetbrains.annotations.ApiStatus;
 
@@ -35,6 +37,11 @@ import org.jetbrains.annotations.ApiStatus;
  *       colour so vanilla's day/night, weather and lightning-flash maths still apply.</li>
  * </ul>
  *
+ * <p>Resolution order: when the server has sent an atmosphere for the current dimension (a
+ * dedicated server, or the integrated server after login / reload), that copy wins; otherwise
+ * the local registry is read as before, which keeps single-player behaviour unchanged before
+ * the first payload arrives.
+ *
  * <p>Fields not set on the descriptor leave vanilla / biome behaviour untouched.
  */
 @ApiStatus.Internal
@@ -42,6 +49,12 @@ import org.jetbrains.annotations.ApiStatus;
 public final class IsekaiClientAtmosphere {
 
     private IsekaiClientAtmosphere() {}
+
+    /** Drop the server-sent copy so the next world starts from its own registry. */
+    @SubscribeEvent
+    public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        AtmosphereSyncCache.clear();
+    }
 
     @SubscribeEvent
     public static void onComputeFogColor(ViewportEvent.ComputeFogColor event) {
@@ -80,12 +93,20 @@ public final class IsekaiClientAtmosphere {
 
     /**
      * Resolve the {@link ClientAtmosphereOverride} active at the camera's Y. Returns
-     * {@code null} when there's no dimension, no declared descriptor at that Y, or the
-     * descriptor has no client-atmosphere overrides set — letting the caller short-circuit.
+     * {@code null} when there's no dimension, no descriptor at that Y, or the descriptor has
+     * no client-atmosphere overrides set — letting the caller short-circuit.
+     *
+     * <p>Once the server has sent a payload for {@code dimension}, the band it carries is
+     * authoritative (an empty band list means "none"). Falling back to the local registry only
+     * while the payload is still unknown keeps single-player unchanged and prevents a stale
+     * local declaration from shadowing the server's answer.
      */
     private static ClientAtmosphereOverride activeFor(ResourceKey<Level> dimension, double cameraY) {
         if (dimension == null) return null;
         int y = (int) Math.floor(cameraY);
+        if (AtmosphereSyncCache.knows(dimension)) {
+            return AtmosphereSyncCache.at(dimension, y).orElse(null);
+        }
         WorldshapeDescriptor desc = Isekai.remap().getDescriptorAt(dimension, y).orElse(null);
         if (desc == null) return null;
         ClientAtmosphereOverride client = desc.clientAtmosphere();

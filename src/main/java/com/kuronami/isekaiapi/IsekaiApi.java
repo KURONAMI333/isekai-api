@@ -1,6 +1,7 @@
 package com.kuronami.isekaiapi;
 
 import com.kuronami.isekaiapi.biomemodifier.IsekaiBiomeModifiers;
+import com.kuronami.isekaiapi.network.AtmosphereSyncNetwork;
 import com.kuronami.isekaiapi.structuremodifier.IsekaiStructureModifiers;
 import com.kuronami.isekaiapi.densityfunction.IsekaiDensityFunctions;
 import com.kuronami.isekaiapi.registry.IsekaiSpiTypes;
@@ -47,5 +48,6 @@ public final class IsekaiApi {
         IsekaiTreePlacers.register(modBus);
         IsekaiFeatures.register(modBus);
         IsekaiStructures.register(modBus);
+        modBus.addListener(AtmosphereSyncNetwork::register);
     }
 }

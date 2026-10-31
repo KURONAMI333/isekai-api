@@ -1,5 +1,6 @@
 package com.kuronami.isekaiapi.impl;
 
+import com.kuronami.isekaiapi.api.query.VerticalRange;
 import com.kuronami.isekaiapi.api.remap.LayeredDescriptor;
 import com.kuronami.isekaiapi.api.remap.TransitionRule;
 import com.kuronami.isekaiapi.api.remap.WorldshapeDescriptor;
@@ -63,7 +64,28 @@ public final class LayerResolver {
      * applies — a gap is a Y-interval, fully expressible without X/Z.
      */
     public static Optional<WorldshapeDescriptor> resolveByY(List<LayeredDescriptor> layers, int y) {
-        return resolve(layers, 0, y, 0, false);
+        for (LayeredDescriptor layer : layers) {
+            VerticalRange range = yOnlyRange(layer);
+            if (y >= range.minY() && y < range.maxY()) {
+                return Optional.of(layer.descriptor());
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * The half-open Y interval a layer owns for Y-only resolution: its declared
+     * {@link LayeredDescriptor#yRange()} minus the top carved out by a
+     * {@link TransitionRule.Gap}. Exposed so the server can send the same intervals to a
+     * remote client instead of duplicating the gap rule there.
+     */
+    public static VerticalRange yOnlyRange(LayeredDescriptor layer) {
+        VerticalRange range = layer.yRange();
+        if (layer.transition() instanceof TransitionRule.Gap gap && gap.gapHeight() > 0) {
+            int max = Math.max(range.minY(), range.maxY() - gap.gapHeight());
+            return new VerticalRange(range.minY(), max, range.distribution());
+        }
+        return range;
     }
 
     private static Optional<WorldshapeDescriptor> resolve(List<LayeredDescriptor> layers,
