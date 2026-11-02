@@ -75,8 +75,11 @@ import org.jetbrains.annotations.ApiStatus;
  * than a one-block lip. It is the only field that reaches past the excavated volume, and it never
  * affects whether the pool places: containment is still judged on the single-cell shell, and the
  * widened rings only replace solid cells (below the waterline always, above it half the time, the
- * same rule the shell uses). {@code 0} is the untouched one-block rim and the default, so existing
- * datapacks generate exactly what they did before the field existed.
+ * same rule the shell uses). Because the reach is {@code radius + 1 + shore_width}, the radius is
+ * shrunk by {@code shore_width} first ({@link #radiusWithinRegion}), so a wide beach eats into the
+ * basin instead of running past the chunks the feature stage holds. {@code 0} is the untouched
+ * one-block rim and the default, so existing datapacks generate exactly what they did before the
+ * field existed.
  *
  * @since 2.1.0
  */
@@ -87,16 +90,31 @@ public class PoolFeature extends Feature<PoolFeature.Config> {
     private static final BlockState CARVED_AIR = Blocks.CAVE_AIR.defaultBlockState();
 
     /**
-     * Ceiling on the sampled {@code xz_radius}. Reads and writes reach {@code radius + 1} from
-     * the origin, and the origin can sit anywhere in the chunk; the feature stage only holds a
-     * 3x3 chunk region, so anything past 15 blocks would ask for a chunk that does not exist
-     * yet. 14 keeps the worst case at exactly the 15 blocks vanilla's own lakes reach. The
-     * codec still accepts 1..64 (it always did) — larger values are clamped, not rejected.
+     * Ceiling on the sampled {@code xz_radius}. Reads and writes reach
+     * {@code radius + 1 + shore_width} from the origin, and the origin can sit anywhere in the
+     * chunk; the feature stage only holds a 3x3 chunk region, so anything past 15 blocks would ask
+     * for a chunk that does not exist yet. 14 keeps the worst case at exactly the 15 blocks
+     * vanilla's own lakes reach — with {@code shore_width} subtracted by
+     * {@link #radiusWithinRegion} before the shape is built. The codec still accepts 1..64 (it
+     * always did) — larger values are clamped, not rejected.
      */
     static final int MAX_RADIUS = 14;
 
     /** Ceiling on {@code shore_width}: the widened rim must stay inside the feature's 3x3 chunks. */
     static final int MAX_SHORE_WIDTH = 6;
+
+    /**
+     * The radius actually built: the sample, shrunk so the widened rim still fits the region.
+     *
+     * <p>{@code shore_width} repeats the rim outward, so the reach of a pool is
+     * {@code radius + 1 + shoreWidth}. Without this the widest beach would push past the 15 blocks
+     * the feature stage can see and the sand would be silently cut at the chunk border. With
+     * {@code shore_width} 0 this is the old {@code min(sample, 14)}, so existing datapacks build the
+     * same basin.
+     */
+    static int radiusWithinRegion(int sampled, int shoreWidth) {
+        return Math.max(1, Math.min(sampled, MAX_RADIUS - shoreWidth));
+    }
 
     public record Config(BlockState fluid, BlockStateProvider rimBlock, IntProvider xzRadius,
                          int depth, int shoreWidth) implements FeatureConfiguration {
@@ -489,7 +507,7 @@ public class PoolFeature extends Feature<PoolFeature.Config> {
         RandomSource random = ctx.random();
         Config config = ctx.config();
         BlockPos origin = ctx.origin();
-        int radius = Math.min(config.xzRadius().sample(random), MAX_RADIUS);
+        int radius = radiusWithinRegion(config.xzRadius().sample(random), config.shoreWidth());
         int depth = config.depth();
 
         // LakeFeature:30-32 — the working box must fit inside the build height.

@@ -46,6 +46,11 @@ import org.jetbrains.annotations.ApiStatus;
  *
  * <p>The processor runs in {@code finalizeProcessing}, so later processors in the same list have
  * already made their block substitutions and this pass sees the final states.
+ *
+ * <p><b>It sees one template and nothing else.</b> Logs in another piece of the same structure are
+ * invisible here, so a trunk and its crown belong in the same template. A crown pasted as its own
+ * jigsaw piece reaches no log at all and lands in {@code orphan_leaves}; for that arrangement use
+ * {@code orphan_leaves: persist} instead of expecting this processor to find the trunk next door.
  */
 @ApiStatus.Internal
 public final class LeafDistanceProcessor extends StructureProcessor {

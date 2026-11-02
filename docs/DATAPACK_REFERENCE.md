@@ -260,7 +260,7 @@ Two consequences for tuning. **`xz_radius` costs placements, `depth` does not** 
 
 `xz_radius` is an `IntProvider`, so its fields sit **inline** beside `"type"` — there is no `"value"` wrapper. Writing one fails registry load with "Not a number / No key min_inclusive".
 
-**`shore_width` (0–6, default 0)** grows the rim outward `N` rings, so a desert pond gets a beach instead of a one-block lip. The rings are grown from the shell by adjacency, so the bank follows the basin's real outline, not a circle around the origin. It changes nothing about whether the pool places — containment is still judged on the single-cell shell — and it only replaces solid cells (below the waterline always, above it half the time, the same rule the shell uses), so it never writes into air or water. `0` is the pool that existed before the field, and the default: existing datapacks generate exactly the same blocks.
+**`shore_width` (0–6, default 0)** grows the rim outward `N` rings, so a desert pond gets a beach instead of a one-block lip. The rings are grown from the shell by adjacency, so the bank follows the basin's real outline, not a circle around the origin. It changes nothing about whether the pool places — containment is still judged on the single-cell shell — and it only replaces solid cells (below the waterline always, above it half the time, the same rule the shell uses), so it never writes into air or water. `0` is the pool that existed before the field, and the default: existing datapacks generate exactly the same blocks. The shore is subtracted from the radius, because a rim that grows past the region the feature is placed into would be cut off at the chunk border: the horizontal reach is `xz_radius + shore_width` capped at 15 blocks from the centre, so `xz_radius` alone is not the reach when a shore is set.
 
 ---
 
@@ -429,6 +429,8 @@ It runs in `finalizeProcessing`, so it sees the states that earlier processors i
 
 Where it runs: only where vanilla reads a processor list — a jigsaw pool element's `processors` field, `isekai_api:grounded_template`'s `processors` field, and the vanilla structures that reference one. `/place template` does not run processors, and `isekai_api:assembled` does not take a processor list, so a template placed by that one keeps the leaf data it was saved with.
 
+**It only sees the one template it is pasting.** A trunk in another piece of the same structure is invisible to it, so put the trunk and its crown in the same template. If you split them across jigsaw pieces (a shared crown pasted over a shared trunk), the leaves reach no log at all and are treated as orphans — use `orphan_leaves: persist` for that arrangement rather than expecting the processor to find the trunk next door.
+
 A persistent leaf never decays regardless of distance, so the two flags are independent: `keep_persistent: true` alone turns nothing into a persistent leaf, and `orphan_leaves: persist` only touches leaves the processor could not reach.
 
 ---
@@ -444,7 +446,7 @@ Used as the `trunk_placer` / `foliage_placer` of a vanilla `minecraft:tree` conf
 | `isekai_api:leaning` | `base_height`, `height_rand_a`, `height_rand_b` (int — shared); `min_height_for_leaves` (positive int, default 1); `lean_length` (IntProvider 1–16); `convert_ground` (bool, default true — false skips the dirt-under-trunk conversion so beach palms stay sandy); `tip_crown_only` (bool, default false — true returns only the bent-tip attachment so a fan crown sprays from one point); `slant_curve` (double 1.0–2.0, default 1.0 — each stalk step moves `round(slant_curve^step)` blocks sideways, so 1.0 is one block per step and 1.3 bends like a palm); `space_check` (bool, default true — an occupied block ends the lean and the crown stays on the trunk instead of floating where no log could be placed); `min_height` (int 1–16, default 4 — a tree whose trunk would be shorter places nothing) | rises straight, leans near the top, then continues as a near-horizontal stalk |
 | `isekai_api:branching` | `base_height`, `height_rand_a`, `height_rand_b` (int — shared); `branch_count` (int 1–6); `branch_length` (IntProvider 1–8); `branch_start_offset_from_top` (IntProvider 0–4, default 0 — how far below the trunk top branches sprout) | straight vertical trunk plus N upward-arcing branches; each branch tip becomes its own crown site, so paired with `disc`/`sphere` you get umbrella/forked silhouettes |
 
-`leaning`'s three newer fields are additive: a datapack that omits all of them gets exactly the old tree. `slant_curve` 1.0 walks one block sideways per step; raising it lengthens each successive step, so the same `lean_length` covers more ground and the bend accelerates instead of forming an L. `space_check` defaults to true because the old behaviour could attach a crown to a position where the trunk log was blocked by a neighbour — a palm growing into a dense stand ended up with leaves in mid-air. Set it to false only to reproduce that old shape deliberately. `min_height` is about the trunk, not about where leaves start (`min_height_for_leaves`), so it is what makes a deliberately short palm possible: raise it above `base_height` and the tree does not generate.
+`leaning`'s three newer fields are additive: a datapack that omits all of them gets exactly the old tree. `slant_curve` 1.0 walks one block sideways per step; raising it lengthens each successive step, so the same `lean_length` covers more ground and the bend accelerates instead of forming an L. **The stalk's horizontal travel is capped at 12 blocks from the origin** (the near-vertical lean counts too): an exponential stride would otherwise walk hundreds of blocks and leave the 3×3 chunks a feature is placed into, so `slant_curve` 2.0 with `lean_length` 16 stops at 12 instead of 131,071. A `lean_length` longer than the budget at `slant_curve` 1.0 (13–16) is cut at the same limit. `space_check` defaults to true because the old behaviour could attach a crown to a position where the trunk log was blocked by a neighbour — a palm growing into a dense stand ended up with leaves in mid-air. Set it to false only to reproduce that old shape deliberately. `min_height` is about the trunk, not about where leaves start (`min_height_for_leaves`), so it is what makes a deliberately short palm possible: raise it above `base_height` and the tree does not generate.
 
 ### Foliage placers (`foliage_placer`)
 
@@ -979,11 +981,13 @@ names which one was used.
 `/locate` answers *where is the nearest one*. When the answer is "nowhere", these two answer *why*.
 
 ```
-/isekai survey <structure> [radius]     # default radius 64 chunks, max 512
+/isekai survey <structure> [radius]     # default radius 64 chunks, max 128
 /isekai fit <structure> [pos]
 ```
 
 Both write JSON under `<world>/isekai/` (`survey/<ns>_<path>-r<radius>.json`, `fit/<ns>_<path>-<chunkX>_<chunkZ>.json`) and print a summary to chat. Neither loads chunks or generates to disk, so they are safe on a live world.
+
+The scan itself runs inside the command call, on the server thread, and it is quadratic in the radius: 64 is 16,641 chunks, 128 is 66,049. The radius is capped at 128 for that reason — the old 512 was 1,050,625 chunks of placement tests plus a generation check for every candidate, in one tick. Nothing is written, but the server waits for the answer before it ticks again.
 
 **`/isekai survey`** replays the two steps chunk generation takes over a square of chunks around you: the structure set's `StructurePlacement#isStructureChunk` decides which chunks are tried, then the structure's own generation decides whether it exists there. Every candidate ends up either placed or counted against exactly one reason:
 
@@ -1030,9 +1034,12 @@ fit <ns>:<name> at chunk 4,-4 in minecraft:the_end
   gate columns: min 48, max 57, spread 9
   verdict: max_slope — lowest column 48 > clearance floor 2; spread 9 > max_slope 4
   template <ns>:<name> (5x4x5, weight 3): y=0 at 48, blocks y 48..51
+  measured on <ns>:<name> at rotation none (the first variant); other variants and turns cover other ground and are not judged here
 ```
 
 The gates sample five of those nine columns (middle and corners); the grid is there so you can see what the footprint would hit if you shrank the template, not so you can tune against columns the structure never reads. Two things the report catches that cost hours otherwise: a `template` whose NBT does not exist (reported as `0x0x0` with a warning — both the gates and the footprint collapse to one column), and a chunk no structure set offers at all (`note: no structure set offers this chunk`), where the gates are not the reason the chunk is empty.
+
+The verdict describes one footprint: the first variant of the template list, unrotated. The last line says so, and the JSON carries `measured_template` / `measured_rotation`. A structure with several variants, or `rotation: random` (drawn per placement), covers different ground in other chunks than the one this report judges.
 
 ### Counting trees and other blocks — `/isekai survey blocks`
 
@@ -1045,7 +1052,9 @@ The gates sample five of those nine columns (middle and corners); the grid is th
 /isekai survey blocks minecraft:palm_log 16 center 0 64 0 biome #minecraft:is_forest
 ```
 
-`survey blocks` answers the half `/isekai survey` cannot: the feature fires, but the world does not look like a palm forest. It generates the square of chunks to `FEATURES` (trees placed, no lighting or spawn pass), counts the matching blocks in each chunk, releases the chunk, and moves on over ticks — one chunk per tick under the 8 ms budget in practice. Unlike the structure survey this **writes terrain to disk**, exactly as a player walking there would; run it on a test world or where generated terrain is acceptable.
+`survey blocks` answers the half `/isekai survey` cannot: the feature fires, but the world does not look like a palm forest. It generates the square of chunks to `FEATURES` (trees placed, no lighting or spawn pass), counts the matching blocks in each chunk, and moves to the next chunk on the next tick. **Generation is synchronous on the server thread**: a fresh chunk costs tens of milliseconds, so one tick per chunk means TPS drops for the length of the run (a radius-8 square is 289 chunks). The tick loop cannot cut inside a chunk's generation; it only decides whether to start another one. Only one `survey blocks` runs per server at a time — a second one is refused with a message naming the run that is still going, because two would interleave inside the same ticks. Unlike the structure survey this **writes terrain to disk**, exactly as a player walking there would; run it on a test world or where generated terrain is acceptable.
+
+Each chunk is counted as soon as its own `FEATURES` stage finishes, before its neighbours generate. A tree rooted in a later chunk can still write logs or leaves into a chunk that was already counted, so the per-chunk numbers are a lower bound; the effect is small for a log tag and larger for a leaf tag, because a crown reaches further across a border than a trunk does.
 
 `radius` is in chunks (default 8, max 32), `center` is a block position (defaults to where you run it), and `biome` keeps only chunks whose centre column is in that biome or tag. The biome filter is resolved from the seed before generation, so skipped chunks are never generated; the report still counts them under `skipped_chunks`. `biome` must come after `radius` because Brigadier needs one unambiguous path per optional argument.
 

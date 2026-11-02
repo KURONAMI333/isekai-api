@@ -28,12 +28,23 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.jetbrains.annotations.ApiStatus;
 
 /**
- * Drives {@link BlockSurvey} over ticks so generating a square of chunks never takes one long tick.
+ * Drives {@link BlockSurvey} over ticks so a whole square of chunks is not generated inside one
+ * command call.
  *
- * <p>Chunk generation is requested one chunk at a time to {@code FEATURES} and counted immediately.
- * Each server tick gets a small time budget (a few chunks); the square is finished over as many ticks
- * as it needs. The ticket a chunk load takes expires on the next tick, so nothing stays pinned after
- * the survey — only the terrain that was written to disk, exactly as if a player had walked there.
+ * <p><b>Chunk generation is synchronous.</b> {@code level.getChunk(pos, FEATURES, true)} returns a
+ * chunk that is already complete, or blocks the server thread until the generator has produced it;
+ * a fresh chunk costs tens of milliseconds. The tick loop therefore does not make generation cheap:
+ * it only decides when to stop, by checking a time budget after each chunk and returning to the
+ * server for that tick. A survey of N chunks can hold the server for about N ticks, each one a
+ * normal tick plus that chunk, so a run visibly lowers TPS and a large square can reach the
+ * server watchdog.
+ *
+ * <p>Because of that cost, <b>one blocks survey runs per server at a time</b>
+ * ({@link #refusalReason}): two would take turns inside the same ticks and double the time each tick
+ * spends inside chunk generation.
+ *
+ * <p>The ticket a chunk load takes expires on the next tick, so nothing stays pinned after the
+ * survey — only the terrain that was written to disk, exactly as if a player had walked there.
  *
  * <p>A run belongs to one {@link ServerLevel} and is started on the server thread (the command does
  * that); the tick event also runs on the server thread, so the queue needs no locking. A run that is
@@ -43,7 +54,14 @@ import org.jetbrains.annotations.ApiStatus;
 @EventBusSubscriber(modid = IsekaiApi.MODID)
 public final class BlockSurveyRun {
 
-    /** Time a single tick may spend generating chunks for surveys, in nanoseconds (8 ms). */
+    /**
+     * Time after which the tick loop stops starting another chunk, in nanoseconds (8 ms).
+     *
+     * <p>This cannot cut inside one chunk's generation: the check runs after a chunk is back, so a
+     * tick that generates a fresh chunk always overruns by that chunk's cost (tens of
+     * milliseconds). The budget only keeps a saved chunk from being followed by another one in the
+     * same tick.
+     */
     private static final long TICK_BUDGET_NANOS = 8_000_000L;
 
     private static final Map<MinecraftServer, List<BlockSurveyRun>> RUNS = new HashMap<>();
@@ -70,11 +88,37 @@ public final class BlockSurveyRun {
     }
 
     /**
+     * Why a new run cannot start on this server, or {@code null} when it can.
+     *
+     * <p>Generation happens on the server thread, so two surveys would interleave inside the same
+     * ticks and each tick would wait for both chunks. One at a time keeps the stall predictable and
+     * makes the report the only thing the server is spending ticks on.
+     */
+    public static String refusalReason(MinecraftServer server) {
+        List<BlockSurveyRun> runs = RUNS.get(server);
+        if (runs == null || runs.isEmpty()) {
+            return null;
+        }
+        BlockSurveyRun running = runs.get(0);
+        return "a blocks survey is already running on this server ("
+                + running.pending.size() + " chunk(s) left, radius " + running.params.radiusChunks()
+                + " around chunk " + running.params.center().x + "," + running.params.center().z
+                + "); chunk generation runs on the server thread, so two at once would double the"
+                + " time each tick spends generating";
+    }
+
+    /**
      * Queues a survey and returns how many chunks it will generate. Biome filtering happens here,
      * from the biome source, so a chunk whose biome is filtered out is never generated.
+     *
+     * @return the queued chunk count, or {@code -1} when a survey is already running on this server
+     *         (see {@link #refusalReason})
      */
     public static int start(ServerLevel level, BlockSurvey.Params params,
                             Consumer<BlockSurvey.Result> onDone, Consumer<Throwable> onError) {
+        if (refusalReason(level.getServer()) != null) {
+            return -1;
+        }
         Deque<ChunkPos> pending = new ArrayDeque<>();
         int skipped = 0;
         ChunkGenerator generator = level.getChunkSource().getGenerator();
@@ -163,7 +207,7 @@ public final class BlockSurveyRun {
         return true;
     }
 
-    /** For tests: whether a run is still queued on this server. */
+    /** Whether a run is still queued on this server (used to refuse a second survey). */
     public static boolean hasPending(MinecraftServer server) {
         List<BlockSurveyRun> runs = RUNS.get(server);
         return runs != null && !runs.isEmpty();

@@ -232,6 +232,40 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
 - **Docs: `ground_patch`'s radius limit has a stated reason.** 16 is the largest disc that stays inside
   the chunks a feature may write (`ChunkStatus.FEATURES` writes one chunk out), while a placement
   modifier that moves the feature's origin into a neighbouring chunk can still reach past it.
+- **A `leaning` trunk's horizontal walk is capped at 12 blocks.** `slant_curve` is exponential, so
+  `slant_curve` 2.0 with `lean_length` 16 walked 131,071 blocks sideways — far outside the chunks a
+  feature is placed into, and the crown was attached there. The stalk now stops at 12 blocks of
+  total horizontal travel from the origin (the near-vertical lean counts). `slant_curve` 1.0 with a
+  `lean_length` of 13–16 is truncated at the same limit; every configuration that stayed inside 12
+  blocks (including 1.0 up to 12) generates exactly as before.
+- **A `leaning` trunk with `space_check` on keeps its crown on the last log it placed.** The fix for
+  the blocked cell moved the crown but left the returned attachment pointing at the intended end
+  position, so a decorator or `tip_crown_only` fan could still hang from a spot with no log under
+  it. The last attachment is now the last placed log itself. `space_check: false` keeps the old
+  geometry for packs that reproduce it deliberately.
+- **`/isekai survey blocks` no longer claims to stay under 8 ms.** Chunk generation runs on the
+  server thread inside the tick, so one chunk per tick means tens of milliseconds per chunk and TPS
+  drops for the length of the run; the tick loop can only decide whether to start another chunk, not
+  slice one. The docs and README now say so, and the per-chunk count is stated as a lower bound
+  because a later chunk's tree can still write into a chunk already counted.
+- **Only one `/isekai survey blocks` runs per server.** A second run inside the same window
+  interleaved with the first inside the same ticks and counted the same chunks twice; it is now
+  refused with a message naming the run that is still going.
+- **`isekai_api:pool`'s `shore_width` is taken out of `xz_radius`.** A radius plus a shore larger
+  than the 15 blocks a feature may reach was cut off at the chunk border, leaving a straight edge
+  instead of a bank. The effective radius is now `xz_radius` shrunk by `shore_width` (floor 1), so
+  `xz_radius` 14 with `shore_width` 6 reaches 15 rather than 19. Pools whose radius plus shore
+  already fit are unchanged.
+- **`/isekai fit` says which variant it measured.** The verdict describes one footprint — the first
+  template variant, unrotated — but the report looked like it covered every variant, and
+  `rotation: random` draws a different turn per chunk. The summary now names the measured template
+  and rotation, and the JSON carries `measured_template` / `measured_rotation`.
+
+### Changed
+
+- **`/isekai survey` caps `radius` at 128 instead of 512.** The scan is quadratic and runs inside the
+  command call on the server thread: 512 was 1,050,625 chunks of placement tests plus a generation
+  check for every candidate in one tick. 128 is 66,049 chunks; use several smaller runs instead.
 
 ### Known limitations
 

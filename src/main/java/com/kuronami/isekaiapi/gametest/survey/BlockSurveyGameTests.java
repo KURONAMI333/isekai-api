@@ -174,6 +174,49 @@ public final class BlockSurveyGameTests {
         });
     }
 
+    /**
+     * Generation runs on the server thread, so a second survey on the same server is refused with a
+     * reason instead of doubling what each tick spends inside the generator.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3", timeoutTicks = 400)
+    public static void secondSurveyIsRefusedWhileOneRuns(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        AtomicReference<BlockSurvey.Result> done = new AtomicReference<>();
+        AtomicReference<Throwable> error = new AtomicReference<>();
+        Params params = new Params("minecraft:oak_log", state -> state.is(Blocks.OAK_LOG), 0,
+                new ChunkPos((ORIGIN_X >> 4) + 2, ORIGIN_Z >> 4), null);
+        int firstQueued = BlockSurveyRun.start(level, params, done::set, error::set);
+        if (firstQueued != 1) {
+            helper.fail("the first survey queued " + firstQueued + " chunks, expected 1");
+            return;
+        }
+
+        String refusal = BlockSurveyRun.refusalReason(level.getServer());
+        if (refusal == null) {
+            helper.fail("a second survey was accepted while the first was still pending");
+            return;
+        }
+        if (!refusal.contains("already running")) {
+            helper.fail("the refusal does not say what is running: " + refusal);
+            return;
+        }
+        int secondQueued = BlockSurveyRun.start(level, params, result -> {}, throwable -> {});
+        if (secondQueued != -1) {
+            helper.fail("start returned " + secondQueued + " for a refused survey, expected -1");
+            return;
+        }
+
+        helper.succeedWhen(() -> {
+            if (error.get() != null) {
+                helper.fail("survey failed: " + error.get());
+            }
+            if (done.get() == null) {
+                helper.fail("the accepted survey did not finish");
+            }
+        });
+    }
+
     /** A biome filter is answered from the seed; a biome the world never uses generates nothing. */
     @PrefixGameTestTemplate(false)
     @GameTest(template = "empty3x3x3", timeoutTicks = 200)

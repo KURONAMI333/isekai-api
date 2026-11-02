@@ -3,6 +3,7 @@ package com.kuronami.isekaiapi.gametest.structure;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.kuronami.isekaiapi.IsekaiApi;
+import com.kuronami.isekaiapi.command.sub.SurveyCommand;
 import com.kuronami.isekaiapi.structure.GroundedTemplateStructure;
 import com.kuronami.isekaiapi.structure.GroundedTemplateStructure.MirrorMode;
 import com.kuronami.isekaiapi.structure.GroundedTemplateStructure.RotationMode;
@@ -195,6 +196,39 @@ public final class StructureSurveyGameTests {
         }
         if (!result.dimension().equals("minecraft:the_end")) {
             helper.fail("dimension reported as " + result.dimension());
+            return;
+        }
+        helper.succeed();
+    }
+
+    // ------------------------------------------------------------------
+
+    /**
+     * The structure survey scans its whole square on the server thread in one command call, so the
+     * radius a player can type is bounded: 512 was 1,050,625 chunks, 128 is 66,049.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3", timeoutTicks = 100)
+    public static void surveyRadiusIsBoundedAtTheCommand(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        var dispatcher = server.getCommands().getDispatcher();
+        var source = server.createCommandSourceStack();
+
+        if (SurveyCommand.MAX_RADIUS != 128) {
+            helper.fail("the structure survey bound is " + SurveyCommand.MAX_RADIUS
+                    + ", not the documented 128");
+            return;
+        }
+        var atMax = dispatcher.parse("isekai survey minecraft:village_plains 128", source);
+        if (!atMax.getExceptions().isEmpty() || atMax.getReader().canRead()) {
+            helper.fail("radius " + SurveyCommand.MAX_RADIUS + " did not parse: "
+                    + atMax.getExceptions());
+            return;
+        }
+        var past = dispatcher.parse("isekai survey minecraft:village_plains 129", source);
+        if (past.getExceptions().isEmpty() && !past.getReader().canRead()) {
+            helper.fail("radius " + (SurveyCommand.MAX_RADIUS + 1) + " parsed; the bound is not"
+                    + " applied to the command");
             return;
         }
         helper.succeed();

@@ -40,6 +40,13 @@ import org.jetbrains.annotations.ApiStatus;
  * exponential bend of a real palm instead of a constant-speed diagonal. A factor of 1.0 is the
  * old one-block-per-step behaviour, so existing datapacks that omit the field are unchanged.
  *
+ * <p><b>Horizontal travel is capped at {@value #MAX_HORIZONTAL_TRAVEL} blocks from the origin.</b>
+ * The cap covers the near-vertical lean and the stalk together. Without it an exponential stride
+ * runs away: {@code slant_curve} 2.0 with {@code lean_length} 16 walks {@code 2^17 - 1} blocks and
+ * leaves the 3x3 chunk region the feature stage hands a generator. A stalk longer than the budget
+ * (for example {@code lean_length} 13-16 at {@code slant_curve} 1.0) is cut at the same limit, so
+ * the walked shape is always the shape the region can hold.
+ *
  * <p>{@code space_check} makes the lean stop where the next block is occupied, so the crown stays
  * on the vertical trunk instead of floating in mid-air next to a neighbour. Setting it to
  * {@code false} restores the old behaviour of attaching a crown even where no log could be placed.
@@ -49,6 +56,17 @@ public class LeaningTrunkPlacer extends TrunkPlacer {
 
     /** Default {@code min_height}: shorter trees are skipped entirely. */
     private static final int DEFAULT_MIN_HEIGHT = 4;
+
+    /**
+     * Horizontal blocks one tree may travel from its origin, counting the near-vertical lean and
+     * the stalk together.
+     *
+     * <p>The feature stage gives a generator a 3x3 chunk region, which always covers 16 blocks in
+     * every direction from an origin inside the middle chunk, so 12 can be walked without a bounds
+     * check. It is also what keeps {@code slant_curve} honest: the exponential stride is meant to
+     * bend a tree, not to march it out of the loaded chunks.
+     */
+    public static final int MAX_HORIZONTAL_TRAVEL = 12;
 
     public static final MapCodec<LeaningTrunkPlacer> CODEC = RecordCodecBuilder.mapCodec(
             // Ten fields exceed what Products can fold from trunkPlacerParts, so the shared
@@ -153,6 +171,8 @@ public class LeaningTrunkPlacer extends TrunkPlacer {
         Direction lean = Direction.Plane.HORIZONTAL.getRandomDirection(random);
         int top = freeTreeHeight - 1;
         BlockPos.MutableBlockPos cursor = pos.mutable();
+        // Horizontal blocks travelled so far, bounded by MAX_HORIZONTAL_TRAVEL
+        int travelled = 0;
         if (this.convertGround) {
             setDirtAt(level, blockSetter, random, cursor.below(), config);
         }
@@ -161,6 +181,7 @@ public class LeaningTrunkPlacer extends TrunkPlacer {
         for (int y = 0; y <= top; y++) {
             if (y + 1 >= top + random.nextInt(2)) {
                 cursor.move(lean);
+                travelled++;
             }
             if (TreeFeature.validTreePos(level, cursor)) {
                 this.placeLog(level, blockSetter, random, cursor, config);
@@ -173,6 +194,7 @@ public class LeaningTrunkPlacer extends TrunkPlacer {
 
         // near-horizontal leaning stalk; crown drapes along it
         int leanLen = this.leanLength.sample(random);
+        BlockPos lastLog = null;
         FoliagePlacer.FoliageAttachment tip = null;
         lean:
         for (int i = 0; i <= leanLen; i++) {
@@ -183,13 +205,19 @@ public class LeaningTrunkPlacer extends TrunkPlacer {
                 }
             } else {
                 this.placeLog(level, blockSetter, random, cursor, config);
+                lastLog = cursor.immutable();
             }
             tip = new FoliagePlacer.FoliageAttachment(cursor.immutable(), 0, false);
             attachments.add(tip);
 
             int stride = horizontalStride(i);
             for (int step = 0; step < stride; step++) {
+                if (travelled >= MAX_HORIZONTAL_TRAVEL) {
+                    // the stalk used its horizontal budget; end it on the last log
+                    break lean;
+                }
                 cursor.move(lean);
+                travelled++;
                 // the intermediate blocks of a long stride still carry logs, so the stalk stays
                 // continuous; the final block is logged at the top of the next iteration
                 if (step == stride - 1) {
@@ -201,8 +229,19 @@ public class LeaningTrunkPlacer extends TrunkPlacer {
                     }
                 } else {
                     this.placeLog(level, blockSetter, random, cursor, config);
+                    lastLog = cursor.immutable();
                 }
             }
+        }
+
+        // A stride wider than one block logs its intermediate cells, so the last log can sit past
+        // the last attachment. With space_check on, the returned tip must name a log that exists, or
+        // a blocked stride leaves a crown behind the wood — and `tip_crown_only` would spray from
+        // the wrong place. With it off the old attachments are kept exactly as they were.
+        if (this.spaceCheck && lastLog != null && !attachments.isEmpty()
+                && !attachments.get(attachments.size() - 1).pos().equals(lastLog)) {
+            tip = new FoliagePlacer.FoliageAttachment(lastLog, 0, false);
+            attachments.set(attachments.size() - 1, tip);
         }
 
         // palm mode: one crown sprays from the bent tip rather than draping up the whole trunk

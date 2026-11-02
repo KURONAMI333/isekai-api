@@ -357,8 +357,8 @@ omitted from the builder chain.
 | `/isekai dump worldgen` | Write the full snapshot to `<world>/isekai_dump/worldgen.txt` |
 | `/isekai dump ore <id>` | Single-feature query |
 | `/isekai dump structure <id>` | Single-structure query |
-| `/isekai survey <structure> [radius]` | Replay placement over a square of chunks (default radius 64, max 512): candidate chunks, placements, and the gate that rejected the rest. Writes `<world>/isekai/survey/<ns>_<path>-r<radius>.json` |
-| `/isekai survey blocks <block\|#tag> [radius] [center <x y z>] [biome <biome\|#tag>]` | Generate the square (default radius 8, max 32) and count matching blocks per chunk: tree count, block count, mean/median/min/max, empty share, top-10% concentration and a histogram. One tree = one six-connected group of blocks inside a chunk. Writes `<world>/isekai/survey/blocks-<target>-r<radius>.json`; generates terrain to disk |
+| `/isekai survey <structure> [radius]` | Replay placement over a square of chunks (default radius 64, max 128): candidate chunks, placements, and the gate that rejected the rest. Runs on the server thread inside the command, so the run blocks the tick it started in (radius 128 is 66,049 chunks). Writes `<world>/isekai/survey/<ns>_<path>-r<radius>.json` |
+| `/isekai survey blocks <block\|#tag> [radius] [center <x y z>] [biome <biome\|#tag>]` | Generate the square (default radius 8, max 32) and count matching blocks per chunk: tree count, block count, mean/median/min/max, empty share, top-10% concentration and a histogram. One tree = one six-connected group of blocks inside a chunk. One chunk generates per tick and generation is synchronous (tens of ms per fresh chunk), so TPS drops for the length of the run; one run per server at a time. Writes `<world>/isekai/survey/blocks-<target>-r<radius>.json`; generates terrain to disk |
 | `/isekai fit <structure> [pos]` | The 3x3 surface grid under one chunk beside the gate limits, the verdict, and each template variant's Y span. Writes `<world>/isekai/fit/<ns>_<path>-<chunkX>_<chunkZ>.json` |
 
 All subcommands require permission level 2 (operators).

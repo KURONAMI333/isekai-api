@@ -259,6 +259,26 @@ class PoolFeatureTest {
                 "radius must keep reads inside the 3x3 chunk region available during worldgen");
     }
 
+    @Test
+    void shoreWidthIsTakenOutOfTheRadius() {
+        // A pool's reach is radius + 1 + shore_width. The radius the feature actually builds has to
+        // give way to the beach, or a wide shore runs past the 15 blocks the feature stage holds.
+        for (int shore = 0; shore <= PoolFeature.MAX_SHORE_WIDTH; shore++) {
+            for (int sampled = 1; sampled <= 64; sampled++) {
+                int radius = PoolFeature.radiusWithinRegion(sampled, shore);
+                assertTrue(radius >= 1, "radius fell to " + radius + " at sample " + sampled);
+                assertTrue(radius + 1 + shore <= 15,
+                        "sample " + sampled + " with shore " + shore + " reaches "
+                                + (radius + 1 + shore) + " blocks");
+            }
+        }
+        assertEquals(PoolFeature.MAX_RADIUS, PoolFeature.radiusWithinRegion(64, 0),
+                "shore_width 0 must keep the old clamp");
+        assertEquals(4, PoolFeature.radiusWithinRegion(4, 3),
+                "a pool that already fits must keep its radius");
+        assertEquals(8, PoolFeature.radiusWithinRegion(12, 6));
+    }
+
     // ------------------------------------------------------------------
     // Outline
     // ------------------------------------------------------------------

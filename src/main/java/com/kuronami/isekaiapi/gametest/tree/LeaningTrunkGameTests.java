@@ -3,10 +3,12 @@ package com.kuronami.isekaiapi.gametest.tree;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.kuronami.isekaiapi.IsekaiApi;
+import com.kuronami.isekaiapi.tree.LeaningTrunkPlacer;
 import com.mojang.serialization.JsonOps;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -80,6 +82,22 @@ public final class LeaningTrunkGameTests {
             , "slant_curve": 2.0
             """);
 
+    /**
+     * The longest stalk the codec allows at the steepest curve: {@code 1+2+4+...+2^16} = 131,071
+     * blocks sideways if the stride were followed without a budget.
+     */
+    private static final String STEEP_AND_LONG = """
+            {
+              "type": "isekai_api:leaning",
+              "base_height": 6,
+              "height_rand_a": 0,
+              "height_rand_b": 0,
+              "convert_ground": false,
+              "lean_length": {"type": "minecraft:constant", "value": 16},
+              "slant_curve": 2.0
+            }
+            """;
+
     private LeaningTrunkGameTests() {}
 
     /**
@@ -113,11 +131,17 @@ public final class LeaningTrunkGameTests {
         return (TreeConfiguration) feature.config();
     }
 
-    /** Runs {@code placeTrunk} against {@code level} and returns the crown sites it emitted. */
+    /**
+     * Runs {@code placeTrunk} against {@code level} and returns the crown sites it emitted.
+     *
+     * <p>The setter copies the position: {@code TrunkPlacer} hands the placer's own mutable cursor to
+     * the consumer, so a map keyed by it keeps one object that moves, and insertion order is lost.
+     */
     private static List<BlockPos> attachments(TreeConfiguration config, LevelSimulatedReader level,
                                               BlockPos origin, Map<BlockPos, BlockState> writes) {
         List<FoliagePlacer.FoliageAttachment> placements = config.trunkPlacer.placeTrunk(
-                level, writes::put, RandomSource.create(SEED), TREE_HEIGHT, origin, config);
+                level, (pos, state) -> writes.put(pos.immutable(), state),
+                RandomSource.create(SEED), TREE_HEIGHT, origin, config);
         List<BlockPos> positions = new ArrayList<>(placements.size());
         for (FoliagePlacer.FoliageAttachment placement : placements) {
             positions.add(placement.pos());
@@ -197,8 +221,10 @@ public final class LeaningTrunkGameTests {
     }
 
     /**
-     * {@code slant_curve} lengthens each step, so the same lean_length reaches further while the
-     * number of crown sites stays the same.
+     * {@code slant_curve} lengthens each step, so the same {@code lean_length} reaches further. The
+     * horizontal budget bounds that reach, so the curved stalk cannot also keep the straight one's
+     * crown count — it is cut one step before its last intended site. What must hold is that the
+     * budget only ever removes sites.
      */
     @PrefixGameTestTemplate(false)
     @GameTest(template = "empty3x3x3")
@@ -211,15 +237,118 @@ public final class LeaningTrunkGameTests {
 
         int straightMax = maxSideways(origin, straight);
         int curvedMax = maxSideways(origin, curved);
-        if (curvedMax < straightMax + 8) {
-            helper.fail("slant_curve 2.0 should reach much further than 1.0: "
+        // How much further is bounded by the horizontal budget, not by the old "+8 blocks"
+        // expectation: with the cap the step counts are 1, 2, 4, 8 and the stalk is cut at 12.
+        if (curvedMax <= straightMax) {
+            helper.fail("slant_curve 2.0 should reach further than 1.0: "
                     + curvedMax + " vs " + straightMax);
             return;
         }
-        if (curved.size() != straight.size()) {
-            helper.fail("slant_curve changed the number of crown sites: " + curved.size()
-                    + " vs " + straight.size());
+        if (curvedMax > LeaningTrunkPlacer.MAX_HORIZONTAL_TRAVEL) {
+            helper.fail("slant_curve 2.0 reached " + curvedMax + " blocks, past the budget of "
+                    + LeaningTrunkPlacer.MAX_HORIZONTAL_TRAVEL);
             return;
+        }
+        if (curved.size() > straight.size()) {
+            helper.fail("slant_curve added crown sites: " + curved.size() + " vs "
+                    + straight.size() + "; the budget can only cut the stalk short");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The stride doubles each step, so the steepest curve on the longest stem has to stop at
+     * {@link LeaningTrunkPlacer#MAX_HORIZONTAL_TRAVEL}; without the budget this walk is over a
+     * hundred thousand blocks and leaves the 3x3 chunk region the feature stage holds.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void slantCurveTravelStopsAtTheLimit(GameTestHelper helper) {
+        BlockPos origin = new BlockPos(0, 100, 0);
+        Map<BlockPos, BlockState> writes = new LinkedHashMap<>();
+        List<BlockPos> sites = attachments(config(helper, STEEP_AND_LONG),
+                new FakeLevel(Set.of()), origin, writes);
+
+        int furthest = 0;
+        for (BlockPos pos : writes.keySet()) {
+            int offset = sideways(origin, pos);
+            furthest = Math.max(furthest, offset);
+            if (offset > LeaningTrunkPlacer.MAX_HORIZONTAL_TRAVEL) {
+                helper.fail("a log sits " + offset + " blocks out, past the budget of "
+                        + LeaningTrunkPlacer.MAX_HORIZONTAL_TRAVEL);
+                return;
+            }
+        }
+        if (furthest < LeaningTrunkPlacer.MAX_HORIZONTAL_TRAVEL) {
+            helper.fail("the stalk stopped at " + furthest + " blocks, before spending the "
+                    + LeaningTrunkPlacer.MAX_HORIZONTAL_TRAVEL + "-block budget");
+            return;
+        }
+        int sitesMax = maxSideways(origin, sites);
+        if (sitesMax > LeaningTrunkPlacer.MAX_HORIZONTAL_TRAVEL) {
+            helper.fail("a crown site sits " + sitesMax + " blocks out, past the budget");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * A stride wider than one block logs the cells between two crown sites. When the last of those
+     * is occupied, the stalk stops there — and the returned tip has to be the last log that exists,
+     * not the last step that started, or the crown sits behind wood the tree did grow.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void blockedStrideKeepsTheTipOnTheLastLog(GameTestHelper helper) {
+        BlockPos origin = new BlockPos(0, 100, 0);
+        TreeConfiguration config = config(helper, STEEP_CURVE);
+        Map<BlockPos, BlockState> freeWrites = new LinkedHashMap<>();
+        List<BlockPos> freeSites = attachments(config, new FakeLevel(Set.of()), origin, freeWrites);
+        Set<BlockPos> sites = new HashSet<>(freeSites);
+
+        // The last stride-internal log that follows another one: blocking it leaves wood behind the
+        // last crown site, which is the case that used to end the stalk on the wrong cell.
+        List<BlockPos> order = new ArrayList<>(freeWrites.keySet());
+        BlockPos blocked = null;
+        for (int i = 1; i < order.size(); i++) {
+            if (!sites.contains(order.get(i)) && !sites.contains(order.get(i - 1))) {
+                blocked = order.get(i);
+            }
+        }
+        if (blocked == null) {
+            helper.fail("the steep trunk placed no stride-internal log after another one: " + order);
+            return;
+        }
+
+        Map<BlockPos, BlockState> blockedWrites = new LinkedHashMap<>();
+        List<BlockPos> blockedSites = attachments(config, new FakeLevel(Set.of(blocked)), origin,
+                blockedWrites);
+        BlockPos lastLog = null;
+        for (BlockPos pos : blockedWrites.keySet()) {
+            lastLog = pos;
+        }
+        if (lastLog == null) {
+            helper.fail("blocking " + blocked.subtract(origin) + " left no log at all");
+            return;
+        }
+        if (blockedWrites.containsKey(blocked)) {
+            helper.fail("the occupied cell " + blocked.subtract(origin) + " was logged");
+            return;
+        }
+        BlockPos tip = blockedSites.get(blockedSites.size() - 1);
+        if (!tip.equals(lastLog)) {
+            helper.fail("the tip is at " + tip.subtract(origin) + " but the stalk ends at "
+                    + lastLog.subtract(origin) + ", so wood is left past the crown");
+            return;
+        }
+        int tipOffset = sideways(origin, lastLog);
+        for (BlockPos pos : blockedWrites.keySet()) {
+            if (sideways(origin, pos) > tipOffset) {
+                helper.fail("a log at " + pos.subtract(origin) + " sits past the tip at "
+                        + lastLog.subtract(origin));
+                return;
+            }
         }
         helper.succeed();
     }

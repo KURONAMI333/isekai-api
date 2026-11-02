@@ -43,8 +43,10 @@ import org.jetbrains.annotations.Nullable;
  *       why it does not. Nothing is generated; see {@link StructureSurvey}.</li>
  *   <li>{@code /isekai survey blocks <block|#tag> [radius] [center] [biome <biome|#tag>]} — how many
  *       trees (or other blocks) each generated chunk really got. This one generates the square to
- *       {@code FEATURES}, spread over ticks, and writes the terrain to disk like a player walking
- *       there; see {@link BlockSurvey} for what "one tree" means.</li>
+ *       {@code FEATURES}, one chunk per tick, and writes the terrain to disk like a player walking
+ *       there; see {@link BlockSurvey} for what "one tree" means. Generation is synchronous on the
+ *       server thread (tens of ms per fresh chunk), so TPS drops while it runs and only one survey
+ *       runs at a time.</li>
  * </ul>
  *
  * <p>Both write JSON to {@code <world>/isekai/survey/} and print the same numbers to chat.
@@ -55,8 +57,13 @@ public final class SurveyCommand {
     /** Radius in chunks used by the structure survey when the command is given no argument. */
     public static final int DEFAULT_RADIUS = 64;
 
-    /** Upper bound for the structure survey, so a typo cannot turn into a minute of work. */
-    public static final int MAX_RADIUS = 512;
+    /**
+     * Upper bound for the structure survey. 128 is a 257x257 square (66,049 chunks), 16 times fewer
+     * than 512's 1,050,625. Nothing is generated to disk, but every scanned chunk runs the placement
+     * test and every candidate runs {@code Structure#generate}, all on the server thread in one
+     * command call — a typo at the old limit could hold the server long enough for the watchdog.
+     */
+    public static final int MAX_RADIUS = 128;
 
     private SurveyCommand() {}
 
@@ -127,15 +134,23 @@ public final class SurveyCommand {
 
         BlockPos middle = center != null ? center : BlockPos.containing(source.getPosition());
         ChunkPos centerChunk = new ChunkPos(middle);
+        ServerLevel level = source.getLevel();
+        String refusal = BlockSurveyRun.refusalReason(level.getServer());
+        if (refusal != null) {
+            source.sendFailure(Component.literal("survey blocks " + target.asPrintable() + ": "
+                    + refusal));
+            return 0;
+        }
         BlockSurvey.Params params = new BlockSurvey.Params(target.asPrintable(), matches, radius,
                 centerChunk, biomes);
-        ServerLevel level = source.getLevel();
 
         int queued = BlockSurveyRun.start(level, params, result -> report(source, params, result),
                 error -> source.sendFailure(Component.literal("survey failed: " + error.getMessage())));
         source.sendSuccess(() -> Component.literal("survey blocks " + target.asPrintable() + ": generating "
                 + queued + " chunks around chunk " + centerChunk.x + "," + centerChunk.z
-                + " (radius " + radius + "), over ticks"), false);
+                + " (radius " + radius + "), one chunk per tick at best. Generation runs on the"
+                + " server thread and a fresh chunk costs tens of ms, so TPS drops while this runs."),
+                false);
         return 1;
     }
 

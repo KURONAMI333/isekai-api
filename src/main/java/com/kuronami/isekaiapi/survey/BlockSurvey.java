@@ -56,8 +56,15 @@ import org.jetbrains.annotations.Nullable;
  * palms" and "few tall palms" can be told apart.
  *
  * <p>Chunks are generated to {@code FEATURES}, the stage where features (trees) have been placed but
- * lighting and spawn work have not. The chunk is then counted and released; the command spreads this
- * over ticks so a survey does not stall a server tick for the whole square.
+ * lighting and spawn work have not. Generation is <b>synchronous on the server thread</b>: a fresh
+ * chunk costs tens of milliseconds, and {@code BlockSurveyRun} can only decide after each chunk
+ * whether to keep going in this tick. A survey therefore lowers TPS for about one tick per chunk, and
+ * only one runs per server at a time.
+ *
+ * <p>Each chunk is counted the moment its own {@code FEATURES} stage finishes, before its neighbours
+ * generate. A tree rooted in a later chunk can still write logs or leaves into a chunk that was
+ * already counted, so a per-chunk count is a lower bound — noticeably more so for a leaf tag than
+ * for a log tag, because a crown reaches further across the border than a trunk does.
  */
 @ApiStatus.Internal
 public final class BlockSurvey {

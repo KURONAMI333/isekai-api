@@ -260,6 +260,51 @@ public final class FootprintCheckGameTests {
         helper.succeed();
     }
 
+    /**
+     * The gates judge one footprint, so the report must say which one. With two variants of
+     * different size the summary and the JSON name the first, unrotated — otherwise the numbers read
+     * as if every shape the structure can place had been measured.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void reportNamesTheVariantItMeasured(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        ResourceLocation first = ResourceLocation.fromNamespaceAndPath("isekai_api_test", "fit_house_first");
+        ResourceLocation second = ResourceLocation.fromNamespaceAndPath("isekai_api_test", "fit_house_second");
+        capture(level, 9500, 5300, HOUSE_SIZE, first);
+        capture(level, 9520, 5300, new Vec3i(9, 6, 9), second);
+
+        Structure structure = structure(level, List.of(Biomes.PLAINS),
+                List.of(new Variant(first), new Variant(second)), 2);
+        ChunkPos chunkPos = new ChunkPos(9500 >> 4, 5300 >> 4);
+        FootprintCheck.Result result = FootprintCheck.run(level, structure,
+                "isekai_api_test:fit_house_first", List.of(set(structure, 4715)), chunkPos);
+
+        if (result.variants().size() != 2) {
+            helper.fail("expected two variants, got " + result.variants().size());
+            return;
+        }
+        String summary = String.join("\n", result.summary());
+        if (!summary.contains(first + " at rotation none")) {
+            helper.fail("the summary does not name the measured variant and rotation:\n" + summary);
+            return;
+        }
+        if (summary.contains(second + " at rotation none")) {
+            helper.fail("the summary claims the second variant was judged:\n" + summary);
+            return;
+        }
+        JsonObject json = JsonParser.parseString(result.toJsonString()).getAsJsonObject();
+        if (!json.get("measured_template").getAsString().equals(first.toString())) {
+            helper.fail("json measured_template is " + json.get("measured_template"));
+            return;
+        }
+        if (!json.get("measured_rotation").getAsString().equals("none")) {
+            helper.fail("json measured_rotation is " + json.get("measured_rotation"));
+            return;
+        }
+        helper.succeed();
+    }
+
     // ------------------------------------------------------------------
 
     private static StructureSet set(Structure structure, int salt) {
@@ -271,6 +316,19 @@ public final class FootprintCheckGameTests {
                                        List<ResourceKey<Biome>> biomes,
                                        ResourceLocation template, int clearance) {
         return structure(level, biomes, template, clearance, 4);
+    }
+
+    private static Structure structure(ServerLevel level,
+                                       List<ResourceKey<Biome>> biomes,
+                                       List<Variant> variants, int clearance) {
+        HolderSet<Biome> holders = HolderSet.direct(biomes.stream()
+                .map(key -> level.registryAccess().lookupOrThrow(Registries.BIOME).getOrThrow(key))
+                .toList());
+        Structure.StructureSettings settings = new Structure.StructureSettings(holders, Map.of(),
+                GenerationStep.Decoration.SURFACE_STRUCTURES, TerrainAdjustment.NONE);
+        return new GroundedTemplateStructure(settings, variants,
+                GroundedTemplateStructure.NO_PROCESSORS, RotationMode.NONE, MirrorMode.NONE,
+                clearance, 4, VERTICAL_OFFSET);
     }
 
     private static Structure structure(ServerLevel level,

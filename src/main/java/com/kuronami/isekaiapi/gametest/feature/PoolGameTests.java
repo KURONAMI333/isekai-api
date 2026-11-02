@@ -41,6 +41,8 @@ public final class PoolGameTests {
     private static final int SLOT_DEFAULT_X = 5000;
     private static final int SLOT_ZERO_X = 5100;
     private static final int SLOT_SHORE_X = 5200;
+    /** A pool whose sampled radius plus shore would reach past the feature stage's 3x3 chunks. */
+    private static final int SLOT_WIDE_X = 5300;
 
     /** The configured features all use this radius/depth; the radius is a bare int, not a provider. */
     private static final int RADIUS = 4;
@@ -109,6 +111,42 @@ public final class PoolGameTests {
 
     // ------------------------------------------------------------------
 
+    /**
+     * The beach comes out of the radius, not out of the chunk region. A pool's reach is
+     * {@code radius + 1 + shore_width}; a full 14 with a 6-wide shore would ask for a chunk the
+     * feature stage does not hold, and the sand would be cut at the border without a word.
+     * {@code xz_radius: 12, shore_width: 6} therefore builds radius 8, whose widest write is 15.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void wideShoreShrinksTheRadius(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos origin = prepare(level, SLOT_WIDE_X, SLOT_Z);
+        if (!place(helper, level, "pool_wide", origin)) {
+            helper.fail("the pool did not place on flat stone with a 6-block-thick plate");
+            return;
+        }
+
+        int widest = widestOffset(level, origin, Blocks.SAND, 20);
+        if (widest > 15) {
+            helper.fail("xz_radius 12 with shore_width 6 reached " + widest + " blocks out; the"
+                    + " feature stage only holds 15, so the rim was cut");
+            return;
+        }
+        if (widest <= RADIUS + 1) {
+            helper.fail("the wide shore only reached " + widest + " blocks out, no further than a"
+                    + " plain rim; the beach did not grow into the radius left for it");
+            return;
+        }
+        if (count(level, origin, Blocks.WATER) == 0) {
+            helper.fail("the shrunk radius left no water");
+            return;
+        }
+        helper.succeed();
+    }
+
+    // ------------------------------------------------------------------
+
     /** Flat stone plate with air above; returns the air cell over its centre (the pool origin). */
     private static BlockPos prepare(ServerLevel level, int x, int z) {
         level.getChunk(SectionPos.blockToSectionCoord(x), SectionPos.blockToSectionCoord(z));
@@ -156,10 +194,16 @@ public final class PoolGameTests {
 
     /** Largest Chebyshev horizontal distance from the origin at which {@code block} appears. */
     private static int widestOffset(ServerLevel level, BlockPos origin, net.minecraft.world.level.block.Block block) {
+        return widestOffset(level, origin, block, RELATIVE_RADIUS);
+    }
+
+    /** As above, scanning {@code reach} blocks out (a wide shore reaches further than a plain rim). */
+    private static int widestOffset(ServerLevel level, BlockPos origin,
+                                    net.minecraft.world.level.block.Block block, int reach) {
         int widest = -1;
         for (BlockPos pos : BlockPos.betweenClosed(
-                origin.offset(-RELATIVE_RADIUS, -DEPTH - 2, -RELATIVE_RADIUS),
-                origin.offset(RELATIVE_RADIUS, DEPTH + 2, RELATIVE_RADIUS))) {
+                origin.offset(-reach, -DEPTH - 2, -reach),
+                origin.offset(reach, DEPTH + 2, reach))) {
             if (!level.getBlockState(pos).is(block)) {
                 continue;
             }

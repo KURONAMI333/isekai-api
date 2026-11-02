@@ -34,6 +34,12 @@ import org.jetbrains.annotations.ApiStatus;
  * corners — and this report says so rather than letting an author tune against columns the
  * structure never looks at.
  *
+ * <p>The verdict describes <b>one</b> footprint: the first template variant, unrotated. A structure
+ * that lists several variants, or leaves {@code rotation} at {@code random}, is judged on
+ * {@code variants[0]} at {@code rotation none} here, and the report says so — a quarter-turned
+ * variant covers different ground, and {@code random} is drawn per placement, so no single answer
+ * describes every chunk.
+ *
  * <p>Nothing is placed and no chunk is generated: like {@link StructureSurvey} this only reads the
  * noise sampler's heights.
  */
@@ -145,6 +151,11 @@ public final class FootprintCheck {
                 variantJson.add(entry);
             }
             root.add("templates", variantJson);
+            // The gates and the template list describe one shape: the first variant at rotation
+            // none. Naming it in the file keeps the numbers from reading as "all variants".
+            root.addProperty("measured_template",
+                    variants.isEmpty() ? null : variants.get(0).template().toString());
+            root.addProperty("measured_rotation", "none");
             return root;
         }
 
@@ -197,6 +208,11 @@ public final class FootprintCheck {
                 lines.add("  note: no structure set offers this chunk"
                         + (structureSets.isEmpty() ? " (the structure is in no set)" : "")
                         + " — an empty chunk here is the placement's answer, not the gates'");
+            }
+            if (!variants.isEmpty()) {
+                lines.add("  measured on " + variants.get(0).template() + " at rotation none (the"
+                        + " first variant); other variants and turns cover other ground and are"
+                        + " not judged here");
             }
             return lines;
         }
