@@ -63,6 +63,14 @@ public final class WoodSetGameTests {
         return set;
     }
 
+    private static WoodSet nonFlammable() {
+        WoodSet set = WoodSetTestFixtures.nonFlammable;
+        if (set == null) {
+            throw new IllegalStateException("wood-set fixtures were not registered — this must run on a GameTest server");
+        }
+        return set;
+    }
+
     /** Every selected part exists, and both halves of each paired part are bound. */
     @PrefixGameTestTemplate(false)
     @GameTest(template = "empty3x3x3")
@@ -195,6 +203,39 @@ public final class WoodSetGameTests {
         compareFire(helper, level, pos, "trapdoor", set.trapdoor().orElseThrow().get(), Blocks.OAK_TRAPDOOR, 0, 0);
         compareFire(helper, level, pos, "sign", set.sign().orElseThrow().get(), Blocks.OAK_SIGN, 0, 0);
 
+        helper.succeed();
+    }
+
+    /**
+     * {@code flammable(false)} keeps the set out of the fire odds map, so neither the log nor the
+     * planks spread fire or burn away, while a default set still does.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void nonFlammableSetDoesNotBurn(GameTestHelper helper) {
+        WoodSet set = nonFlammable();
+        if (set.isFlammable()) {
+            helper.fail("the fixture declared flammable(false) still reports isFlammable()");
+            return;
+        }
+        BlockPos pos = helper.absolutePos(new BlockPos(1, 1, 1));
+        ServerLevel level = helper.getLevel();
+        for (String part : List.of("log", "planks")) {
+            Block block = part.equals("log") ? set.log().orElseThrow().get() : set.planks().orElseThrow().get();
+            BlockState state = block.defaultBlockState();
+            int spread = state.getFireSpreadSpeed(level, pos, Direction.UP);
+            int flammable = state.getFlammability(level, pos, Direction.UP);
+            if (spread != 0 || flammable != 0) {
+                helper.fail(part + " of a flammable(false) set is " + spread + "/" + flammable
+                        + " instead of 0/0");
+                return;
+            }
+        }
+        // The default is still on: a set that never asked is flammable like oak.
+        if (!full().isFlammable()) {
+            helper.fail("the default fixture reports isFlammable() == false");
+            return;
+        }
         helper.succeed();
     }
 

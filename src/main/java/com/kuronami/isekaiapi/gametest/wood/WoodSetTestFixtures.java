@@ -63,6 +63,9 @@ public final class WoodSetTestFixtures {
     /** Log and planks only. Assigned only for a GameTest server or a data run. */
     public static WoodSet sparse;
 
+    /** Log and planks declared {@code flammable(false)}. Assigned only for a GameTest server or a data run. */
+    public static WoodSet nonFlammable;
+
     private WoodSetTestFixtures() {}
 
     /** Whether the fixtures exist in this process. */
@@ -104,6 +107,13 @@ public final class WoodSetTestFixtures {
                 .log().planks()
                 .mapColor(MapColor.COLOR_LIGHT_BLUE)
                 .register(BLOCKS, ITEMS);
+
+        nonFlammable = WoodSet
+                .builder(ResourceLocation.fromNamespaceAndPath(TEST_MODID, "stone_wood"))
+                .log().planks()
+                .flammable(false)
+                .mapColor(MapColor.STONE)
+                .register(BLOCKS, ITEMS);
     }
 
     /**
@@ -120,5 +130,7 @@ public final class WoodSetTestFixtures {
                 .displayName("Test Wood", "テストウッド"));
         wood.add(sparse, new WoodSetDataGen.Overrides()
                 .displayName("Sparse Wood", "スパースウッド"));
+        wood.add(nonFlammable, new WoodSetDataGen.Overrides()
+                .displayName("Stone Wood", "ストーンウッド"));
     }
 }

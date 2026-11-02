@@ -1,5 +1,6 @@
 package com.kuronami.isekaiapi.command.sub;
 
+import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.impl.wood.validation.WoodSetAudit;
 import com.kuronami.isekaiapi.validation.DimensionDiagnostics;
 import com.kuronami.isekaiapi.validation.IsekaiValidator;
@@ -45,12 +46,21 @@ public final class ValidateCommand {
                     String ns = StringArgumentType.getString(ctx, "namespace");
                     var rm = ctx.getSource().getServer().getResourceManager();
                     var result = IsekaiValidator.validateNamespace(ns, rm);
-                    var wood = WoodSetAudit.audit(ns, rm);
+                    // Report what already succeeded first: a crash in the audit must not hide it.
                     ctx.getSource().sendSuccess(() ->
                             Component.literal(String.format("Validated %d files, %d errors found",
                                     result.filesChecked(), result.errorsFound())), false);
                     for (String err : result.errors()) {
                         ctx.getSource().sendFailure(Component.literal("  " + err));
+                    }
+                    WoodSetAudit.Report wood;
+                    try {
+                        wood = WoodSetAudit.audit(ns, rm);
+                    } catch (RuntimeException e) {
+                        IsekaiApi.LOGGER.warn("[Isekai] the wood-set audit for {} failed", ns, e);
+                        ctx.getSource().sendFailure(Component.literal(
+                                "  [audit] the wood-set audit failed; the log has the cause"));
+                        return 0;
                     }
                     if (wood.sets() > 0) {
                         ctx.getSource().sendSuccess(

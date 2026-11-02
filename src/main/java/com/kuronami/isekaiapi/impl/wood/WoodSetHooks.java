@@ -29,8 +29,10 @@ import org.jetbrains.annotations.ApiStatus;
  *   <li>sign and hanging-sign block entities — {@link BlockEntityTypeAddBlocksEvent} adds this
  *       set's sign blocks to vanilla's {@code SIGN} / {@code HANGING_SIGN} types.</li>
  *   <li>flammability — {@link FMLCommonSetupEvent} writes vanilla oak's fire odds into
- *       {@code FireBlock} (its odds map has no data-driven form in 1.21.1); the same setup step
- *       registers the dispenser behaviour that places the set's boats.</li>
+ *       {@code FireBlock} (its odds map has no data-driven form in 1.21.1); a set declared with
+ *       {@code flammable(false)} is skipped, and its data generator tags it out of
+ *       {@code logs_that_burn}. The same setup step registers the dispenser behaviour that places
+ *       the set's boats.</li>
  *   <li>compostability — {@link DataMapsUpdatedEvent} adds this set's leaves and sapling to the
  *       live {@code neoforge:compostables} map on the server, without replacing an entry the
  *       data map file or a datapack already set.</li>
@@ -67,6 +69,9 @@ public final class WoodSetHooks {
         event.enqueueWork(() -> {
             FireBlock fire = (FireBlock) Blocks.FIRE;
             for (WoodSet set : WoodSets.all()) {
+                if (!set.isFlammable()) {
+                    continue;
+                }
                 // Same odds as vanilla oak: sawn blocks spread fire and burn out at 5/20, the
                 // bark-covered pillar blocks and their stripped versions at 5/5, leaves at 30/60.
                 set.planks().ifPresent(block -> fire.setFlammable(block.get(), 5, 20));

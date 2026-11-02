@@ -643,6 +643,142 @@ public final class TreeDecoratorGameTests {
         helper.succeed();
     }
 
+    /**
+     * A 2x2 trunk writes its ground blocks through the trunk setter, one per column. A decorator that
+     * reuses the lowest log has to skip all four: before the fix only the first was dropped, so the
+     * other three stayed in the list, the inherited stub block came back as dirt, and the stub base
+     * moved one block down.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void giantTrunkGroundBlocksDoNotBecomeStubs(GameTestHelper helper) {
+        BlockPos origin = TreeTestScenes.prepare(helper, 22);
+        // No block_provider: the stub reuses whatever the tree's lowest log is.
+        String northStubs = "{\"type\": \"isekai_api:branch_stubs\", "
+                + "\"count\": {\"type\": \"minecraft:constant\", \"value\": 4}, "
+                + "\"length\": {\"type\": \"minecraft:constant\", \"value\": 1}, "
+                + "\"start_fraction\": 0.0, \"upward_chance\": 0.0, \"directions\": [\"north\"]}";
+        String giantTrunk = "{\"type\": \"minecraft:giant_trunk_placer\", "
+                + "\"base_height\": 4, \"height_rand_a\": 0, \"height_rand_b\": 0}";
+        ConfiguredFeature<?, ?> tree = TreeTestScenes.parseTree(helper, northStubs, NO_FOLIAGE, giantTrunk);
+        if (!TreeTestScenes.place(helper, tree, origin)) {
+            helper.fail("the 2x2-trunk tree did not place at all");
+            return;
+        }
+        // Four columns for three layers, plus the single log the top layer of a giant trunk keeps.
+        int trunkLogs = 0;
+        for (int dy = 0; dy <= 3; dy++) {
+            for (int dx = 0; dx <= 1; dx++) {
+                for (int dz = 0; dz <= 1; dz++) {
+                    if (dy == 3 && (dx != 0 || dz != 0)) {
+                        continue;
+                    }
+                    if (helper.getLevel().getBlockState(origin.offset(dx, dy, dz)).is(Blocks.OAK_LOG)) {
+                        trunkLogs++;
+                    }
+                }
+            }
+        }
+        if (trunkLogs != 13) {
+            helper.fail("expected the 13 logs of a 2x2 base_height-4 trunk, found " + trunkLogs);
+            return;
+        }
+        int stubs = 0;
+        for (BlockPos pos : BlockPos.betweenClosed(origin.offset(-2, 0, -2), origin.offset(3, 3, 3))) {
+            boolean inTrunk = pos.getX() >= origin.getX() && pos.getX() <= origin.getX() + 1
+                    && pos.getZ() >= origin.getZ() && pos.getZ() <= origin.getZ() + 1;
+            BlockState state = helper.getLevel().getBlockState(pos);
+            if (inTrunk || state.isAir()) {
+                continue;
+            }
+            if (state.is(Blocks.DIRT)) {
+                helper.fail("dirt at " + pos + " above the ground layer: a decorator inherited a ground block");
+                return;
+            }
+            if (state.is(Blocks.OAK_LOG)) {
+                stubs++;
+                if (state.getValue(BlockStateProperties.AXIS) != Direction.Axis.Z) {
+                    helper.fail("a north-going stub kept axis " + state.getValue(BlockStateProperties.AXIS));
+                    return;
+                }
+            }
+        }
+        if (stubs == 0) {
+            helper.fail("no stub grew above the ground layer, so the ground blocks were not skipped");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * A decorator-written leaf keeps its pinned distance only until the leaf ticker recomputes it:
+     * after the tree feature's closing shape pass, leaves within six steps of a log keep their
+     * distance and stay, while ones further out become distance 7 and are removed by a random tick.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void decoratorLeavesDecayBeyondSixStepsFromLog(GameTestHelper helper) {
+        BlockPos origin = TreeTestScenes.prepare(helper, 23);
+        // One eight-block run of leaf stubs north of the top log: steps 1..6 are reachable, 7..8 not.
+        String leafStub = "{\"type\": \"isekai_api:branch_stubs\", "
+                + JUNGLE_LEAVES_PROVIDER + ", "
+                + "\"count\": {\"type\": \"minecraft:constant\", \"value\": 16}, "
+                + "\"length\": {\"type\": \"minecraft:constant\", \"value\": 8}, "
+                + "\"start_fraction\": 1.0, \"upward_chance\": 0.0, \"directions\": [\"north\"]}";
+        ConfiguredFeature<?, ?> tree = TreeTestScenes.parseTree(helper, leafStub, NO_FOLIAGE, trunk(4));
+        if (!TreeTestScenes.place(helper, tree, origin)) {
+            helper.fail("the leaf-stub tree did not place at all");
+            return;
+        }
+        BlockPos tip = origin.above(3);
+        if (!helper.getLevel().getBlockState(tip.north(8)).is(Blocks.JUNGLE_LEAVES)) {
+            helper.fail("the eight-block leaf strand was not placed, so there is nothing to tick");
+            return;
+        }
+        // Let the shape-edge pass schedule its leaf ticks, then check what the ticker decided. The
+        // tree grows in a chunk that was generated on demand, not one the test structures sit in,
+        // so the chunk has to be forced for its scheduled block ticks to run at all.
+        int chunkX = origin.getX() >> 4;
+        int chunkZ = origin.getZ() >> 4;
+        helper.getLevel().setChunkForced(chunkX, chunkZ, true);
+        helper.runAfterDelay(20, () -> {
+            helper.getLevel().setChunkForced(chunkX, chunkZ, false);
+            for (int step = 1; step <= 6; step++) {
+                BlockPos pos = tip.north(step);
+                BlockState state = helper.getLevel().getBlockState(pos);
+                if (!state.is(Blocks.JUNGLE_LEAVES)) {
+                    helper.fail("leaf " + step + ", within six steps of the log, is " + state);
+                    return;
+                }
+                if (state.getValue(LeavesBlock.DISTANCE) > step) {
+                    helper.fail("leaf " + step + " is at distance " + state.getValue(LeavesBlock.DISTANCE)
+                            + " instead of " + step);
+                    return;
+                }
+            }
+            for (int step = 7; step <= 8; step++) {
+                BlockPos pos = tip.north(step);
+                BlockState state = helper.getLevel().getBlockState(pos);
+                if (state.isAir()) {
+                    continue;
+                }
+                if (!state.is(Blocks.JUNGLE_LEAVES) || state.getValue(LeavesBlock.DISTANCE) < 7) {
+                    helper.fail("leaf " + step + " was recomputed to " + state + " instead of distance 7");
+                    return;
+                }
+                // helper.randomTick takes a relative position, and this chunk is far from the test
+                // structure, so tick the block directly at the absolute position instead.
+                var level = helper.getLevel();
+                level.getBlockState(pos).randomTick(level, pos, level.random);
+                if (!helper.getLevel().getBlockState(pos).isAir()) {
+                    helper.fail("leaf " + step + " at distance 7 survived a random tick");
+                    return;
+                }
+            }
+            helper.succeed();
+        });
+    }
+
     /** A straight trunk of a fixed height, for tests that only care about what grows on it. */
     private static String trunk(int height) {
         return "{\"type\": \"minecraft:straight_trunk_placer\", "

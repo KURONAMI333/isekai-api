@@ -53,7 +53,9 @@ public final class WoodBlockTagProvider extends BlockTagsProvider {
             var appender = tag(logs);
             gen.blocks(WoodPart.LOG, WoodPart.WOOD, WoodPart.STRIPPED_LOG, WoodPart.STRIPPED_WOOD)
                     .forEach(appender::add);
-            tag(BlockTags.LOGS_THAT_BURN).addTag(logs);
+            // logs_that_burn is what vanilla consults when a fire block looks for fuel; a set that
+            // is not wood declares itself in the plain logs tag instead.
+            tag(gen.set().isFlammable() ? BlockTags.LOGS_THAT_BURN : BlockTags.LOGS).addTag(logs);
         }
 
         gen.blocks(WoodPart.PLANKS).forEach(block -> tag(BlockTags.PLANKS).add(block));

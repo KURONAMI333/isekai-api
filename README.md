@@ -156,9 +156,9 @@ Wire either rule into your dimension's `surface_rule` sequence — prepend `worl
 
 A third rule, **`isekai_api:strata`**, takes an ordered list of `{block, thickness}` bands measured downward from the floor surface — collapses an N-layer nested `stone_depth` sequence (e.g. sand → sandstone → stone) into one flat list.
 
-### Tree placers — neutral, decay-safe geometry
+### Tree placers — neutral geometry
 
-Used as the `trunk_placer` / `foliage_placer` of a vanilla `minecraft:tree` configured feature. The wood/leaf blocks come from the feature's own `trunk_provider` / `foliage_provider` slots — the placer only decides geometry. Compose any trunk with any foliage. Spread leaves are placed with their `LeavesBlock.DISTANCE` pinned internally so the tree never decays.
+Used as the `trunk_placer` / `foliage_placer` of a vanilla `minecraft:tree` configured feature. The wood/leaf blocks come from the feature's own `trunk_provider` / `foliage_provider` slots — the placer only decides geometry. Compose any trunk with any foliage. Spread leaves are placed with their `LeavesBlock.DISTANCE` pinned, so they survive worldgen; on the first tick the game recomputes the real distance from the trunk, and a leaf more than six steps from a log decays as a vanilla leaf does.
 
 | | Placers |
 |---|---|

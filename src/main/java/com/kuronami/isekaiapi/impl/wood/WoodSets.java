@@ -1,10 +1,10 @@
 package com.kuronami.isekaiapi.impl.wood;
 
 import com.kuronami.isekaiapi.api.wood.WoodSet;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import javax.annotation.Nullable;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -26,8 +26,16 @@ import org.jetbrains.annotations.ApiStatus;
 @ApiStatus.Internal
 public final class WoodSets {
 
-    private static final List<WoodSet> ALL = new ArrayList<>();
-    private static final Map<ResourceLocation, WoodSet> BY_BOAT_ENTITY = new HashMap<>();
+    /**
+     * Every set declared so far, and the boat lookup.
+     *
+     * <p>Mod constructors do not all run on one thread: NeoForge dispatches
+     * {@code FMLConstructModEvent} per mod and runs the batches in parallel, so two mods can call
+     * {@link WoodSet.Builder#register} at the same time. Both collections are therefore concurrent,
+     * and reads copy instead of iterating the live collection.
+     */
+    private static final List<WoodSet> ALL = new CopyOnWriteArrayList<>();
+    private static final Map<ResourceLocation, WoodSet> BY_BOAT_ENTITY = new ConcurrentHashMap<>();
 
     private WoodSets() {}
 
@@ -78,6 +86,25 @@ public final class WoodSets {
     public static ResourceLocation boatTexture(ResourceLocation woodSet, boolean chest) {
         return ResourceLocation.fromNamespaceAndPath(woodSet.getNamespace(),
                 "textures/entity/" + (chest ? "chest_boat" : "boat") + "/" + woodSet.getPath() + ".png");
+    }
+
+    /**
+     * The texture a wood set's sign is rendered with, in the layout vanilla's
+     * {@code Sheets#createSignMaterial} reads: {@code textures/entity/signs/<path>.png}, or
+     * {@code textures/entity/signs/hanging/<path>.png} for a hanging sign.
+     */
+    public static ResourceLocation signTexture(ResourceLocation woodSet, boolean hanging) {
+        return ResourceLocation.fromNamespaceAndPath(woodSet.getNamespace(),
+                "textures/entity/signs/" + (hanging ? "hanging/" : "") + woodSet.getPath() + ".png");
+    }
+
+    /**
+     * The texture a hanging sign's editor screen is drawn with:
+     * {@code textures/gui/hanging_signs/<path>.png}.
+     */
+    public static ResourceLocation hangingSignGuiTexture(ResourceLocation woodSet) {
+        return ResourceLocation.fromNamespaceAndPath(woodSet.getNamespace(),
+                "textures/gui/hanging_signs/" + woodSet.getPath() + ".png");
     }
 
     /**

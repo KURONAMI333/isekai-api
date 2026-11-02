@@ -13,41 +13,47 @@ import net.minecraft.world.level.material.Fluids;
 import org.jetbrains.annotations.ApiStatus;
 
 /**
- * Shared decay-safe leaf placement for Isekai foliage placers — the part of vanilla's
- * {@code FoliagePlacer.tryPlaceLeaf} contract that's missing for spread / disconnected leaves.
+ * Shared leaf placement for Isekai foliage placers and tree decorators.
  *
- * <p>Background. Minecraft leaves with {@code persistent:false} decay unless they have a path
- * to a log within block-distance 6. Vanilla's {@code tryPlaceLeaf} leaves the {@code distance}
- * blockstate at its default and relies on a neighbour update — but worldgen does NOT trigger
- * neighbour updates, so any leaf that isn't physically adjacent to a log (or to another leaf
- * that resolves to a low distance via vanilla's compact crowns) decays. A placer that draws
- * fronds, hanging strands, branching tips or any non-compact crown therefore loses its outer
- * leaves the first time the chunk ticks — the tree visibly falls apart.
+ * <p>Leaves with {@code persistent:false} survive only while {@link LeavesBlock#DISTANCE} is below
+ * 7. That distance is the length of the shortest chain of leaves reaching a log (a log directly
+ * next to the leaf counts as 1). Vanilla's {@code tryPlaceLeaf} writes the provider's state as-is
+ * and relies on a later neighbour update to fill the distance in, and worldgen does not run
+ * neighbour updates: a leaf placed away from the trunk keeps the provider's default
+ * {@code distance: 7} and is removed the first time it is random-ticked.
  *
- * <p>Fix. For any leaf NOT physically anchored to a log, place it with {@link LeavesBlock#DISTANCE}
- * pinned to a value &lt; 7 (5 here, matching Nature's Spirit's coconut implementation). The
- * pinned distance survives because worldgen skips neighbour updates. Compact-core leaves can
- * keep calling vanilla's {@code tryPlaceLeaf} directly from the placer subclass — they resolve
- * to a low distance naturally from log adjacency.
+ * <p>{@link #placePinned} and {@link #pinIfLeaves} write {@code distance: 5} instead. That carries
+ * the leaf through generation: the tree feature's closing shape pass
+ * ({@code StructureTemplate.updateShapeAtEdge}) calls {@link LeavesBlock#updateShape} on the blocks
+ * at the shape boundary, which schedules a tick, and {@link LeavesBlock#tick} then recomputes the
+ * distance from the real neighbour graph. A pinned leaf within 6 steps of a log gets its true
+ * distance and stays; one further away becomes 7 and decays on its next random tick.
  *
- * <p>This is the canonical Isekai mechanism for spread-leaf placement — every new foliage
- * placer should call {@link #placePinned} for non-log-adjacent leaves rather than reimplement
- * the {@link BlockStateProperties#WATERLOGGED} / distance dance inline.
+ * <p>The pin is therefore not persistence. It keeps the placement itself — without it every spread
+ * leaf would be gone before the chunk ticks once — and the crown still has to put its leaves within
+ * reach of the trunk. Call vanilla's {@code tryPlaceLeaf} for a compact log-adjacent core, and the
+ * pinned helpers for fronds, strands and tips that are close enough to survive.
  */
 @ApiStatus.Internal
 public final class LeafPlacing {
 
-    /** Pinned distance for spread leaves. {@code < 7} prevents decay; 5 matches vanilla's max. */
+    /**
+     * Distance written by the pinned helpers. Below 7, so the leaf survives long enough for the
+     * scheduler to compute its real distance; 5 is vanilla's largest reachable non-decaying value.
+     */
     public static final int SAFE_PINNED_DISTANCE = 5;
 
     private LeafPlacing() {}
 
     /**
-     * Place a leaf with {@link LeavesBlock#DISTANCE} pinned to {@link #SAFE_PINNED_DISTANCE} so
-     * it does not decay even when not in a connected leaf-path to a log. Use for fronds, hanging
-     * strands, branching tips, disc/weeping placements — anything outside a compact log-adjacent
-     * core. For core leaves that ARE log-adjacent, call vanilla's
-     * {@code FoliagePlacer.tryPlaceLeaf} directly from the placer subclass.
+     * Places a leaf with {@link LeavesBlock#DISTANCE} pinned to {@link #SAFE_PINNED_DISTANCE}.
+     *
+     * <p>Use for fronds, hanging strands, branching tips and disc/weeping placements, where the
+     * provider's own distance (usually 7) would be removed before the chunk ticks. The pin keeps
+     * the block through generation only: once the leaf ticker recomputes from the real neighbour
+     * graph, a leaf with no chain of leaves to a log within 6 steps turns to distance 7 and decays.
+     * For core leaves that are log-adjacent, call vanilla's {@code FoliagePlacer.tryPlaceLeaf}
+     * directly from the placer subclass.
      */
     public static void placePinned(LevelSimulatedReader level, FoliagePlacer.FoliageSetter setter,
                                    RandomSource random, TreeConfiguration config, BlockPos pos) {
@@ -66,13 +72,15 @@ public final class LeafPlacing {
     }
 
     /**
-     * Pins {@link LeavesBlock#DISTANCE} when {@code state} is a leaf block, so leaves placed by a
-     * tree decorator decay like the crown's own leaves instead of falling apart on the first tick.
+     * Pins {@link LeavesBlock#DISTANCE} when {@code state} is a leaf block, so a leaf a decorator
+     * writes survives long enough for the scheduler to compute its real distance.
      *
-     * <p>Decorators set blocks one at a time and never run through the feature's leaf
-     * distance pass, so a leaf provider written into a decorator would otherwise keep
-     * {@code distance: 7} — the "no log nearby" state — and vanish. Any other state is returned
-     * unchanged, so this is safe to call from every decorator placement.
+     * <p>Decorators set blocks one at a time and never run through the feature's leaf distance
+     * pass, so a leaf provider written into a decorator would keep {@code distance: 7} and vanish
+     * on the first random tick, even when it touches the trunk. The recomputation from the real
+     * neighbour graph decides afterwards: a leaf within 6 steps of a log keeps its distance and
+     * stays, one further away becomes 7 and decays. Any other state is returned unchanged, so this
+     * is safe to call from every decorator placement.
      */
     public static BlockState pinIfLeaves(BlockState state) {
         if (state.hasProperty(LeavesBlock.DISTANCE)) {

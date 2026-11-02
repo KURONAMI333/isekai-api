@@ -17,9 +17,10 @@ import org.jetbrains.annotations.ApiStatus;
 /**
  * A radial frond crown: a compact log-adjacent core at the tip with cardinal arms that reach
  * out {@code crown_radius} blocks and droop {@code hang} blocks past the tip — a fan/frond
- * silhouette. Spread leaves are placed via {@link LeafPlacing#placePinned} so they never decay;
- * the dense core uses vanilla {@code tryPlaceLeaf} since it resolves to a safe distance from
- * log adjacency.
+ * silhouette. Spread leaves are placed via {@link LeafPlacing#placePinned}, which keeps them
+ * through generation; a leaf further than six steps from a log still decays, so the arms stay
+ * within that reach of the trunk. The dense core uses vanilla {@code tryPlaceLeaf} since it
+ * resolves to a safe distance from log adjacency.
  *
  * <p>Neutral primitive — the leaf block is the {@code foliage_provider}. JSON fields: shared
  * {@code radius}/{@code offset} (IntProviders; geometry is driven by the fields below so

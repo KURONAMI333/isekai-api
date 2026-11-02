@@ -86,6 +86,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
  * <p>Supporting behaviour that cannot be expressed on the blocks themselves is installed once by
  * Isekai at mod load: axe stripping, vanilla-oak flammability, compostability of leaves and
  * saplings, sign and hanging-sign block entities, flower-pot acceptance, and boat rendering.
+ * Flammability can be turned off per set with {@link Builder#flammable(boolean)}.
  *
  * <p>Boat and chest-boat textures are read from {@code textures/entity/boat/<path>.png} and
  * {@code textures/entity/chest_boat/<path>.png} in the wood set's namespace.
@@ -95,6 +96,7 @@ public final class WoodSet {
     private final ResourceLocation id;
     private final WoodType woodType;
     private final BlockSetType blockSetType;
+    private final boolean flammable;
 
     @Nullable private final DeferredBlock<RotatedPillarBlock> log;
     @Nullable private final DeferredBlock<RotatedPillarBlock> wood;
@@ -129,6 +131,7 @@ public final class WoodSet {
         this.id = builder.id;
         this.woodType = Objects.requireNonNull(builder.woodType, "wood type");
         this.blockSetType = Objects.requireNonNull(builder.blockSetType, "block set type");
+        this.flammable = builder.flammable;
         this.log = builder.log;
         this.wood = builder.wood;
         this.strippedLog = builder.strippedLog;
@@ -177,6 +180,16 @@ public final class WoodSet {
     /** The block set type shared by this set's door, trapdoor, button and pressure plate. */
     public BlockSetType blockSetType() {
         return blockSetType;
+    }
+
+    /**
+     * Whether this set behaves like vanilla wood: its logs, wood and sawn blocks catch fire at
+     * oak's odds, its leaves spread fire, and {@code WoodSetDataGen} tags the pillar blocks as
+     * {@code #minecraft:logs_that_burn}. False for a set declared with
+     * {@link Builder#flammable(boolean) flammable(false)}.
+     */
+    public boolean isFlammable() {
+        return flammable;
     }
 
     public Optional<DeferredBlock<RotatedPillarBlock>> log() {
@@ -324,6 +337,12 @@ public final class WoodSet {
 
         private boolean registered;
 
+        /**
+         * Whether the set behaves like vanilla wood: the logs burn in fire and the pillar blocks
+         * belong to {@code #minecraft:logs_that_burn}. Default true; see {@link #flammable(boolean)}.
+         */
+        private boolean flammable = true;
+
         private WoodType woodType;
         private BlockSetType blockSetType;
         private DeferredBlock<RotatedPillarBlock> log;
@@ -374,6 +393,27 @@ public final class WoodSet {
         /** Sound type for every block in the set. */
         public Builder sound(SoundType soundType) {
             this.sound = Objects.requireNonNull(soundType, "soundType");
+            return this;
+        }
+
+        /**
+         * Whether the set behaves like vanilla wood. On by default.
+         *
+         * <p>{@code false} is for a species that is not wood at all — stone, bone, metal — and it
+         * does two things: the pillar blocks and the sawn blocks are left out of
+         * {@code FireBlock}'s odds map, so they do not spread fire or burn away, and
+         * {@code WoodSetDataGen} tags them as {@code #minecraft:logs} instead of
+         * {@code #minecraft:logs_that_burn}. Vanilla links those two tags only through the fire
+         * behaviour, so both halves are needed for the blocks to be treated as non-flammable
+         * everywhere.
+         *
+         * <p>One part cannot be turned off: every block keeps vanilla's {@code ignited_by_lava}
+         * flag from the oak properties it copies. Lava therefore still sets them alight. There is
+         * no supported way to remove a property flag in 1.21.1 without rebuilding every property
+         * value by hand, which would change more than this flag.
+         */
+        public Builder flammable(boolean flammable) {
+            this.flammable = flammable;
             return this;
         }
 
@@ -547,7 +587,6 @@ public final class WoodSet {
                 throw new IllegalArgumentException("wood set " + id
                         + " selects a potted sapling; call sapling(TreeGrower) first");
             }
-            registered = true;
 
             final String path = id.getPath();
             final String name = id.toString();
@@ -723,6 +762,10 @@ public final class WoodSet {
             }
 
             WoodSet set = new WoodSet(this);
+            // Claim the builder only once nothing below can throw any more: a failure part-way
+            // through leaves the block set type and wood type registered but must not also leave
+            // this builder permanently unusable.
+            registered = true;
             WoodSets.add(set);
             return set;
         }

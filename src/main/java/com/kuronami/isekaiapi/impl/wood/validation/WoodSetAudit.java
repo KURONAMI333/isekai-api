@@ -73,7 +73,8 @@ public final class WoodSetAudit {
         LANGUAGE("language key"),
         BLOCKSTATE("blockstate"),
         MODEL("model"),
-        TEXTURE("texture");
+        TEXTURE("texture"),
+        REFERENCE("reference");
 
         private final String label;
 
@@ -206,11 +207,16 @@ public final class WoodSetAudit {
         }
     }
 
-    /** Resolves a reference the way a model does: a bare path belongs to the referring namespace. */
-    private static ResourceLocation resolve(String value, String defaultNamespace) {
-        return value.contains(":")
-                ? ResourceLocation.parse(value)
-                : ResourceLocation.fromNamespaceAndPath(defaultNamespace, value);
+    /**
+     * Resolves a reference the way vanilla reads it: a bare path means {@code minecraft:}, not the
+     * namespace of the file that contains it ({@link ResourceLocation#parse} backs
+     * {@code BlockModel.Deserializer}'s {@code parent} and {@code ModelVariant}'s {@code model}).
+     * A string that is not a valid id is not a reference at all, so it comes back {@code null}
+     * instead of throwing — {@code BlockModel.Deserializer} fails the file the same way.
+     */
+    @Nullable
+    private static ResourceLocation resolve(String value) {
+        return ResourceLocation.tryParse(value);
     }
 
     private static ResourceLocation file(String namespace, String path) {
@@ -300,10 +306,13 @@ public final class WoodSetAudit {
 
         /** Tag membership vanilla oak has, asked of the resolved tags instead of the files. */
         private void tags() {
-            blockTag(WoodPart.LOG, BlockTags.LOGS_THAT_BURN);
-            blockTag(WoodPart.WOOD, BlockTags.LOGS_THAT_BURN);
-            blockTag(WoodPart.STRIPPED_LOG, BlockTags.LOGS_THAT_BURN);
-            blockTag(WoodPart.STRIPPED_WOOD, BlockTags.LOGS_THAT_BURN);
+            // A set declared flammable(false) is data-generated into #logs, not #logs_that_burn,
+            // so it is checked against the tag its own generator writes.
+            TagKey<Block> blockLogTag = set.isFlammable() ? BlockTags.LOGS_THAT_BURN : BlockTags.LOGS;
+            blockTag(WoodPart.LOG, blockLogTag);
+            blockTag(WoodPart.WOOD, blockLogTag);
+            blockTag(WoodPart.STRIPPED_LOG, blockLogTag);
+            blockTag(WoodPart.STRIPPED_WOOD, blockLogTag);
             blockTag(WoodPart.PLANKS, BlockTags.PLANKS);
             blockTag(WoodPart.STAIRS, BlockTags.WOODEN_STAIRS);
             blockTag(WoodPart.SLAB, BlockTags.WOODEN_SLABS);
@@ -321,10 +330,11 @@ public final class WoodSetAudit {
             blockTag(wallSign, "Wall Sign", BlockTags.WALL_SIGNS);
             blockTag(wallHangingSign, "Wall Hanging Sign", BlockTags.WALL_HANGING_SIGNS);
 
-            itemTag(WoodPart.LOG, ItemTags.LOGS_THAT_BURN);
-            itemTag(WoodPart.WOOD, ItemTags.LOGS_THAT_BURN);
-            itemTag(WoodPart.STRIPPED_LOG, ItemTags.LOGS_THAT_BURN);
-            itemTag(WoodPart.STRIPPED_WOOD, ItemTags.LOGS_THAT_BURN);
+            TagKey<Item> itemLogTag = set.isFlammable() ? ItemTags.LOGS_THAT_BURN : ItemTags.LOGS;
+            itemTag(WoodPart.LOG, itemLogTag);
+            itemTag(WoodPart.WOOD, itemLogTag);
+            itemTag(WoodPart.STRIPPED_LOG, itemLogTag);
+            itemTag(WoodPart.STRIPPED_WOOD, itemLogTag);
             itemTag(WoodPart.PLANKS, ItemTags.PLANKS);
             itemTag(WoodPart.STAIRS, ItemTags.WOODEN_STAIRS);
             itemTag(WoodPart.SLAB, ItemTags.WOODEN_SLABS);
@@ -486,7 +496,7 @@ public final class WoodSetAudit {
                 if (state == null) {
                     continue;
                 }
-                for (ResourceLocation model : references(state, "model", id.getNamespace())) {
+                for (ResourceLocation model : references(state, "model", stateFile)) {
                     checkModel(model, subject, 0);
                 }
             }
@@ -512,6 +522,20 @@ public final class WoodSetAudit {
                 expect(Layer.ASSETS, Kind.TEXTURE, WoodSets.boatTexture(set.id(), true),
                         "Chest Boat item " + BuiltInRegistries.ITEM.getKey(chestBoat));
             }
+
+            // Signs are not blocks with a model: the renderer loads these three textures by
+            // wood-type name, so a missing file only shows up when a player opens a sign.
+            Block sign = set.sign().map(holder -> (Block) holder.get()).orElse(null);
+            if (sign != null) {
+                expect(Layer.ASSETS, Kind.TEXTURE, WoodSets.signTexture(set.id(), false),
+                        "Sign " + BuiltInRegistries.BLOCK.getKey(sign));
+            }
+            Block hangingSign = set.hangingSign().map(holder -> (Block) holder.get()).orElse(null);
+            if (hangingSign != null) {
+                String subject = "Hanging Sign " + BuiltInRegistries.BLOCK.getKey(hangingSign);
+                expect(Layer.ASSETS, Kind.TEXTURE, WoodSets.signTexture(set.id(), true), subject);
+                expect(Layer.ASSETS, Kind.TEXTURE, WoodSets.hangingSignGuiTexture(set.id()), subject);
+            }
         }
 
         /** Follows a model and its parents, checking every non-vanilla model and texture it names. */
@@ -534,7 +558,13 @@ public final class WoodSetAudit {
             }
             JsonElement parent = json.get("parent");
             if (parent != null && parent.isJsonPrimitive()) {
-                checkModel(resolve(parent.getAsString(), model.getNamespace()), subject, depth + 1);
+                checks++;
+                ResourceLocation resolved = resolve(parent.getAsString());
+                if (resolved == null) {
+                    invalidReference(modelFile, "parent", parent.getAsString());
+                } else {
+                    checkModel(resolved, subject, depth + 1);
+                }
             }
             JsonElement textures = json.get("textures");
             if (textures == null || !textures.isJsonObject()) {
@@ -550,7 +580,12 @@ public final class WoodSetAudit {
                     // A variable of the model itself; the parent chain resolves the real texture.
                     continue;
                 }
-                ResourceLocation texture = resolve(reference, model.getNamespace());
+                checks++;
+                ResourceLocation texture = resolve(reference);
+                if (texture == null) {
+                    invalidReference(modelFile, "texture " + entry.getKey(), reference);
+                    continue;
+                }
                 if (isVanilla(texture)) {
                     // A dedicated server's vanilla pack has no assets; never call those missing.
                     continue;
@@ -559,6 +594,46 @@ public final class WoodSetAudit {
                         "textures/" + texture.getPath() + ".png");
                 expect(Layer.ASSETS, Kind.TEXTURE, png, subject + " (texture " + texture + ")");
             }
+        }
+
+        /** Every value of {@code field} in this file, resolved; a value that is not an id is a finding. */
+        private List<ResourceLocation> references(JsonObject json, String field, ResourceLocation source) {
+            List<ResourceLocation> result = new ArrayList<>();
+            collect(json, field, source, result);
+            return result;
+        }
+
+        private void collect(JsonElement element, String field, ResourceLocation source,
+                             List<ResourceLocation> result) {
+            if (element.isJsonObject()) {
+                for (Map.Entry<String, JsonElement> entry : element.getAsJsonObject().entrySet()) {
+                    if (field.equals(entry.getKey()) && entry.getValue().isJsonPrimitive()) {
+                        checks++;
+                        ResourceLocation id = resolve(entry.getValue().getAsString());
+                        if (id == null) {
+                            invalidReference(source, field, entry.getValue().getAsString());
+                        } else {
+                            result.add(id);
+                        }
+                    } else {
+                        collect(entry.getValue(), field, source, result);
+                    }
+                }
+            } else if (element.isJsonArray()) {
+                for (JsonElement child : element.getAsJsonArray()) {
+                    collect(child, field, source, result);
+                }
+            }
+        }
+
+        /**
+         * A reference no vanilla reader would accept. The subject is the file that holds it, because
+         * that is the file the consumer has to edit; the value is quoted so a stray space or colon is
+         * visible.
+         */
+        private void invalidReference(ResourceLocation source, String where, String value) {
+            finding(Layer.ASSETS, Kind.REFERENCE, source,
+                    source + ": " + where + " \"" + value + "\" is not a valid resource location");
         }
 
         // ----------------------------------------------------------- language
@@ -630,30 +705,6 @@ public final class WoodSetAudit {
                         entity.getDescriptionId())));
             }
             return keys;
-        }
-    }
-
-    /** Every string value of {@code field}, at any depth, in document order. */
-    private static List<ResourceLocation> references(JsonObject json, String field, String namespace) {
-        List<ResourceLocation> result = new ArrayList<>();
-        collect(json, field, namespace, result);
-        return result;
-    }
-
-    private static void collect(JsonElement element, String field, String namespace,
-                                List<ResourceLocation> result) {
-        if (element.isJsonObject()) {
-            for (Map.Entry<String, JsonElement> entry : element.getAsJsonObject().entrySet()) {
-                if (field.equals(entry.getKey()) && entry.getValue().isJsonPrimitive()) {
-                    result.add(resolve(entry.getValue().getAsString(), namespace));
-                } else {
-                    collect(entry.getValue(), field, namespace, result);
-                }
-            }
-        } else if (element.isJsonArray()) {
-            for (JsonElement child : element.getAsJsonArray()) {
-                collect(child, field, namespace, result);
-            }
         }
     }
 }

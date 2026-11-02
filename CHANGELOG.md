@@ -119,6 +119,15 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
   button, signs, leaves, sapling, potted sapling, boats) and its datagen; the pack beside it holds
   the configured feature with an `isekai_api` decorator. The class is compiled and the pack is
   loaded only on the GameTest server, and neither ships in the jar.
+- **`WoodSet.Builder#flammable(boolean)`.** A set declared `flammable(false)` is left out of the fire odds
+  map and its logs are data-generated into `#logs` instead of `#logs_that_burn`, so neither the logs nor
+  the planks spread fire or burn away; `WoodSet#isFlammable()` reports the setting. One part cannot be
+  turned off: every block keeps vanilla's `ignited_by_lava` flag from the oak properties it copies, so
+  lava still sets it alight.
+- **The wood-set audit covers sign textures.** A set with `sign` or `hanging_sign` also needs
+  `textures/entity/signs/<path>.png`, `textures/entity/signs/hanging/<path>.png` and
+  `textures/gui/hanging_signs/<path>.png`, which `WoodSets.signTexture` and
+  `WoodSets.hangingSignGuiTexture` name. The example pack ships the three files.
 
 ### Fixed
 
@@ -136,6 +145,29 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
   no `LevelStem` entry falls back to the overworld envelope.
 - **No declarations, no cost.** Every hook returns on an empty check before a registry or biome
   lookup; the reconcile returns immediately when no worldshape is declared.
+- **Decorators no longer inherit a 2x2 trunk's ground blocks.** `TreeDecorator.Context#logs()` carries
+  one block per trunk column written by `TrunkPlacer.setDirtAt` (four for `giant_trunk_placer` on
+  grass), and only the first was dropped. `branch_stubs` without a `block_provider` could therefore
+  take its block from dirt and start one row too low. Every dirt-like entry at the lowest level is now
+  dropped, and only when a trunk block sits above it.
+- **The wood-set audit reads references the way the game does.** A bare path in a model `parent`, a
+  `textures` value or a blockstate `model` resolves to `minecraft:`, not to the namespace of the file
+  that names it; a value that is not a valid resource location becomes a `reference` finding instead of
+  failing the whole audit. `/isekai validate <namespace>` prints the validation result before the
+  wood-set audit, and an audit failure is logged and reported as one line instead of hiding it.
+- **`broken_top`'s `fill_provider` uses the decorator placement helpers.** A leaf used as the fill is
+  pinned like every other decorator-written leaf rather than written at `distance: 7`.
+- **A wood set's builder is claimed only after registration succeeds.** A failure part-way through
+  `register()` no longer leaves the builder marked as registered and unusable.
+- **`WoodSets` survives parallel mod construction.** NeoForge constructs mods in parallel; the set list
+  and the boat lookup are now concurrent collections.
+- **Docs: a pinned leaf is not a permanent leaf.** `LeafPlacing`, the placer section of
+  `docs/DATAPACK_REFERENCE.md` and the README now state that the pin carries a leaf through generation,
+  and that the first tick recomputes the real distance, so a leaf more than six steps from a log decays
+  as a vanilla leaf does. The behaviour is unchanged.
+- **Docs: `ground_patch`'s radius limit has a stated reason.** 16 is the largest disc that stays inside
+  the chunks a feature may write (`ChunkStatus.FEATURES` writes one chunk out), while a placement
+  modifier that moves the feature's origin into a neighbouring chunk can still reach past it.
 
 ### Known limitations
 

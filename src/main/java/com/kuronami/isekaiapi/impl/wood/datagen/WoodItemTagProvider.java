@@ -47,7 +47,8 @@ public final class WoodItemTagProvider extends ItemTagsProvider {
             // Copied before it is referenced: a reference to a tag this provider has not written
             // yet fails the reference check.
             copy(BlockTags.create(logs), ItemTags.create(logs));
-            tag(ItemTags.LOGS_THAT_BURN).addTag(ItemTags.create(logs));
+            tag(gen.set().isFlammable() ? ItemTags.LOGS_THAT_BURN : ItemTags.LOGS)
+                    .addTag(ItemTags.create(logs));
         }
 
         gen.items(WoodPart.PLANKS).forEach(item -> tag(ItemTags.PLANKS).add(item));

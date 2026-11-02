@@ -96,7 +96,7 @@ public final class BrokenTopDecorator extends TreeDecorator {
             if (state.isAir()) {
                 openColumns.add(column);
             }
-            context.setBlock(pos, state);
+            DecoratorPlacing.place(context, pos, state);
         }
     }
 

@@ -35,15 +35,18 @@ final class DecoratorPlacing {
      * The tree's own trunk positions, lowest first.
      *
      * <p>{@link TreeDecorator.Context#logs()} is not only the trunk: {@code TrunkPlacer.setDirtAt}
-     * writes the ground block under the base through the same setter, so the first entry is that
-     * ground block whenever the tree did not grow on plain dirt. A decorator that measures the
-     * trunk, reuses its block or counts its blocks has to skip it.
+     * writes the ground block under the base through the same setter. A 2x2 trunk placer
+     * ({@code giant_trunk_placer}, {@code dark_oak_trunk_placer}) calls it for all four columns, so
+     * on grass it adds four dirt entries — every one of them one block below the trunk. A
+     * decorator that measures the trunk, reuses its block or counts its blocks has to skip them.
      *
-     * <p>Only the first entry is examined, and it is dropped only when it is dirt-like (the same
-     * test {@code TrunkPlacer} uses to decide whether to write the ground block at all). A trunk
+     * <p>Every dirt-like entry at the lowest Y is dropped, and only there: the ground blocks all
+     * share that Y, while the trunk starts above it. The test is the same one {@code TrunkPlacer}
+     * uses to decide whether to write the ground block at all ({@code DIRT} plus farmland). A trunk
      * built out of basalt, blackstone or planks is therefore kept whole; a datapack that sets a
-     * {@code dirt_provider} to something that is not dirt-tagged keeps the extra entry, which costs
-     * one block of height range and nothing else.
+     * {@code dirt_provider} to something that is not dirt-tagged keeps the extra entries, which
+     * cost one block of height range and nothing else. When the tree has only one Y of entries,
+     * nothing is dropped: there is no trunk above the ground to fall back to.
      *
      * <p>Positions an earlier decorator has turned to air (for example {@code isekai_api:broken_top})
      * are left out, so a later decorator never hangs a branch, a vine or a patch off a log that is
@@ -51,14 +54,19 @@ final class DecoratorPlacing {
      */
     static List<BlockPos> logs(TreeDecorator.Context context) {
         List<BlockPos> all = context.logs();
-        if (all.size() >= 2) {
-            BlockState first = stateAt(context.level(), all.get(0));
-            if (first != null && (first.is(BlockTags.DIRT) || first.is(Blocks.FARMLAND))) {
-                all = all.subList(1, all.size());
-            }
+        if (all.isEmpty()) {
+            return List.of();
         }
+        int lowestY = all.get(0).getY();
+        boolean hasHigher = all.get(all.size() - 1).getY() > lowestY;
         List<BlockPos> standing = new java.util.ArrayList<>(all.size());
         for (BlockPos pos : all) {
+            if (hasHigher && pos.getY() == lowestY) {
+                BlockState state = stateAt(context.level(), pos);
+                if (state != null && (state.is(BlockTags.DIRT) || state.is(Blocks.FARMLAND))) {
+                    continue;
+                }
+            }
             if (!context.isAir(pos)) {
                 standing.add(pos);
             }

@@ -1,5 +1,6 @@
 package com.kuronami.isekaiapi.gametest.wood;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.kuronami.isekaiapi.IsekaiApi;
@@ -89,8 +90,8 @@ public final class WoodSetValidationGameTests {
     }
 
     /**
-     * One hole in each of the eight kinds is reported as eight findings, one per kind — no kind is
-     * silent, and nothing is reported twice or invented.
+     * One hole in each kind is reported as one finding per kind — no kind is silent, and nothing is
+     * reported twice or invented.
      */
     @PrefixGameTestTemplate(false)
     @GameTest(template = "empty3x3x3")
@@ -157,8 +158,15 @@ public final class WoodSetValidationGameTests {
      * <p>Only one of each is hidden so the finding count is a fixed number: hiding a blockstate also
      * stops the models it points at from being walked, and two holes of the same kind collapse into
      * one finding because findings are keyed by kind and subject.
+     *
+     * <p>The reference hole is not a missing file: the log's blockstate is served with one
+     * {@code model} value replaced by a string that is not a resource location at all, which is what
+     * a hand-edited blockstate with a stray space looks like.
      */
     private static final class HoledProbe implements WoodSetProbe {
+
+        /** Not a valid id: vanilla's parser rejects the space, so this cannot resolve anywhere. */
+        private static final String BAD_REFERENCE = "not a valid id";
 
         private final WoodSetProbe delegate;
 
@@ -167,6 +175,7 @@ public final class WoodSetValidationGameTests {
         private final ResourceLocation model;
         private final ResourceLocation texture;
         private final ResourceLocation language;
+        private final ResourceLocation blockstateWithBadReference;
         private final String hiddenLanguageKey;
         private final String hiddenRecipeMarker;
 
@@ -185,6 +194,8 @@ public final class WoodSetValidationGameTests {
             this.texture = file(namespace,
                     "textures/block/" + blockPath(set.sapling().orElseThrow().get()) + ".png");
             this.language = file(namespace, "lang/en_us.json");
+            this.blockstateWithBadReference = file(namespace,
+                    "blockstates/" + blockPath(set.log().orElseThrow().get()) + ".json");
             this.hiddenLanguageKey = door.getDescriptionId();
             this.hiddenRecipeMarker =
                     BuiltInRegistries.ITEM.getKey(set.stairs().orElseThrow().get().asItem()).toString();
@@ -230,6 +241,9 @@ public final class WoodSetValidationGameTests {
             if (id.equals(language)) {
                 return delegate.readAsset(id).map(this::withoutHiddenKey);
             }
+            if (id.equals(blockstateWithBadReference)) {
+                return delegate.readAsset(id).map(this::withBadReference);
+            }
             return delegate.readAsset(id);
         }
 
@@ -237,6 +251,36 @@ public final class WoodSetValidationGameTests {
             JsonObject json = JsonParser.parseString(text).getAsJsonObject();
             json.remove(hiddenLanguageKey);
             return json.toString();
+        }
+
+        private String withBadReference(String text) {
+            JsonObject json = JsonParser.parseString(text).getAsJsonObject();
+            breakFirstModel(json);
+            return json.toString();
+        }
+
+        /** Replaces the first {@code model} value at any depth, so exactly one reference is broken. */
+        private static boolean breakFirstModel(JsonElement element) {
+            if (element.isJsonObject()) {
+                JsonObject object = element.getAsJsonObject();
+                JsonElement model = object.get("model");
+                if (model != null && model.isJsonPrimitive()) {
+                    object.addProperty("model", BAD_REFERENCE);
+                    return true;
+                }
+                for (Map.Entry<String, JsonElement> entry : object.entrySet()) {
+                    if (breakFirstModel(entry.getValue())) {
+                        return true;
+                    }
+                }
+            } else if (element.isJsonArray()) {
+                for (JsonElement child : element.getAsJsonArray()) {
+                    if (breakFirstModel(child)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         @Override
