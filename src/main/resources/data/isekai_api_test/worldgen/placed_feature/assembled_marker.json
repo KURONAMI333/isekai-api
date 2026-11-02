@@ -1,0 +1,18 @@
+{
+  "feature": "isekai_api_test:assembled_marker",
+  "placement": [
+    {
+      "type": "minecraft:count",
+      "count": 1
+    },
+    {
+      "type": "minecraft:random_offset",
+      "xz_spread": {
+        "type": "minecraft:uniform",
+        "min_inclusive": 0,
+        "max_inclusive": 8
+      },
+      "y_spread": 0
+    }
+  ]
+}

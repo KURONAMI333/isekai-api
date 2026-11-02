@@ -209,7 +209,7 @@ Geometric placement primitives — use as `type` inside a configured_feature JSO
 | Type | Fields | Effect |
 |---|---|---|
 | `isekai_api:cluster` | `block` (BlockStateProvider), `size` (IntProvider 1–256), `can_replace_solid` (bool, default false) | random-walk BFS from origin, places `size` connected blocks. Use for moss patches, dirt veins, fungus spreads, ore clusters — any "blob of N connected blocks". |
-| `isekai_api:pool` | `fluid` (BlockState), `rim_block` (BlockStateProvider), `xz_radius` (IntProvider 1–64, values above 14 are clamped — flat form `{"type":"minecraft:uniform","min_inclusive":3,"max_inclusive":5}`), `depth` (int 1–32, default 2) | a bounded body of fluid dug into the terrain, using vanilla `LakeFeature`'s algorithm. Outline is the union of 4–7 random ellipsoids, so no two are alike and none is a circle. Lines the whole shell with `rim_block`, not just the floor. **Refuses to place unless the terrain can contain the fluid** — see below. Avoids `waterlogged_vegetation_patch`'s grass→dirt drowning trap: the rim block is whatever you pass, never drowned grass. |
+| `isekai_api:pool` | `fluid` (BlockState), `rim_block` (BlockStateProvider), `xz_radius` (IntProvider 1–64, values above 14 are clamped — flat form `{"type":"minecraft:uniform","min_inclusive":3,"max_inclusive":5}`), `depth` (int 1–32, default 2), `shore_width` (int 0–6, default 0) | a bounded body of fluid dug into the terrain, using vanilla `LakeFeature`'s algorithm. Outline is the union of 4–7 random ellipsoids, so no two are alike and none is a circle. Lines the whole shell with `rim_block`, not just the floor. `shore_width` repeats that rim outward N more rings (a beach); `0` is the single-ring bank every existing datapack already has. **Refuses to place unless the terrain can contain the fluid** — see below. Avoids `waterlogged_vegetation_patch`'s grass→dirt drowning trap: the rim block is whatever you pass, never drowned grass. |
 
 ### `pool` — containment, and what it costs you
 
@@ -252,12 +252,15 @@ Two consequences for tuning. **`xz_radius` costs placements, `depth` does not** 
     "fluid": {"Name": "minecraft:water"},
     "rim_block": {"type": "minecraft:simple_state_provider", "state": {"Name": "minecraft:sand"}},
     "xz_radius": {"type": "minecraft:uniform", "min_inclusive": 3, "max_inclusive": 5},
-    "depth": 2
+    "depth": 2,
+    "shore_width": 2
   }
 }
 ```
 
 `xz_radius` is an `IntProvider`, so its fields sit **inline** beside `"type"` — there is no `"value"` wrapper. Writing one fails registry load with "Not a number / No key min_inclusive".
+
+**`shore_width` (0–6, default 0)** grows the rim outward `N` rings, so a desert pond gets a beach instead of a one-block lip. The rings are grown from the shell by adjacency, so the bank follows the basin's real outline, not a circle around the origin. It changes nothing about whether the pool places — containment is still judged on the single-cell shell — and it only replaces solid cells (below the waterline always, above it half the time, the same rule the shell uses), so it never writes into air or water. `0` is the pool that existed before the field, and the default: existing datapacks generate exactly the same blocks.
 
 ---
 
@@ -347,6 +350,8 @@ The footprint is sampled at the template's centre + four corners, so a too-aggre
 
 A `Structure` that places a list of `PlacedFeature`s at a single origin (Y snapped to live `WORLD_SURFACE_WG`). Use it **only** when the features are genuinely independent and don't need to line up — e.g. "scatter a few boulders and bushes near this point." It has **no** `terrain_adaptation`, no relative positioning between features, and no processors, so it is the wrong tool for a coordinated landmark; use the jigsaw+NBT path above for those.
 
+The feature list runs **once**, from the chunk that contains the origin. Vanilla calls a piece's `postProcess` for every chunk its bounding box overlaps (each with its own random), so without that guard a 33-block-wide assembled piece would re-place the whole list up to nine times and stack nine differently-shaped results on the same spot. Features may still write past the origin chunk (a pool whose rim reaches 10 blocks out) — that is the same neighbour write a `place` feature makes during decoration.
+
 ```jsonc
 // data/<ns>/worldgen/structure/<name>.json
 {
@@ -360,6 +365,44 @@ A `Structure` that places a list of `PlacedFeature`s at a single origin (Y snapp
 ```
 Pair with a `structure_set` (same shape as above) for density + `/locate`.
 
+### `isekai_api:leaf_distances` — recompute leaf decay data for a pasted template
+
+A structure processor, not a structure type. Paste a tree template whose leaves were written by an editor (or saved before the trunk existed) and the leaves carry whatever `distance` the tool left behind; if that value is `7`, a leaf that is visually part of the crown decays on the first shape update and the tree sheds. This processor walks the template's own logs and writes the distance the game would have computed: **1** for a leaf touching a `#minecraft:logs` block, **+1 per leaf step**, **7** for a leaf that cannot reach a log within six steps.
+
+It runs in `finalizeProcessing`, so it sees the states that earlier processors in the same list produced — put it last in the list and it rewrites the final crown, not an intermediate one.
+
+| Field | Values | Default | Meaning |
+|---|---|---|---|
+| `orphan_leaves` | `decay` \| `persist` | `decay` | what to do with leaves that reach no log. `decay` leaves them at distance 7 and non-persistent (vanilla removes them); `persist` marks them persistent, which is how a floating canopy with no trunk in the template survives |
+| `keep_persistent` | bool | `false` | `false` resets every template leaf's `persistent` flag, so the leaf decays as the recomputed distance says; `true` keeps the flag the template wrote (a leaf that was persistent stays persistent, everything else still gets the recomputed distance) |
+
+```jsonc
+// data/<ns>/worldgen/processor_list/palm_crown.json
+{
+  "processors": [
+    { "processor_type": "isekai_api:leaf_distances", "orphan_leaves": "decay" }
+  ]
+}
+```
+
+```jsonc
+// data/<ns>/worldgen/template_pool/<name>/<variant>.json — the processor list is attached
+// to the pool element, not to the jigsaw structure
+{
+  "element": {
+    "element_type": "minecraft:single_pool_element",
+    "location": "<ns>:<name>",
+    "processors": "<ns>:palm_crown",
+    "projection": "rigid"
+  },
+  "weight": 1
+}
+```
+
+Where it runs: only where vanilla reads a processor list — a jigsaw pool element's `processors` field, and the vanilla structures that reference one. `/place template` does not run processors, and `isekai_api:grounded_template` / `isekai_api:assembled` do not take a processor list, so a template placed by those two keeps the leaf data it was saved with.
+
+A persistent leaf never decays regardless of distance, so the two flags are independent: `keep_persistent: true` alone turns nothing into a persistent leaf, and `orphan_leaves: persist` only touches leaves the processor could not reach.
+
 ---
 
 ## Tree placers (`isekai_api:`)
@@ -370,8 +413,10 @@ Used as the `trunk_placer` / `foliage_placer` of a vanilla `minecraft:tree` conf
 
 | Type | Fields | Shape |
 |---|---|---|
-| `isekai_api:leaning` | `base_height`, `height_rand_a`, `height_rand_b` (int — shared); `min_height_for_leaves` (positive int, default 1); `lean_length` (IntProvider 1–16); `convert_ground` (bool, default true — false skips the dirt-under-trunk conversion so beach palms stay sandy); `tip_crown_only` (bool, default false — true returns only the bent-tip attachment so a fan crown sprays from one point) | rises straight, leans near the top, then continues as a near-horizontal stalk |
+| `isekai_api:leaning` | `base_height`, `height_rand_a`, `height_rand_b` (int — shared); `min_height_for_leaves` (positive int, default 1); `lean_length` (IntProvider 1–16); `convert_ground` (bool, default true — false skips the dirt-under-trunk conversion so beach palms stay sandy); `tip_crown_only` (bool, default false — true returns only the bent-tip attachment so a fan crown sprays from one point); `slant_curve` (double 1.0–2.0, default 1.0 — each stalk step moves `round(slant_curve^step)` blocks sideways, so 1.0 is one block per step and 1.3 bends like a palm); `space_check` (bool, default true — an occupied block ends the lean and the crown stays on the trunk instead of floating where no log could be placed); `min_height` (int 1–16, default 4 — a tree whose trunk would be shorter places nothing) | rises straight, leans near the top, then continues as a near-horizontal stalk |
 | `isekai_api:branching` | `base_height`, `height_rand_a`, `height_rand_b` (int — shared); `branch_count` (int 1–6); `branch_length` (IntProvider 1–8); `branch_start_offset_from_top` (IntProvider 0–4, default 0 — how far below the trunk top branches sprout) | straight vertical trunk plus N upward-arcing branches; each branch tip becomes its own crown site, so paired with `disc`/`sphere` you get umbrella/forked silhouettes |
+
+`leaning`'s three newer fields are additive: a datapack that omits all of them gets exactly the old tree. `slant_curve` 1.0 walks one block sideways per step; raising it lengthens each successive step, so the same `lean_length` covers more ground and the bend accelerates instead of forming an L. `space_check` defaults to true because the old behaviour could attach a crown to a position where the trunk log was blocked by a neighbour — a palm growing into a dense stand ended up with leaves in mid-air. Set it to false only to reproduce that old shape deliberately. `min_height` is about the trunk, not about where leaves start (`min_height_for_leaves`), so it is what makes a deliberately short palm possible: raise it above `base_height` and the tree does not generate.
 
 ### Foliage placers (`foliage_placer`)
 

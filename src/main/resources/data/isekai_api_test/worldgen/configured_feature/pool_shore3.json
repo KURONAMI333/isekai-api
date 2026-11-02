@@ -1,0 +1,13 @@
+{
+  "type": "isekai_api:pool",
+  "config": {
+    "fluid": {"Name": "minecraft:water"},
+    "rim_block": {
+      "type": "minecraft:simple_state_provider",
+      "state": {"Name": "minecraft:sand"}
+    },
+    "xz_radius": 4,
+    "depth": 2,
+    "shore_width": 3
+  }
+}

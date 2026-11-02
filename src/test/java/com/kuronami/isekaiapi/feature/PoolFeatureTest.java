@@ -19,6 +19,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -395,5 +396,39 @@ class PoolFeatureTest {
                 }""");
         assertEquals(2, config.depth(), "depth must keep defaulting to 2");
         assertEquals(4, config.xzRadius().sample(RandomSource.create(1)));
+    }
+
+    @Test
+    void shoreWidthDefaultsToTheExistingOneBlockRim() {
+        // A pool JSON written before the field existed must keep generating the same pool: the
+        // default is 0 (no ring added), not 1.
+        PoolFeature.Config config = decode("""
+                {
+                  "fluid": {"Name": "minecraft:water"},
+                  "rim_block": {"type": "minecraft:simple_state_provider",
+                                "state": {"Name": "minecraft:sand"}},
+                  "xz_radius": 4
+                }""");
+        assertEquals(0, config.shoreWidth(), "shore_width must default to the unchanged rim");
+    }
+
+    @Test
+    void shoreWidthIsBoundedToTheWorkingBox() {
+        assertThrows(AssertionError.class, () -> decode("""
+                {
+                  "fluid": {"Name": "minecraft:water"},
+                  "rim_block": {"type": "minecraft:simple_state_provider",
+                                "state": {"Name": "minecraft:sand"}},
+                  "xz_radius": 4,
+                  "shore_width": 7
+                }"""), "shore_width past the codec range must fail decoding, not clamp");
+        assertEquals(6, decode("""
+                {
+                  "fluid": {"Name": "minecraft:water"},
+                  "rim_block": {"type": "minecraft:simple_state_provider",
+                                "state": {"Name": "minecraft:sand"}},
+                  "xz_radius": 4,
+                  "shore_width": 6
+                }""").shoreWidth());
     }
 }

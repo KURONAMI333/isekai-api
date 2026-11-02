@@ -67,8 +67,16 @@ import org.jetbrains.annotations.ApiStatus;
  *    "fluid": {"Name": "minecraft:water"},
  *    "rim_block": {"type": "minecraft:simple_state_provider", "state": {"Name": "minecraft:sand"}},
  *    "xz_radius": {"type": "minecraft:uniform", "min_inclusive": 3, "max_inclusive": 5},
- *    "depth": 2}}
+ *    "depth": 2,
+ *    "shore_width": 2}}
  * }</pre>
+ *
+ * <p><b>{@code shore_width}</b> repeats the rim ring outward, so the bank reads as a beach rather
+ * than a one-block lip. It is the only field that reaches past the excavated volume, and it never
+ * affects whether the pool places: containment is still judged on the single-cell shell, and the
+ * widened rings only replace solid cells (below the waterline always, above it half the time, the
+ * same rule the shell uses). {@code 0} is the untouched one-block rim and the default, so existing
+ * datapacks generate exactly what they did before the field existed.
  *
  * @since 2.1.0
  */
@@ -87,13 +95,18 @@ public class PoolFeature extends Feature<PoolFeature.Config> {
      */
     static final int MAX_RADIUS = 14;
 
+    /** Ceiling on {@code shore_width}: the widened rim must stay inside the feature's 3x3 chunks. */
+    static final int MAX_SHORE_WIDTH = 6;
+
     public record Config(BlockState fluid, BlockStateProvider rimBlock, IntProvider xzRadius,
-                         int depth) implements FeatureConfiguration {
+                         int depth, int shoreWidth) implements FeatureConfiguration {
         public static final Codec<Config> CODEC = RecordCodecBuilder.create(i -> i.group(
                 BlockState.CODEC.fieldOf("fluid").forGetter(Config::fluid),
                 BlockStateProvider.CODEC.fieldOf("rim_block").forGetter(Config::rimBlock),
                 IntProvider.codec(1, 64).fieldOf("xz_radius").forGetter(Config::xzRadius),
-                Codec.intRange(1, 32).optionalFieldOf("depth", 2).forGetter(Config::depth)
+                Codec.intRange(1, 32).optionalFieldOf("depth", 2).forGetter(Config::depth),
+                Codec.intRange(0, MAX_SHORE_WIDTH).optionalFieldOf("shore_width", 0)
+                        .forGetter(Config::shoreWidth)
         ).apply(i, Config::new));
     }
 
@@ -338,6 +351,21 @@ public class PoolFeature extends Feature<PoolFeature.Config> {
     @SuppressWarnings("deprecation")  // BlockState#isSolid — see canHold
     static boolean placeInto(Cells cells, int radius, int depth, BlockState fluid,
                              RandomSource random) {
+        return placeInto(cells, radius, depth, fluid, 0, random);
+    }
+
+    /**
+     * As above, plus {@code shoreWidth} rings of {@code rim_block} outside the shell.
+     *
+     * <p>The shore is grown, not measured: start from the shell cells and take the neighbour ring
+     * {@code shoreWidth} times. That reuses the same adjacency definition as {@link Blob#isShell}
+     * (6-neighbourhood), so a widened bank follows the basin's real outline instead of a circle
+     * around the origin. Cells outside the working box are never added, which keeps the widened
+     * rim inside the streamed chunks.
+     */
+    @SuppressWarnings("deprecation")  // BlockState#isSolid — see canHold
+    static boolean placeInto(Cells cells, int radius, int depth, BlockState fluid, int shoreWidth,
+                             RandomSource random) {
         Blob blob = shape(radius, depth, random);
         if (blob.isEmpty()) {
             return false;
@@ -380,7 +408,79 @@ public class PoolFeature extends Feature<PoolFeature.Config> {
                 }
             }
         }
+
+        if (shoreWidth > 0) {
+            widenShore(cells, blob, radius, depth, shoreWidth, random);
+        }
         return true;
+    }
+
+    /**
+     * Repeats the rim ring outward. Same write rule as the shell pass (solid cells only; above the
+     * waterline, half of them), so a wide beach is the one-block bank grown outward rather than a
+     * different material pattern. The ring membership ignores material so the bank keeps a
+     * consistent thickness where a neighbouring block is air (above ground, over a cave mouth):
+     * those cells are simply not written.
+     */
+    private static void widenShore(Cells cells, Blob blob, int radius, int depth, int shoreWidth,
+                                   RandomSource random) {
+        int maxDXZ = radius + 1 + shoreWidth;
+        int minDY = -(depth + 1);
+        int maxDY = depth;
+
+        java.util.Set<Long> ring = new java.util.HashSet<>();
+        for (int dx = -(radius + 1); dx <= radius + 1; dx++) {
+            for (int dz = -(radius + 1); dz <= radius + 1; dz++) {
+                for (int dy = minDY; dy <= maxDY; dy++) {
+                    if (blob.isShell(dx, dy, dz)) {
+                        ring.add(BlockPos.asLong(dx, dy, dz));
+                    }
+                }
+            }
+        }
+
+        for (int step = 0; step < shoreWidth; step++) {
+            java.util.Set<Long> next = new java.util.HashSet<>();
+            for (long key : ring) {
+                int dx = BlockPos.getX(key);
+                int dy = BlockPos.getY(key);
+                int dz = BlockPos.getZ(key);
+                grow(next, blob, ring, dx + 1, dy, dz, maxDXZ, minDY, maxDY);
+                grow(next, blob, ring, dx - 1, dy, dz, maxDXZ, minDY, maxDY);
+                grow(next, blob, ring, dx, dy + 1, dz, maxDXZ, minDY, maxDY);
+                grow(next, blob, ring, dx, dy - 1, dz, maxDXZ, minDY, maxDY);
+                grow(next, blob, ring, dx, dy, dz + 1, maxDXZ, minDY, maxDY);
+                grow(next, blob, ring, dx, dy, dz - 1, maxDXZ, minDY, maxDY);
+            }
+            for (long key : next) {
+                int dx = BlockPos.getX(key);
+                int dy = BlockPos.getY(key);
+                int dz = BlockPos.getZ(key);
+                if (dy >= 0 && random.nextInt(2) == 0) {
+                    continue;
+                }
+                if (cells.get(dx, dy, dz).isSolid()) {
+                    cells.rim(dx, dy, dz);
+                }
+            }
+            ring.addAll(next);
+        }
+    }
+
+    /** Adds one cell to {@code next} if it is inside the working box and not already excavated. */
+    private static void grow(java.util.Set<Long> next, Blob blob, java.util.Set<Long> ring,
+                             int dx, int dy, int dz, int maxDXZ, int minDY, int maxDY) {
+        if (dx < -maxDXZ || dx > maxDXZ || dz < -maxDXZ || dz > maxDXZ
+                || dy < minDY || dy > maxDY) {
+            return;
+        }
+        if (blob.get(dx, dy, dz)) {
+            return;
+        }
+        long key = BlockPos.asLong(dx, dy, dz);
+        if (!ring.contains(key)) {
+            next.add(key);
+        }
     }
 
     @Override
@@ -398,6 +498,6 @@ public class PoolFeature extends Feature<PoolFeature.Config> {
             return false;
         }
         return placeInto(new LevelCells(level, origin, config, random),
-                radius, depth, config.fluid(), random);
+                radius, depth, config.fluid(), config.shoreWidth(), random);
     }
 }

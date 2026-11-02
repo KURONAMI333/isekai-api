@@ -128,9 +128,39 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
   `textures/entity/signs/<path>.png`, `textures/entity/signs/hanging/<path>.png` and
   `textures/gui/hanging_signs/<path>.png`, which `WoodSets.signTexture` and
   `WoodSets.hangingSignGuiTexture` name. The example pack ships the three files.
+- **`isekai_api:pool` takes a `shore_width`.** `shore_width` (int 0–6, default 0) grows the pool's
+  rim block outward that many more rings, so a pond can have a beach instead of a one-block lip.
+  The rings are grown from the shell by adjacency, so the bank follows the basin's real outline,
+  and only solid cells are replaced (below the waterline always, above it half the time — the same
+  rule the shell uses). It does not change containment: a pool still refuses terrain that cannot
+  hold it. `0` is the old single ring, and the default, so existing datapacks place the same blocks.
+- **`isekai_api:leaning` trunk placer takes `slant_curve`, `space_check` and `min_height`.**
+  `slant_curve` (double 1.0–2.0, default 1.0) lengthens each successive sideways step, so the same
+  `lean_length` covers more ground and the bend accelerates instead of forming an L; 1.0 is one
+  block per step and byte-identical to the old tree. `space_check` (bool, default true) ends the
+  lean at an occupied cell and keeps the crown on the trunk — see Fixed. `min_height` (int 1–16,
+  default 4) makes the tree place nothing when its trunk would be shorter, which is what a
+  deliberately short palm needs. A datapack that omits all three gets the old shape.
+- **`isekai_api:leaf_distances` structure processor.** Recomputes a pasted template's leaf decay
+  data from the template's own `#minecraft:logs` blocks: distance 1 for a leaf touching a log, +1
+  per leaf step, 7 when no log is reachable. `orphan_leaves` (`decay`|`persist`, default `decay`)
+  decides whether unreachable leaves are left to decay or marked persistent, and `keep_persistent`
+  (default false) decides whether a template leaf's existing persistent flag survives. It runs in
+  `finalizeProcessing`, so it sees the states earlier processors produced. A template saved with
+  every leaf at distance 7 no longer sheds its whole crown on the first shape update.
 
 ### Fixed
 
+- **`isekai_api:assembled` places its features once, not once per overlapping chunk.** A piece's
+  `postProcess` runs for every chunk its box overlaps, each with its own random, so a
+  three-chunk-wide assembled landmark could re-place the whole feature list up to nine times and
+  stack nine differently-shaped pools and tree clusters on one spot. The run is now gated on the
+  chunk that contains the origin, which does not depend on chunk visit order. Features may still
+  write past that chunk, exactly as a `place` feature does during decoration.
+- **A `leaning` trunk no longer attaches its crown to a blocked cell.** With `space_check` on (the
+  new default), a lean that runs into an occupied cell stops there and the crown stays on the
+  trunk; previously the crown could sit in mid-air where no log could be placed. Set
+  `space_check: false` to reproduce the old shape.
 - **Worldshapes for different dimension types of one dimension key coexist.** Single-layer
   declarations were stored one-per-dimension key, so a Sky World shape (`sky_world:sky`) and a
   Tundra World shape (`frozen_world:frozen`) both targeting `minecraft:overworld` replaced each

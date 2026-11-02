@@ -4,6 +4,7 @@ import com.kuronami.isekaiapi.IsekaiApi;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
+import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -38,6 +39,17 @@ import java.util.Optional;
  * {@link StructurePieceSerializationContext}. This keeps the piece self-sufficient across
  * chunk save/load (the {@link AssembledStructure} configuration is also re-resolved from
  * the same registry, so consistency is automatic).
+ *
+ * <p><b>{@code postProcess} runs once per overlapping chunk; the features run only for the
+ * origin's own chunk.</b> {@code StructureStart#placeInChunk} calls {@code postProcess} for
+ * every chunk the piece's bounding box touches, each time with a random seeded per chunk, so a
+ * 33x97x33 box fires it up to nine times with nine different random streams. Re-running the
+ * feature list each time is not a harmless repeat: a pool re-digs its basin at a new shape, a
+ * tree cluster scatters a second set of trees, and the landmark accumulates nine versions of
+ * itself. The origin chunk is the one place the placement point actually belongs, so the other
+ * eight return immediately. Features that write past the origin chunk (a pool whose rim reaches
+ * 10 blocks out) still do so in that single call — the same neighbour writes a {@code place}
+ * feature makes during the decoration stage.
  */
 @ApiStatus.Internal
 public final class AssembledPiece extends StructurePiece {
@@ -92,6 +104,13 @@ public final class AssembledPiece extends StructurePiece {
     public void postProcess(WorldGenLevel level, StructureManager mgr,
                             ChunkGenerator gen, RandomSource random, BoundingBox box, ChunkPos chunkPos,
                             BlockPos pivot) {
+        // Fired once per overlapping chunk (StructureStart#placeInChunk). Only the chunk that
+        // contains the origin runs the feature list; see the class javadoc for why.
+        if (chunkPos.x != SectionPos.blockToSectionCoord(originX)
+                || chunkPos.z != SectionPos.blockToSectionCoord(originZ)) {
+            return;
+        }
+
         // Snap Y to the live heightmap so the structure sits on the actual surface even if
         // terrain finalised differently from initial expectation. Use WORLD_SURFACE_WG (no
         // floor restriction) — consumers can write their own y_anchor into individual
