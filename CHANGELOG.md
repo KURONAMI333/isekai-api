@@ -108,6 +108,17 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
   through the real configured-feature registry and assert the trunk, stubs, snap and ground ring,
   alongside codec round-trips for the new placers and decorators. The fixture and its test wrapper
   classes stay out of the jar (`data/isekai_api_test/**`, `gametest/**`).
+- **`/isekai validate <namespace>` reports missing wood-set files.** For every species the namespace
+  declares with `WoodSet`, it checks the loot tables, block and item tags, recipes, language keys,
+  blockstates, models and textures that the species' parts imply, and lists each gap by kind and
+  subject. Members that are not visible from the current side (client-only resource packs on a
+  dedicated server) are counted as "not visible here" instead of missing. This catches a missing
+  texture before it shows up as the purple-black checker in game.
+- **A one-species example under `examples/4_wood/`.** `ExampleWoodMod` declares a full wood set
+  (log, wood, stripped variants, planks, stairs, slab, fence, gate, door, trapdoor, pressure plate,
+  button, signs, leaves, sapling, potted sapling, boats) and its datagen; the pack beside it holds
+  the configured feature with an `isekai_api` decorator. The class is compiled and the pack is
+  loaded only on the GameTest server, and neither ships in the jar.
 
 ### Fixed
 

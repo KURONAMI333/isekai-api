@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "isekai_example:block/example_log",
+    "side": "isekai_example:block/example_log"
+  }
+}

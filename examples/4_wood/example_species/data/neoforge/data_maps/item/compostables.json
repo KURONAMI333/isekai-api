@@ -1,0 +1,10 @@
+{
+  "values": {
+    "isekai_example:example_leaves": {
+      "chance": 0.3
+    },
+    "isekai_example:example_sapling": {
+      "chance": 0.3
+    }
+  }
+}

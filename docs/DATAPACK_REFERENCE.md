@@ -463,6 +463,11 @@ A leafless, charred tree — vanilla `minecraft:tree`, Isekai parts only:
 
 A datapack cannot bind a sapling to a tree — that mapping is Java (`WoodSet` + `TreeGrowers`, which takes the configured features above). The JSON is what those keys point at.
 
+A complete species, end to end, is in [`examples/4_wood/`](../examples/4_wood/README.md): one Java class
+declares the set and its generators, and the pack beside it holds the configured feature plus the
+generated data and assets. Run `/isekai validate <namespace>` in that world to list what the species
+is still missing.
+
 ---
 
 ## Biome / structure modifiers (`isekai_api:`) under `data/<ns>/isekai/worldshape/<name>.json`, then point the `_ref` modifiers at it by dimension. The `_ref` forms are the recommended path (no descriptor duplication, 4-line modifier files).

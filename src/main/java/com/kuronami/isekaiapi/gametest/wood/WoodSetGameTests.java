@@ -432,13 +432,24 @@ public final class WoodSetGameTests {
         helper.succeed();
     }
 
-    /** Only the sets declared through the builder exist: the library itself ships no species. */
+    /**
+     * Only the sets declared through the builder exist, and none of them is Isekai's own: the
+     * library ships no species, so every declared set belongs to a consumer's namespace. The
+     * example species is one of those consumers, which is why this asks about namespaces instead
+     * of counting.
+     */
     @PrefixGameTestTemplate(false)
     @GameTest(template = "empty3x3x3")
     public static void libraryDeclaresNoSpeciesOfItsOwn(GameTestHelper helper) {
         List<WoodSet> declared = WoodSets.all();
-        if (declared.size() != 2 || declared.get(0) != full() || declared.get(1) != sparse()) {
-            helper.fail("expected exactly the two fixture sets, got " + declared.size());
+        for (WoodSet set : declared) {
+            if (set.id().getNamespace().equals(IsekaiApi.MODID)) {
+                helper.fail("the library declares a species of its own: " + set.id());
+                return;
+            }
+        }
+        if (!declared.contains(full()) || !declared.contains(sparse())) {
+            helper.fail("the fixture sets are missing from " + declared.size() + " declared set(s)");
             return;
         }
         helper.succeed();

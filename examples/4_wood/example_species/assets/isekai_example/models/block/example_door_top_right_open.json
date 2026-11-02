@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/door_top_right_open",
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "bottom": "isekai_example:block/example_door_bottom",
+    "top": "isekai_example:block/example_door_top"
+  }
+}

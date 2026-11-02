@@ -15,6 +15,17 @@ group = mod_group_id
 sourceSets.main.resources {
     srcDir('src/generated/resources')
     exclude("src/generated/**/.cache")
+    // The wood-set example: its data pack sits at the resources root as `example_species/` so
+    // `AddPackFindersEvent` can load it by name. Inert unless that pack is added (GameTest only).
+    srcDir('examples/4_wood')
+    exclude 'java/**'
+    // The example's own README documents the pack; it is not a resource.
+    exclude '*.md'
+}
+
+sourceSets.main.java {
+    // The example's one class, compiled with the mod so it cannot drift from the API it shows.
+    srcDir 'examples/4_wood/java'
 }
 
 base {
@@ -68,6 +79,20 @@ neoForge {
             systemProperty 'isekai.datagen.testwood', 'true'
         }
 
+        // Regenerates the example species' data files, so `examples/4_wood` stays reproducible
+        // instead of being hand-edited JSON:
+        //   _tools/gw <cell> dataExample
+        // Generation writes to build/ and `syncExampleSpecies` copies the result onto the pack.
+        // It cannot write into the pack directly: a data run deletes every file in its output
+        // directory that it did not write itself, which would eat pack.mcmeta and the tree.
+        dataExample {
+            data()
+            programArguments.addAll '--mod', project.mod_id, '--all',
+                    '--output', layout.buildDirectory.dir('example_species').get().asFile.absolutePath,
+                    '--existing', layout.projectDirectory.dir('src/main/resources').asFile.absolutePath
+            systemProperty 'isekai.datagen.example', 'true'
+        }
+
         configureEach {
             systemProperty 'forge.logging.markers', 'REGISTRIES'
             logLevel = org.slf4j.event.Level.DEBUG
@@ -85,6 +110,43 @@ neoForge {
     unitTest {
         enable()
         testedMod = mods."${mod_id}"
+    }
+}
+
+// Copies the generated halves of the example species onto the checked-in pack. A data run deletes
+// every file in its output directory that it did not write itself (that is how stale entries
+// disappear), so it cannot write into the pack: `pack.mcmeta`, the tree's configured feature and
+// the placeholder textures are hand-written. Only the generated subtrees are replaced, so
+// `data/<namespace>/worldgen` and `assets/<namespace>/textures` survive a regeneration.
+def exampleNamespace = 'isekai_example' // mirrors ExampleWoodMod.MOD_ID
+
+tasks.register('dataExample') {
+    group = 'isekai'
+    description = 'Regenerates examples/4_wood/example_species from the wood-set generators.'
+    dependsOn 'runDataExample'
+    def generatedDir = layout.buildDirectory.dir('example_species')
+    def packDir = layout.projectDirectory.dir('examples/4_wood/example_species')
+    // Everything the wood-set generators write, and nothing else.
+    def generatedSubtrees = [
+            'data/minecraft',
+            'data/neoforge',
+            "data/${exampleNamespace}/advancement",
+            "data/${exampleNamespace}/loot_table",
+            "data/${exampleNamespace}/recipe",
+            "data/${exampleNamespace}/tags",
+            "assets/${exampleNamespace}/blockstates",
+            "assets/${exampleNamespace}/models",
+            "assets/${exampleNamespace}/lang",
+    ]
+    doLast {
+        File pack = packDir.asFile
+        generatedSubtrees.each { delete new File(pack, it) }
+        copy {
+            from(generatedDir.get().asFile) {
+                exclude '.cache/**'
+            }
+            into pack
+        }
     }
 }
 
@@ -149,6 +211,11 @@ def testPayloadExcludes = { CopySpec spec ->
     // them would clobber every consumer's overworld. Dev-only, jar-excluded like isekai_verify.
     spec.exclude 'data/minecraft/worldgen/noise_settings/overworld.json'
     spec.exclude 'data/minecraft/worldgen/world_preset/normal.json'
+    // The wood-set example: a complete species written as documentation and exercised by the
+    // GameTest server. Shipping it would add a second species' blocks, tags and textures to every
+    // consumer's game, so the pack and the one class that declares it stay out of the jar.
+    spec.exclude 'example_species/**'
+    spec.exclude 'com/kuronami/isekaiapi/examples/**'
 }
 tasks.named('jar', Jar) { testPayloadExcludes(it) }
 tasks.named('sourcesJar', Jar) { testPayloadExcludes(it) }

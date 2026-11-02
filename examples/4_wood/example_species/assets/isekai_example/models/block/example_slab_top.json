@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/slab_top",
+  "textures": {
+    "bottom": "isekai_example:block/example_planks",
+    "side": "isekai_example:block/example_planks",
+    "top": "isekai_example:block/example_planks"
+  }
+}

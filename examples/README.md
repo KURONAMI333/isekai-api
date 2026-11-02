@@ -10,6 +10,9 @@ Every Isekai world is three steps. The examples are organised by which step they
 
 Reusable copy-paste starting points (not runnable packs) live in [`templates/`](templates/).
 
+[`4_wood/`](4_wood/) is a different kind of example: a complete one-species mod in one Java class
+plus one data pack, compiled with the library and exercised by the GameTest server.
+
 ---
 
 ## 1. Shape — `1_shape/`
@@ -31,6 +34,14 @@ Worldshape descriptors that re-place existing content so a reshaped world still 
 - **`sky_archipelago/`**, **`flipped/`** — 3-file consumer skeletons (`apply_worldshape_ref` + `apply_worldshape_structures_ref` pointing at a worldshape declared once under `isekai/worldshape/<name>.json`), with `content_overrides` gating lakes on solid ground so water doesn't leak into the void.
 - **`runtime_effects/`** — biome / structure modifier packs (`data/<ns>/neoforge/{biome,structure}_modifier/`) that produce visible in-game changes through NeoForge's modifier pipeline.
 - **`declaration_only/`** — worldshape / layered_worldshape descriptors that populate Isekai's runtime registry (queryable via `/isekai query worldshape`) without themselves altering chunk generation; wrap them in an `apply_worldshape` modifier to apply.
+
+## 4. Wood species — `4_wood/`
+
+**`4_wood/`** — a complete species (log through boats) declared by one class and shipped as one
+data pack. It is not a pure datapack: the blocks come from `WoodSet` in Java, and the pack holds
+what the generators write for them — loot tables, recipes, tags, blockstates, models, textures,
+names — plus the hand-written configured feature the sapling grows. See
+[`4_wood/README.md`](4_wood/README.md).
 
 ## Trying a pack
 

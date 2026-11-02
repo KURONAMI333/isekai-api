@@ -350,7 +350,7 @@ omitted from the builder chain.
 | `/isekai query dimensions` | List dimensions with declared worldshape |
 | `/isekai query worldshape <dim>` | Inspect a single dimension's declaration |
 | `/isekai query atmosphere <biome>` | Report a biome's resolved sky/fog/water/foliage/grass colors (decimal + hex) |
-| `/isekai validate <namespace>` | Validate every `isekai/*.json` under that namespace |
+| `/isekai validate <namespace>` | Validate every `isekai/*.json` under that namespace, then the wood sets declared in it: loot tables, block/item tag membership, recipes, blockstates, models, textures and language keys, listed by kind |
 | `/isekai validate dimension <dim>` | Runtime diagnosis: LevelStem profile (build height, sea level), `applies_to` that matches no biome, out-of-bounds `playable_range`, features skipped in this dimension |
 | `/isekai preview range <id> [dim]` | Show overworld-resolved + per-dim VerticalRange |
 | `/isekai preview column <dim> <x> <z>` | Sample the base column at (x, z) and dump the block at each playable-band Y |

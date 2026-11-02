@@ -1,5 +1,6 @@
 package com.kuronami.isekaiapi.command.sub;
 
+import com.kuronami.isekaiapi.impl.wood.validation.WoodSetAudit;
 import com.kuronami.isekaiapi.validation.DimensionDiagnostics;
 import com.kuronami.isekaiapi.validation.IsekaiValidator;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -17,7 +18,8 @@ import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.ApiStatus;
 
 /**
- * {@code /isekai validate <namespace>} — datapack codec + cross-field validation.
+ * {@code /isekai validate <namespace>} — datapack codec + cross-field validation, plus the wood-set
+ * completeness audit (missing loot tables, tags, recipes, blockstates/models/textures and names).
  *
  * <p>{@code /isekai validate dimension <id>} — runtime diagnosis against the dimension's
  * {@code LevelStem} profile and the worldshape currently registered for it (build height,
@@ -43,13 +45,26 @@ public final class ValidateCommand {
                     String ns = StringArgumentType.getString(ctx, "namespace");
                     var rm = ctx.getSource().getServer().getResourceManager();
                     var result = IsekaiValidator.validateNamespace(ns, rm);
+                    var wood = WoodSetAudit.audit(ns, rm);
                     ctx.getSource().sendSuccess(() ->
                             Component.literal(String.format("Validated %d files, %d errors found",
                                     result.filesChecked(), result.errorsFound())), false);
                     for (String err : result.errors()) {
                         ctx.getSource().sendFailure(Component.literal("  " + err));
                     }
-                    return result.isOk() ? 1 : 0;
+                    if (wood.sets() > 0) {
+                        ctx.getSource().sendSuccess(
+                                () -> Component.literal(String.format(
+                                        "Wood sets: %d set(s), %d checks, %d missing, %d not visible here",
+                                        wood.sets(), wood.checks(), wood.findings().size(),
+                                        wood.skipped())), false);
+                    }
+                    for (WoodSetAudit.Finding finding : wood.findings()) {
+                        ctx.getSource().sendFailure(Component.literal(
+                                "  [" + finding.kind().name().toLowerCase(java.util.Locale.ROOT)
+                                        + "] " + finding.message()));
+                    }
+                    return result.isOk() && wood.isOk() ? 1 : 0;
                 }));
     }
 

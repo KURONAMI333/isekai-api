@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_stripped_logs": {
+      "conditions": {
+        "items": [
+          {
+            "items": "isekai_example:stripped_example_log"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "isekai_example:example_hanging_sign"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_the_recipe",
+      "has_stripped_logs"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "isekai_example:example_hanging_sign"
+    ]
+  }
+}
