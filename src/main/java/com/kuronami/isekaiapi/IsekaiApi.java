@@ -11,6 +11,7 @@ import com.kuronami.isekaiapi.structure.IsekaiStructures;
 import com.kuronami.isekaiapi.surfacerule.IsekaiSurfaceRules;
 import com.kuronami.isekaiapi.biomesource.IsekaiBiomeSources;
 import com.kuronami.isekaiapi.tree.IsekaiTreePlacers;
+import com.kuronami.isekaiapi.impl.wood.WoodSetHooks;
 import com.mojang.logging.LogUtils;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -48,6 +49,7 @@ public final class IsekaiApi {
         IsekaiTreePlacers.register(modBus);
         IsekaiFeatures.register(modBus);
         IsekaiStructures.register(modBus);
+        WoodSetHooks.init(modBus);
         modBus.addListener(AtmosphereSyncNetwork::register);
     }
 }
