@@ -139,6 +139,11 @@ def testPayloadExcludes = { CopySpec spec ->
     // Dev-loaded from build/resources; must never ship — a neutral library must not carry
     // a consumer-flavoured world (the v0.1 preset-library sin).
     spec.exclude 'data/isekai_verify/**'
+    // Acceptance fixture for the bare-tree parts: a leafless, branch-bearing tree written only
+    // with Isekai's own decorators and `isekai_api:none`, loaded from disk so the GameTest reads
+    // it through the real configured-feature registry. It is a verification tree, not a library
+    // part, so it stays out of the shipped jar like the rest of the fixtures.
+    spec.exclude 'data/isekai_api_test/**'
     // The cosmos acceptance world replaces the vanilla overworld in-dev by overriding these
     // two minecraft-namespace registry entries. They are pure verification fixtures — shipping
     // them would clobber every consumer's overworld. Dev-only, jar-excluded like isekai_verify.

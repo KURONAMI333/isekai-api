@@ -1,14 +1,13 @@
 package com.kuronami.isekaiapi.gametest.wood;
 
 import com.kuronami.isekaiapi.IsekaiApi;
+import com.kuronami.isekaiapi.api.wood.TreeGrowers;
 import com.kuronami.isekaiapi.api.wood.WoodSet;
 import com.kuronami.isekaiapi.api.wood.WoodSetDataGen;
-import java.util.Optional;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.level.block.grower.TreeGrower;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.material.MapColor;
 import net.neoforged.bus.api.IEventBus;
@@ -42,8 +41,16 @@ public final class WoodSetTestFixtures {
     /** Set by the {@code data} run in {@code build.gradle}; never present in a shipped mod. */
     public static final String DATAGEN_PROPERTY = "isekai.datagen.testwood";
 
+    /** The id the full fixture wood set is built with; the grower name comes from it. */
+    private static final ResourceLocation FULL_ID =
+            ResourceLocation.fromNamespaceAndPath(TEST_MODID, "test_wood");
+
     private static final ResourceKey<ConfiguredFeature<?, ?>> OAK_TREE =
             ResourceKey.create(Registries.CONFIGURED_FEATURE, ResourceLocation.withDefaultNamespace("oak"));
+
+    /** The 2x2 shape, so a mega-sapling growth is distinguishable from a single one. */
+    private static final ResourceKey<ConfiguredFeature<?, ?>> MEGA_TREE =
+            ResourceKey.create(Registries.CONFIGURED_FEATURE, ResourceLocation.withDefaultNamespace("dark_oak"));
 
     private static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(TEST_MODID);
     private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(TEST_MODID);
@@ -80,12 +87,12 @@ public final class WoodSetTestFixtures {
         ENTITIES.register(bus);
 
         full = WoodSet
-                .builder(ResourceLocation.fromNamespaceAndPath(TEST_MODID, "test_wood"))
+                .builder(FULL_ID)
                 .log().wood().strippedLog().strippedWood()
                 .family()
                 .signs()
                 .leaves()
-                .sapling(new TreeGrower(TEST_MODID + "/test_wood", Optional.empty(), Optional.of(OAK_TREE), Optional.empty()))
+                .sapling(TreeGrowers.builder(FULL_ID).tree(OAK_TREE).megaTree(MEGA_TREE).build())
                 .pottedSapling()
                 .boats()
                 .mapColor(MapColor.COLOR_ORANGE)

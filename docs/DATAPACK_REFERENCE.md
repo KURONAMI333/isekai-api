@@ -384,6 +384,7 @@ Common fields on every placer: `radius` (IntProvider — vanilla, often 0 since 
 | `isekai_api:cone` | `base_radius` (int 1–8); `height` (int 1–16); `taper` (`linear`\|`concave`, default linear); `jitter` (float 0–1, default 0.15) | conical crown; concave taper = conifer/cypress silhouette |
 | `isekai_api:disc` | `disc_radius` (int 1–8); `thickness` (int 1–4, default 1); `jitter` (float 0–1, default 0.2) | flat wide horizontal disc — umbrella/savanna |
 | `isekai_api:weeping` | `crown_radius` (int 2–6, default 3); `crown_thickness` (int 1–3, default 2); `strand_length` (IntProvider 1–6); `strand_chance` (float 0–1, default 0.4) | stacked discs + vertical leaf strands dripping from rim cells — willow/wisteria/sadesign review |
+| `isekai_api:none` | none — `radius` and `offset` are accepted and default to 0, so `{"type": "isekai_api:none"}` is enough | places no leaves at all. `minecraft:tree` always requires a foliage placer, so this is what a leafless trunk (dead, burnt, pollarded) uses; pair it with `branch_stubs` for the limbs |
 
 Minimal palm example:
 
@@ -407,9 +408,64 @@ Minimal palm example:
 
 ---
 
-## Biome / structure modifiers (`isekai_api:`)
+## Tree decorators (`isekai_api:`)
 
-Declare the worldshape **once** under `data/<ns>/isekai/worldshape/<name>.json`, then point the `_ref` modifiers at it by dimension. The `_ref` forms are the recommended path (no descriptor duplication, 4-line modifier files).
+The `decorators` array of the same `minecraft:tree` configured feature. Placers decide where the trunk and the crown go; decorators add what grows on them. They run in array order, after the trunk and the crown are in the world, and every block they place is a `block_provider` slot, so nothing here bakes in a species.
+
+| Type | Fields | Effect |
+|---|---|---|
+| `isekai_api:attach_to_logs` | `block_provider` (required); `chance` (0–1, required); `directions` (default the four horizontals); `max_per_log` (1–16, default 1) | attaches a block to an empty side of each trunk block — shelf fungus, moss, resin. A block with a facing property is turned away from the trunk |
+| `isekai_api:ground_patch` | `block_provider` (required); `radius` (IntProvider 0–16, required); `chance` (0–1, default 1); `replaceable` (block tag, default `minecraft:dirt`); `mode` (`cover`\|`replace`, default `cover`) | lays a disc of blocks around the base. `cover` puts the block on top of the ground, `replace` switches the ground block itself, which is how a scorched ring or moss carpet is made |
+| `isekai_api:hang_from_leaves` | `block_provider` (required); `tip_provider` (optional); `length` (IntProvider 1–16, required); `chance` (0–1, default 1); `only_on_rim` (bool, default false) | strands hanging from the underside of the crown. Leaf tip states are pinned so the strands do not decay |
+| `isekai_api:snow_cap` | `layers` (IntProvider 1–8, default 1); `chance` (0–1, default 1) | snow layers on the sky-facing leaves |
+| `isekai_api:branch_stubs` | `count` (IntProvider 0–16, required); `length` (IntProvider 1–8, required); `start_fraction` (0–1, default 0.4); `upward_chance` (0–1, default 0.5); `directions` (default the four horizontals); `block_provider` (optional) | short bare branches out of the trunk's sides — the leafless limbs of a dead or burnt tree. `start_fraction` keeps them in the upper part of the trunk (`0` = the whole trunk); `upward_chance` decides, per stub, whether it stays flat or steps out and up. Each block's `axis` follows the step, so a flat stub is a run of horizontal logs. Omit `block_provider` to reuse the block the tree's own lowest trunk block is made of |
+| `isekai_api:broken_top` | `count` (IntProvider 1–12, required); `fill_provider` (optional); `fill_chance` (0–1, default 1) | snaps the top `count` trunk blocks off, always keeping at least one. With `fill_provider` the top is replaced by that block (turned upright) instead of air, which is how a snapped trunk keeps a charred end. In each column the fill can only sit at the bottom of the break; above an opened log everything is air. List it before `branch_stubs` and the other trunk decorators: decorators run in list order, and later ones skip logs the break has removed |
+
+`isekai_api:branching` (above, in trunk placers) also grows branches, but it makes them part of the crown: every branch tip becomes a leaf site. A tree with no leaves needs branches and no leaf sites, which is `branch_stubs`.
+
+`broken_top` is for trees whose height varies and should still look snapped. If every tree of the species should be the same short height, lower the trunk placer's `base_height` instead and skip the decorator.
+
+A leafless, charred tree — vanilla `minecraft:tree`, Isekai parts only:
+
+```jsonc
+// data/<ns>/worldgen/configured_feature/snag.json
+{
+  "type": "minecraft:tree",
+  "config": {
+    "ignore_vines": true, "force_dirt": false,
+    "trunk_provider": { "type": "minecraft:weighted_state_provider", "entries": [
+      { "data": { "Name": "minecraft:dark_oak_log", "Properties": { "axis": "y" } }, "weight": 3 },
+      { "data": { "Name": "minecraft:basalt",       "Properties": { "axis": "y" } }, "weight": 1 } ] },
+    "foliage_provider": { "type": "minecraft:simple_state_provider",
+                          "state": { "Name": "minecraft:dark_oak_leaves" } },
+    "dirt_provider": { "type": "minecraft:simple_state_provider", "state": { "Name": "minecraft:coarse_dirt" } },
+    "minimum_size": { "type": "minecraft:two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1 },
+    "trunk_placer": { "type": "minecraft:straight_trunk_placer", "base_height": 5, "height_rand_a": 3, "height_rand_b": 2 },
+    "foliage_placer": { "type": "isekai_api:none" },
+    "decorators": [
+      { "type": "isekai_api:broken_top",
+        "count": { "type": "minecraft:uniform", "min_inclusive": 1, "max_inclusive": 2 },
+        "fill_provider": { "type": "minecraft:simple_state_provider",
+                           "state": { "Name": "minecraft:basalt", "Properties": { "axis": "y" } } },
+        "fill_chance": 0.45 },
+      { "type": "isekai_api:branch_stubs",
+        "count":  { "type": "minecraft:uniform", "min_inclusive": 2, "max_inclusive": 4 },
+        "length": { "type": "minecraft:uniform", "min_inclusive": 1, "max_inclusive": 2 },
+        "start_fraction": 0.35, "upward_chance": 0.6 },
+      { "type": "isekai_api:ground_patch",
+        "block_provider": { "type": "minecraft:simple_state_provider", "state": { "Name": "minecraft:coarse_dirt" } },
+        "radius": { "type": "minecraft:uniform", "min_inclusive": 2, "max_inclusive": 3 },
+        "chance": 0.8, "mode": "replace" }
+    ]
+  }
+}
+```
+
+A datapack cannot bind a sapling to a tree — that mapping is Java (`WoodSet` + `TreeGrowers`, which takes the configured features above). The JSON is what those keys point at.
+
+---
+
+## Biome / structure modifiers (`isekai_api:`) under `data/<ns>/isekai/worldshape/<name>.json`, then point the `_ref` modifiers at it by dimension. The `_ref` forms are the recommended path (no descriptor duplication, 4-line modifier files).
 
 ### Biome modifiers — `data/<ns>/neoforge/biome_modifier/*.json`
 

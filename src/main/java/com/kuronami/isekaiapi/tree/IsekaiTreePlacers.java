@@ -26,6 +26,8 @@ import org.jetbrains.annotations.ApiStatus;
  *       {@link LeaningTrunkPlacer}.</li>
  *   <li>{@code isekai_api:sphere} — an ellipsoid leaf crown with edge jitter, see
  *       {@link SphereFoliagePlacer}.</li>
+ *   <li>{@code isekai_api:none} — no leaves at all, for bare trunks, see
+ *       {@link NoneFoliagePlacer}.</li>
  * </ul>
  */
 @ApiStatus.Internal
@@ -50,12 +52,14 @@ public final class IsekaiTreePlacers {
             FOLIAGE_PLACERS.register("disc", () -> new FoliagePlacerType<>(DiscFoliagePlacer.CODEC));
     public static final Supplier<FoliagePlacerType<WeepingFoliagePlacer>> WEEPING =
             FOLIAGE_PLACERS.register("weeping", () -> new FoliagePlacerType<>(WeepingFoliagePlacer.CODEC));
+    public static final Supplier<FoliagePlacerType<NoneFoliagePlacer>> NONE =
+            FOLIAGE_PLACERS.register("none", () -> new FoliagePlacerType<>(NoneFoliagePlacer.CODEC));
 
     private IsekaiTreePlacers() {}
 
     public static void register(IEventBus modBus) {
         TRUNK_PLACERS.register(modBus);
         FOLIAGE_PLACERS.register(modBus);
-        IsekaiApi.LOGGER.info("[Isekai] tree placers registered: leaning, branching (trunk); sphere, fan, cone, disc, weeping (foliage)");
+        IsekaiApi.LOGGER.info("[Isekai] tree placers registered: leaning, branching (trunk); sphere, fan, cone, disc, weeping, none (foliage)");
     }
 }

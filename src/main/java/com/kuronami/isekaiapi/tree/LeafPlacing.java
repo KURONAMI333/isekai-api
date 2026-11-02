@@ -64,4 +64,20 @@ public final class LeafPlacing {
         }
         setter.set(pos, state);
     }
+
+    /**
+     * Pins {@link LeavesBlock#DISTANCE} when {@code state} is a leaf block, so leaves placed by a
+     * tree decorator decay like the crown's own leaves instead of falling apart on the first tick.
+     *
+     * <p>Decorators set blocks one at a time and never run through the feature's leaf
+     * distance pass, so a leaf provider written into a decorator would otherwise keep
+     * {@code distance: 7} — the "no log nearby" state — and vanish. Any other state is returned
+     * unchanged, so this is safe to call from every decorator placement.
+     */
+    public static BlockState pinIfLeaves(BlockState state) {
+        if (state.hasProperty(LeavesBlock.DISTANCE)) {
+            return state.setValue(LeavesBlock.DISTANCE, SAFE_PINNED_DISTANCE);
+        }
+        return state;
+    }
 }

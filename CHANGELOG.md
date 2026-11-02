@@ -88,6 +88,26 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
   Only the sampled base colour changes: vanilla's day/night, rain/thunder and lightning-flash
   shading still apply. Carried by `ClientLevelSkyColorMixin`, so it exists on the client only, and
   it applies to dimensions whose `effects` is `minecraft:overworld` (the vanilla sky path).
+- **`isekai_api:none` foliage placer.** A crown of nothing, so a `minecraft:tree` feature can place
+  a bare trunk without leaves. `radius` and `offset` are optional and default to `0`, which makes
+  `{"type": "isekai_api:none"}` valid on its own.
+- **Six tree decorators.** `minecraft:tree`'s `decorators` array now accepts `isekai_api:` parts:
+  `attach_to_logs` (blocks on trunk sides), `ground_patch` (a disc of blocks around the base,
+  `cover` or `replace`), `hang_from_leaves` (strands from the crown's underside), `snow_cap`
+  (snow layers on sky-facing leaves), `branch_stubs` (bare limbs out of the trunk, each `axis`
+  following the step, block optional so it can reuse the trunk's own block) and `broken_top`
+  (snaps the top `count` trunk blocks off, keeping at least one; optional `fill_provider` turns the
+  break into basalt or charcoal instead of air). Every block is a `block_provider` slot, so the
+  parts carry no species; leaf states written by a decorator are pinned on `distance` so they do
+  not decay. Fields and the charred-tree example are in `docs/DATAPACK_REFERENCE.md`.
+- **`TreeGrowers`** (`api/wood`) builds the `TreeGrower` a sapling needs from configured feature
+  keys — plain, mega, secondary and flower forms — with Isekai's own name convention, so a wood set
+  does not have to hand-write the eight-argument constructor; a wood set hands the result to
+  `WoodSet.Builder#sapling`.
+- **Bare-tree fixture and coverage.** The GameTests load a leafless, branch-bearing tree from disk
+  through the real configured-feature registry and assert the trunk, stubs, snap and ground ring,
+  alongside codec round-trips for the new placers and decorators. The fixture and its test wrapper
+  classes stay out of the jar (`data/isekai_api_test/**`, `gametest/**`).
 
 ### Fixed
 
