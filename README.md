@@ -357,6 +357,8 @@ omitted from the builder chain.
 | `/isekai dump worldgen` | Write the full snapshot to `<world>/isekai_dump/worldgen.txt` |
 | `/isekai dump ore <id>` | Single-feature query |
 | `/isekai dump structure <id>` | Single-structure query |
+| `/isekai survey <structure> [radius]` | Replay placement over a square of chunks (default radius 64, max 512): candidate chunks, placements, and the gate that rejected the rest. Writes `<world>/isekai/survey/<ns>_<path>-r<radius>.json` |
+| `/isekai fit <structure> [pos]` | The 3x3 surface grid under one chunk beside the gate limits, the verdict, and each template variant's Y span. Writes `<world>/isekai/fit/<ns>_<path>-<chunkX>_<chunkZ>.json` |
 
 All subcommands require permission level 2 (operators).
 

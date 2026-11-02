@@ -339,12 +339,40 @@ Use it instead of `minecraft:jigsaw` for any world where a set-piece could land 
   "spawn_overrides": {},
   "terrain_adaptation": "beard_thin",
   "template": "<ns>:<name>",          // -> data/<ns>/structure/<name>.nbt
+  "processors": "<ns>:<list>",         // optional; omit and the NBT is placed exactly as saved
+  "rotation": "none",                  // optional; none | clockwise_90 | clockwise_180 | counterclockwise_90 | random
+  "mirror": "none",                    // optional; none | left_right | front_back | random
   "clearance_above_fluid": 2,          // every footprint column must rise >= this above sea level
   "max_slope": 4,                      // reject if footprint height-spread exceeds this
   "vertical_offset": -1                // template y=0 lands at (surface + this); tune sink/raise
 }
 ```
-The footprint is sampled at the template's centre + four corners, so a too-aggressive `max_slope` (for a large template on hilly terrain) makes it rare or absent; loosen it or shrink the template if natural spawns dry up.
+
+`processors` works like the same field on a jigsaw `single_pool_element`: a processor list id
+(`"<ns>:palm_crown"`) or the list written inline (`{"processors": [ ... ]}`). Omitting it is the
+behaviour every older datapack already had — the template lands with the block states the NBT
+saved. Attach `isekai_api:leaf_distances` here to fix a hand-authored tree in place, without
+routing it through a jigsaw pool.
+
+**Variation.** `rotation` and `mirror` default to `none`, which is the orientation an existing
+datapack gets, and `random` draws once per placement attempt from the chunk's structure seed, so the
+same world always gives the same result for the same chunk. `left_right` reverses the template's Z
+axis and `front_back` its X axis (vanilla's names). To vary *which* template is used, write
+`template` as a weighted list instead of an id:
+
+```jsonc
+"template": [
+  { "template": "<ns>:oasis_large", "weight": 3 },
+  { "template": "<ns>:oasis_small" }        // weight defaults to 1
+]
+```
+
+**Footprint.** The gates sample the ground the piece will really cover: the extents come from the
+rotated template (a quarter turn swaps X and Z) and the template is centred on the chunk middle in
+every orientation. A too-aggressive `max_slope` (a large template on hilly terrain) makes it rare or
+absent; loosen it or shrink the template if natural spawns dry up. `/isekai survey` reports exactly
+which gate rejects how many candidate chunks, and `/isekai fit` shows one chunk's heights beside the
+limits (see [A structure that never spawns](#a-structure-that-never-spawns--isekai-survey-and-isekai-fit)).
 
 ### `isekai_api:assembled` — loose scatter of features at one origin (NOT coordinated landmarks)
 
@@ -399,7 +427,7 @@ It runs in `finalizeProcessing`, so it sees the states that earlier processors i
 }
 ```
 
-Where it runs: only where vanilla reads a processor list — a jigsaw pool element's `processors` field, and the vanilla structures that reference one. `/place template` does not run processors, and `isekai_api:grounded_template` / `isekai_api:assembled` do not take a processor list, so a template placed by those two keeps the leaf data it was saved with.
+Where it runs: only where vanilla reads a processor list — a jigsaw pool element's `processors` field, `isekai_api:grounded_template`'s `processors` field, and the vanilla structures that reference one. `/place template` does not run processors, and `isekai_api:assembled` does not take a processor list, so a template placed by that one keeps the leaf data it was saved with.
 
 A persistent leaf never decays regardless of distance, so the two flags are independent: `keep_persistent: true` alone turns nothing into a persistent leaf, and `orphan_leaves: persist` only touches leaves the processor could not reach.
 
@@ -943,6 +971,68 @@ declared worldshape: buried, no footing within 32 blocks, or lava is an error; s
 water is a warning; an unloaded dimension is skipped. The start point is the overworld shared
 spawn, or the (0,0) `MOTION_BLOCKING_NO_LEAVES` heightmap position for other dimensions; the line
 names which one was used.
+
+---
+
+## A structure that never spawns — `/isekai survey` and `/isekai fit`
+
+`/locate` answers *where is the nearest one*. When the answer is "nowhere", these two answer *why*.
+
+```
+/isekai survey <structure> [radius]     # default radius 64 chunks, max 512
+/isekai fit <structure> [pos]
+```
+
+Both write JSON under `<world>/isekai/` (`survey/<ns>_<path>-r<radius>.json`, `fit/<ns>_<path>-<chunkX>_<chunkZ>.json`) and print a summary to chat. Neither loads chunks or generates to disk, so they are safe on a live world.
+
+**`/isekai survey`** replays the two steps chunk generation takes over a square of chunks around you: the structure set's `StructurePlacement#isStructureChunk` decides which chunks are tried, then the structure's own generation decides whether it exists there. Every candidate ends up either placed or counted against exactly one reason:
+
+| reason | meaning |
+|---|---|
+| `clearance_above_fluid` | a footprint column sits at or below the placement's clearance floor |
+| `max_slope` | the footprint's height spread exceeds `max_slope` |
+| `biome` | the position's biome is not in the structure's `biomes` (only checked after both gates pass) |
+| `declined` | the structure type returned "nothing here" for a reason of its own (`jigsaw`, `assembled`, modded types) |
+
+The two rates separate the two halves of the problem: `candidate_rate` is how often the structure set offers a chunk at all (set spacing/separation), `place_rate_of_candidates` is how often the gates say yes. A measured run on a real pack's world, radius 64 (the JSON keeps up to five sample placements; one is shown):
+
+```json
+{
+  "structure": "minecraft:village_plains",
+  "dimension": "minecraft:overworld",
+  "radius_chunks": 64,
+  "scanned_chunks": 16641,
+  "candidate_chunks": 13,
+  "candidate_rate": 0.000781,
+  "placed": 13,
+  "place_rate_of_candidates": 1.000000,
+  "place_rate_of_scanned": 0.000781,
+  "rejections": {},
+  "structure_sets": [ "minecraft:villages" ],
+  "sample_placements": [
+    { "chunk_x": -15, "chunk_z": -63, "box": [ -298, -76, -1088, -179, -36, -927 ] }
+  ],
+  "elapsed_ms": 421
+}
+```
+
+Every candidate became a village, so the set is the limit, not the terrain. The opposite reading — 16,641 chunks scanned, 9 candidates, none placed, and `rejections` naming the split — is what sends you to `max_slope`/`clearance` instead of the spacing.
+
+**`/isekai fit`** answers the single-chunk version at full detail: the heightmap the gates read, laid out as a 3x3 grid, beside the numbers they compare it to, plus where `vertical_offset` puts each variant of the template.
+
+```
+fit <ns>:<name> at chunk 4,-4 in minecraft:the_end
+  sea level 0, clearance_above_fluid 2, max_slope 4, vertical_offset -3
+  surface heights, 3x3 (rows north to south, columns west to east; the gates read the middle and the four corners):
+       57    48    48
+       57    51    50
+       57    57    55
+  gate columns: min 48, max 57, spread 9
+  verdict: max_slope — lowest column 48 > clearance floor 2; spread 9 > max_slope 4
+  template <ns>:<name> (5x4x5, weight 3): y=0 at 48, blocks y 48..51
+```
+
+The gates sample five of those nine columns (middle and corners); the grid is there so you can see what the footprint would hit if you shrank the template, not so you can tune against columns the structure never reads. Two things the report catches that cost hours otherwise: a `template` whose NBT does not exist (reported as `0x0x0` with a warning — both the gates and the footprint collapse to one column), and a chunk no structure set offers at all (`note: no structure set offers this chunk`), where the gates are not the reason the chunk is empty.
 
 ---
 

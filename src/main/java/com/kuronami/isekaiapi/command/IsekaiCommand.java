@@ -2,10 +2,12 @@ package com.kuronami.isekaiapi.command;
 
 import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.command.sub.DumpCommand;
+import com.kuronami.isekaiapi.command.sub.FitCommand;
 import com.kuronami.isekaiapi.command.sub.PreviewCommand;
 import com.kuronami.isekaiapi.command.sub.QueryCommand;
 import com.kuronami.isekaiapi.command.sub.ReloadCommand;
 import com.kuronami.isekaiapi.command.sub.StatsCommand;
+import com.kuronami.isekaiapi.command.sub.SurveyCommand;
 import com.kuronami.isekaiapi.command.sub.ValidateCommand;
 import com.kuronami.isekaiapi.command.sub.VersionCommand;
 import com.mojang.brigadier.CommandDispatcher;
@@ -29,6 +31,8 @@ import org.jetbrains.annotations.ApiStatus;
  *       {@code /isekai validate dimension <id>} (runtime profile + worldshape diagnosis)</li>
  *   <li>{@link PreviewCommand}  — {@code /isekai preview range <id> [dim]}</li>
  *   <li>{@link DumpCommand}     — {@code /isekai dump worldgen} / {@code ore <id>} / {@code structure <id>}</li>
+ *   <li>{@link SurveyCommand}   — {@code /isekai survey <structure> [radius]}</li>
+ *   <li>{@link FitCommand}      — {@code /isekai fit <structure> [pos]}</li>
  * </ul>
  *
  * <p>All subcommands require permission level 2 (operators).
@@ -53,7 +57,9 @@ public final class IsekaiCommand {
                 .then(QueryCommand.build())
                 .then(ValidateCommand.build())
                 .then(PreviewCommand.build())
-                .then(DumpCommand.build()));
-        IsekaiApi.LOGGER.info("[Isekai] commands registered: /isekai version|reload|stats|query|validate|preview|dump");
+                .then(DumpCommand.build())
+                .then(SurveyCommand.build())
+                .then(FitCommand.build()));
+        IsekaiApi.LOGGER.info("[Isekai] commands registered: /isekai version|reload|stats|query|validate|preview|dump|survey|fit");
     }
 }

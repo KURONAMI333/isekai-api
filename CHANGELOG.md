@@ -148,6 +148,32 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
   (default false) decides whether a template leaf's existing persistent flag survives. It runs in
   `finalizeProcessing`, so it sees the states earlier processors produced. A template saved with
   every leaf at distance 7 no longer sheds its whole crown on the first shape update.
+- **`isekai_api:grounded_template` takes a `processors` list.** The same field a jigsaw
+  `single_pool_element` has: a processor-list id or the list written inline, applied when the piece
+  pastes the template. Omitting it places the NBT exactly as saved, which is what every existing
+  datapack already got. Attaching `isekai_api:leaf_distances` here fixes a hand-authored tree
+  without routing it through a jigsaw pool.
+- **`isekai_api:grounded_template` varies the shape.** `rotation` (`none` by default, plus
+  `clockwise_90`, `clockwise_180`, `counterclockwise_90`, `random`) and `mirror` (`none` by
+  default, plus `left_right`, `front_back`, `random`) turn or flip the pasted template, and
+  `template` now also takes a weighted list, so one structure entry can share several NBT variants.
+  `random` draws once per placement attempt from the chunk's structure seed. The gates sample the
+  rotated extents, so a quarter-turned template is judged on the ground it actually covers, and the
+  template stays centred on the chunk middle in every orientation. A datapack that omits the new
+  fields places the same blocks as before.
+- **`/isekai survey <structure> [radius]`** replays structure placement over a square of chunks and
+  reports how many chunks the structure set offered, how many were placed, and, for the rest, which
+  gate rejected them (`clearance_above_fluid`, `max_slope`, `biome`, or `declined` for a structure
+  type with its own reason). Nothing is generated to disk and no chunk is loaded, so it answers
+  "why does this never spawn" on a live world; the same numbers are written to
+  `<world>/isekai/survey/<ns>_<path>-r<radius>.json`. The rejection attribution runs through
+  `StructureProbe`, which is inert outside a survey.
+- **`/isekai fit <structure> [pos]`** shows one chunk at full detail: the `WORLD_SURFACE_WG` heights
+  the gates read as a 3x3 grid, the minimum/spread against `clearance_above_fluid` and `max_slope`,
+  the verdict, and where `vertical_offset` puts each template variant. It also flags the two
+  authoring mistakes that make a structure vanish without an error: a `template` id with no NBT
+  (reported as `0x0x0`) and a chunk no structure set offers. Written to
+  `<world>/isekai/fit/<ns>_<path>-<chunkX>_<chunkZ>.json`.
 
 ### Fixed
 
