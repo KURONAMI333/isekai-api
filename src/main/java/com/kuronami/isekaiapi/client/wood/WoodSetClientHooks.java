@@ -1,5 +1,8 @@
 package com.kuronami.isekaiapi.client.wood;
 
+import net.minecraft.client.renderer.Sheets;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+
 import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.api.wood.WoodSet;
 import com.kuronami.isekaiapi.impl.wood.WoodSets;
@@ -20,6 +23,20 @@ import org.jetbrains.annotations.ApiStatus;
 public final class WoodSetClientHooks {
 
     private WoodSetClientHooks() {}
+
+    /**
+     * Adds every wood set's sign materials to {@link Sheets}. Its maps are filled from
+     * {@code WoodType.values()} when the class first loads; this covers a load that happened
+     * before a consumer declared its set. Re-adding an existing type is harmless.
+     */
+    @SubscribeEvent
+    static void onClientSetup(FMLClientSetupEvent event) {
+        event.enqueueWork(() -> {
+            for (WoodSet set : WoodSets.all()) {
+                Sheets.addWoodType(set.woodType());
+            }
+        });
+    }
 
     @SubscribeEvent
     static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {

@@ -85,6 +85,7 @@ public final class WoodSets {
      * this swaps oak planks for the set's own. Every other item passes through untouched.
      */
     public static ItemLike substitutePlanks(EntityType<?> type, ItemLike item) {
-        return item == Items.OAK_PLANKS ? boatPlanks(type) : item;
+        // Boat.Type#getPlanks() hands over the oak planks *block*; compare as items.
+        return item.asItem() == Items.OAK_PLANKS ? boatPlanks(type) : item;
     }
 }

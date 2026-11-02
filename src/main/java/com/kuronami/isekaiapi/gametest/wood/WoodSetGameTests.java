@@ -362,6 +362,56 @@ public final class WoodSetGameTests {
         rider.stopRiding();
     }
 
+    /**
+     * A boat broken by a fall drops the set's planks. Vanilla hands over its type's planks as a
+     * block ({@code Boat.Type#getPlanks}), so the substitution must recognise the block form.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void boatFallBreakDropsSetPlanks(GameTestHelper helper) {
+        WoodSet set = full();
+        net.minecraft.world.item.Item planks = set.planks().orElseThrow().get().asItem();
+        for (var holder : java.util.List.of(set.boatEntity().orElseThrow(), set.chestBoatEntity().orElseThrow())) {
+            var type = holder.get();
+            if (com.kuronami.isekaiapi.impl.wood.WoodSets.substitutePlanks(type, net.minecraft.world.level.block.Blocks.OAK_PLANKS).asItem() != planks) {
+                helper.fail(BuiltInRegistries.ENTITY_TYPE.getKey(type) + " drops oak planks (block form) on a fall break");
+                return;
+            }
+            if (com.kuronami.isekaiapi.impl.wood.WoodSets.substitutePlanks(type, net.minecraft.world.item.Items.OAK_PLANKS).asItem() != planks) {
+                helper.fail(BuiltInRegistries.ENTITY_TYPE.getKey(type) + " drops oak planks (item form) on a fall break");
+                return;
+            }
+            if (com.kuronami.isekaiapi.impl.wood.WoodSets.substitutePlanks(type, net.minecraft.world.item.Items.STICK).asItem() != net.minecraft.world.item.Items.STICK) {
+                helper.fail(BuiltInRegistries.ENTITY_TYPE.getKey(type) + " rewrites sticks on a fall break");
+                return;
+            }
+        }
+        helper.succeed();
+    }
+
+    /** A powered dispenser places the set's boat on the water in front of it. */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void dispenserPlacesSetBoat(GameTestHelper helper) {
+        WoodSet set = full();
+        BlockPos dispenser = new BlockPos(0, 1, 1);
+        helper.setBlock(new BlockPos(1, 0, 1), net.minecraft.world.level.block.Blocks.STONE);
+        helper.setBlock(new BlockPos(1, 1, 1), net.minecraft.world.level.block.Blocks.WATER);
+        helper.setBlock(dispenser, net.minecraft.world.level.block.Blocks.DISPENSER.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.DispenserBlock.FACING, Direction.EAST));
+        if (!(helper.getBlockEntity(dispenser) instanceof net.minecraft.world.level.block.entity.DispenserBlockEntity container)) {
+            helper.fail("dispenser block entity missing");
+            return;
+        }
+        container.setItem(0, new net.minecraft.world.item.ItemStack(set.boatItem().orElseThrow().get()));
+        helper.setBlock(new BlockPos(0, 2, 1), net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK);
+        var type = set.boatEntity().orElseThrow().get();
+        helper.succeedWhen(() -> {
+            helper.assertEntityPresent(type);
+            helper.assertItemEntityNotPresent(set.boatItem().orElseThrow().get());
+        });
+    }
+
     /** The texture a boat of this set is drawn with follows vanilla's layout. */
     @PrefixGameTestTemplate(false)
     @GameTest(template = "empty3x3x3")

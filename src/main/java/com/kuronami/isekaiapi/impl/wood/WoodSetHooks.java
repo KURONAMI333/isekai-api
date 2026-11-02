@@ -1,5 +1,7 @@
 package com.kuronami.isekaiapi.impl.wood;
 
+import net.minecraft.world.level.block.DispenserBlock;
+
 import com.kuronami.isekaiapi.api.wood.WoodSet;
 import java.util.Map;
 import net.minecraft.core.registries.Registries;
@@ -27,7 +29,8 @@ import org.jetbrains.annotations.ApiStatus;
  *   <li>sign and hanging-sign block entities — {@link BlockEntityTypeAddBlocksEvent} adds this
  *       set's sign blocks to vanilla's {@code SIGN} / {@code HANGING_SIGN} types.</li>
  *   <li>flammability — {@link FMLCommonSetupEvent} writes vanilla oak's fire odds into
- *       {@code FireBlock} (its odds map has no data-driven form in 1.21.1).</li>
+ *       {@code FireBlock} (its odds map has no data-driven form in 1.21.1); the same setup step
+ *       registers the dispenser behaviour that places the set's boats.</li>
  *   <li>compostability — {@link DataMapsUpdatedEvent} adds this set's leaves and sapling to the
  *       live {@code neoforge:compostables} map on the server, without replacing an entry the
  *       data map file or a datapack already set.</li>
@@ -76,6 +79,12 @@ public final class WoodSetHooks {
                 set.strippedLog().ifPresent(block -> fire.setFlammable(block.get(), 5, 5));
                 set.strippedWood().ifPresent(block -> fire.setFlammable(block.get(), 5, 5));
                 set.leaves().ifPresent(block -> fire.setFlammable(block.get(), 30, 60));
+            }
+            for (WoodSet set : WoodSets.all()) {
+                set.boatItem().ifPresent(item -> DispenserBlock.registerBehavior(item.get(),
+                        new WoodBoatDispenseBehavior(set.boatEntity().orElseThrow()::get)));
+                set.chestBoatItem().ifPresent(item -> DispenserBlock.registerBehavior(item.get(),
+                        new WoodBoatDispenseBehavior(set.chestBoatEntity().orElseThrow()::get)));
             }
         });
     }
