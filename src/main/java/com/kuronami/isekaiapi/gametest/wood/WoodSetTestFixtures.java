@@ -2,6 +2,7 @@ package com.kuronami.isekaiapi.gametest.wood;
 
 import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.api.wood.WoodSet;
+import com.kuronami.isekaiapi.api.wood.WoodSetDataGen;
 import java.util.Optional;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -15,6 +16,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLConstructModEvent;
+import net.neoforged.neoforge.data.event.GatherDataEvent;
 import net.neoforged.neoforge.gametest.GameTestHooks;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -24,15 +26,21 @@ import net.neoforged.neoforge.registries.DeferredRegister;
  *
  * <p>One set selects every part the builder offers; the other selects only a log and planks, so the
  * gametests can tell "registered because it was asked for" apart from "registered anyway". Nothing
- * is registered unless a GameTest server is running ({@link GameTestHooks#isGametestServer()}), and
- * the whole {@code gametest} tree is excluded from the published jar, so Isekai itself ships no
- * species.
+ * is registered unless a GameTest server is running ({@link GameTestHooks#isGametestServer()}) or a
+ * data run asks for the fixtures with {@code -Disekai.datagen.testwood=true}, and the whole
+ * {@code gametest} tree is excluded from the published jar, so Isekai itself ships no species.
+ *
+ * <p>The data run generates the fixtures' data files into a scratch directory, which is how the
+ * generators are checked against vanilla's oak files without shipping a test species.
  */
 @EventBusSubscriber(modid = IsekaiApi.MODID, bus = EventBusSubscriber.Bus.MOD)
 public final class WoodSetTestFixtures {
 
     /** Foreign namespace, standing in for a consumer mod id. */
     public static final String TEST_MODID = "isekai_api_test";
+
+    /** Set by the {@code data} run in {@code build.gradle}; never present in a shipped mod. */
+    public static final String DATAGEN_PROPERTY = "isekai.datagen.testwood";
 
     private static final ResourceKey<ConfiguredFeature<?, ?>> OAK_TREE =
             ResourceKey.create(Registries.CONFIGURED_FEATURE, ResourceLocation.withDefaultNamespace("oak"));
@@ -42,13 +50,18 @@ public final class WoodSetTestFixtures {
     private static final DeferredRegister<EntityType<?>> ENTITIES =
             DeferredRegister.create(Registries.ENTITY_TYPE, TEST_MODID);
 
-    /** Every part selected. Assigned only on a GameTest server. */
+    /** Every part selected. Assigned only for a GameTest server or a data run. */
     public static WoodSet full;
 
-    /** Log and planks only. Assigned only on a GameTest server. */
+    /** Log and planks only. Assigned only for a GameTest server or a data run. */
     public static WoodSet sparse;
 
     private WoodSetTestFixtures() {}
+
+    /** Whether the fixtures exist in this process. */
+    private static boolean enabled() {
+        return GameTestHooks.isGametestServer() || Boolean.getBoolean(DATAGEN_PROPERTY);
+    }
 
     /**
      * Declares the sets once the mod buses exist but before any registry event, which is where a
@@ -56,7 +69,7 @@ public final class WoodSetTestFixtures {
      */
     @SubscribeEvent
     static void onConstruct(FMLConstructModEvent event) {
-        if (!GameTestHooks.isGametestServer()) {
+        if (!enabled()) {
             return;
         }
         IEventBus bus = ModList.get().getModContainerById(IsekaiApi.MODID)
@@ -84,5 +97,21 @@ public final class WoodSetTestFixtures {
                 .log().planks()
                 .mapColor(MapColor.COLOR_LIGHT_BLUE)
                 .register(BLOCKS, ITEMS);
+    }
+
+    /**
+     * Generates the fixtures' data files during a data run, using the public API exactly as a
+     * consumer would.
+     */
+    @SubscribeEvent
+    static void gatherData(GatherDataEvent event) {
+        if (!Boolean.getBoolean(DATAGEN_PROPERTY)) {
+            return;
+        }
+        WoodSetDataGen wood = WoodSetDataGen.create(event);
+        wood.add(full, new WoodSetDataGen.Overrides()
+                .displayName("Test Wood", "テストウッド"));
+        wood.add(sparse, new WoodSetDataGen.Overrides()
+                .displayName("Sparse Wood", "スパースウッド"));
     }
 }

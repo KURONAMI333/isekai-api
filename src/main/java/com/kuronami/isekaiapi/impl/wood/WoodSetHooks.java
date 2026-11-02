@@ -29,7 +29,8 @@ import org.jetbrains.annotations.ApiStatus;
  *   <li>flammability — {@link FMLCommonSetupEvent} writes vanilla oak's fire odds into
  *       {@code FireBlock} (its odds map has no data-driven form in 1.21.1).</li>
  *   <li>compostability — {@link DataMapsUpdatedEvent} adds this set's leaves and sapling to the
- *       live {@code neoforge:compostables} map on the server.</li>
+ *       live {@code neoforge:compostables} map on the server, without replacing an entry the
+ *       data map file or a datapack already set.</li>
  * </ul>
  *
  * <p>Nothing here runs unless a consumer declared a wood set, so a game without any wood set pays
@@ -89,8 +90,13 @@ public final class WoodSetHooks {
             Map<ResourceKey<Item>, Compostable> compostables =
                     registry.getDataMap(NeoForgeDataMaps.COMPOSTABLES);
             for (WoodSet set : WoodSets.all()) {
-                set.leavesItem().ifPresent(item -> compostables.put(item.getKey(), new Compostable(COMPOST_CHANCE)));
-                set.saplingItem().ifPresent(item -> compostables.put(item.getKey(), new Compostable(COMPOST_CHANCE)));
+                // putIfAbsent, not put: when the consumer ships the data map (WoodSetDataGen) or a
+                // datapack decides the chance, that value is the one the game should use. This
+                // hook is the fallback for a set whose mod does not run datagen at all.
+                set.leavesItem().ifPresent(item ->
+                        compostables.putIfAbsent(item.getKey(), new Compostable(COMPOST_CHANCE)));
+                set.saplingItem().ifPresent(item ->
+                        compostables.putIfAbsent(item.getKey(), new Compostable(COMPOST_CHANCE)));
             }
         });
     }

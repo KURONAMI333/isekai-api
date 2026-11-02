@@ -56,6 +56,18 @@ neoForge {
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
+        // Data run for the wood-set generator: it generates the gametest fixtures (a foreign
+        // namespace, see WoodSetTestFixtures) into build/verify-datagen instead of
+        // src/generated/resources, so the comparison with vanilla's files is reproducible without
+        // committing a test species. The fixtures are gone from the published jar.
+        data {
+            data()
+            programArguments.addAll '--mod', project.mod_id, '--all',
+                    '--output', layout.buildDirectory.dir('verify-datagen').get().asFile.absolutePath,
+                    '--existing', layout.projectDirectory.dir('src/main/resources').asFile.absolutePath
+            systemProperty 'isekai.datagen.testwood', 'true'
+        }
+
         configureEach {
             systemProperty 'forge.logging.markers', 'REGISTRIES'
             logLevel = org.slf4j.event.Level.DEBUG
