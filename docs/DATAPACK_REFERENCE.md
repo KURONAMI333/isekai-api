@@ -1034,6 +1034,49 @@ fit <ns>:<name> at chunk 4,-4 in minecraft:the_end
 
 The gates sample five of those nine columns (middle and corners); the grid is there so you can see what the footprint would hit if you shrank the template, not so you can tune against columns the structure never reads. Two things the report catches that cost hours otherwise: a `template` whose NBT does not exist (reported as `0x0x0` with a warning — both the gates and the footprint collapse to one column), and a chunk no structure set offers at all (`note: no structure set offers this chunk`), where the gates are not the reason the chunk is empty.
 
+### Counting trees and other blocks — `/isekai survey blocks`
+
+```
+/isekai survey blocks <block|#tag> [radius] [center <x y z>] [biome <biome|#tag>]
+```
+
+```
+/isekai survey blocks #minecraft:logs 16 biome minecraft:forest
+/isekai survey blocks minecraft:palm_log 16 center 0 64 0 biome #minecraft:is_forest
+```
+
+`survey blocks` answers the half `/isekai survey` cannot: the feature fires, but the world does not look like a palm forest. It generates the square of chunks to `FEATURES` (trees placed, no lighting or spawn pass), counts the matching blocks in each chunk, releases the chunk, and moves on over ticks — one chunk per tick under the 8 ms budget in practice. Unlike the structure survey this **writes terrain to disk**, exactly as a player walking there would; run it on a test world or where generated terrain is acceptable.
+
+`radius` is in chunks (default 8, max 32), `center` is a block position (defaults to where you run it), and `biome` keeps only chunks whose centre column is in that biome or tag. The biome filter is resolved from the seed before generation, so skipped chunks are never generated; the report still counts them under `skipped_chunks`. `biome` must come after `radius` because Brigadier needs one unambiguous path per optional argument.
+
+**One tree is one six-connected group of matching blocks inside one chunk.** A 2x2 trunk is one tree, not four; a leaning trunk is one tree, not one per step. The tradeoff is the chunk border: a tree straddling two chunks is cut and counted in each chunk, so a 2x2 trunk on a chunk corner reads as one tree in each of the four chunks. Trunks that touch are also one group, so give it a log id or a log tag, not a leaf tag. Every chunk also reports its matching **block** count, which separates "many short palms" from "few tall palms".
+
+```json
+{
+  "target": "#minecraft:logs",
+  "dimension": "minecraft:overworld",
+  "radius_chunks": 8,
+  "center_chunk": [ -32, -24 ],
+  "biome_filter": "minecraft:forest",
+  "counted_chunks": 157,
+  "skipped_chunks": 132,
+  "failed_chunks": 0,
+  "tree_definition": "one six-connected group of matching blocks inside one chunk",
+  "trees": {
+    "total": 1045, "mean_per_chunk": 6.658, "min_per_chunk": 0,
+    "median_per_chunk": 7.0, "max_per_chunk": 19,
+    "zero_chunks": 2, "zero_share": 0.0127,
+    "top_ten_percent_chunks": 16, "top_ten_percent_share": 0.1895,
+    "histogram": { "0": 2, "1-2": 12, "3-5": 24, "6-10": 109, "11-20": 10, "21-40": 0, "41+": 0 }
+  },
+  "blocks": { "total": 5120, "mean_per_chunk": 32.6115 },
+  "chunks": [ { "x": -32, "z": -24, "trees": 5, "blocks": 22 } ],
+  "elapsed_ms": 7435
+}
+```
+
+The written file keeps one entry per counted chunk, so the distribution can be mapped afterwards: `<world>/isekai/survey/blocks-<target>-r<radius>.json`, plus `-<biome>` when a filter is given. Measured on a fresh vanilla world: `minecraft:forest` averages **6.7 trees per chunk** at both radius 8 (157 chunks) and radius 16 (260 chunks), with 1.2–1.3% empty chunks and about 19% of all trees in the busiest 10% of chunks. Vanilla `trees_birch_and_oak` makes ten placement attempts per chunk and some fail on slope or space, so compare against measured numbers like these rather than the attempt count — and always compare runs with the same biome filter, since an unfiltered square includes ocean and plains and drops the mean (5.0 at radius 8 in the same world).
+
 ---
 
 ## World preset overrides — the Nether/End trap

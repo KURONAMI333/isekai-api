@@ -174,6 +174,14 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
   authoring mistakes that make a structure vanish without an error: a `template` id with no NBT
   (reported as `0x0x0`) and a chunk no structure set offers. Written to
   `<world>/isekai/fit/<ns>_<path>-<chunkX>_<chunkZ>.json`.
+- **`/isekai survey blocks <block|#tag> [radius] [center <x y z>] [biome <biome|#tag>]`** counts what
+  actually made it into each chunk: it generates the square (default radius 8, max 32) to `FEATURES`,
+  spread over ticks, and reports trees, matching blocks, mean/median/min/max, the share of empty
+  chunks, how much of the total sits in the busiest 10% of chunks, and a histogram. One tree is one
+  six-connected group of matching blocks inside a chunk, so a 2x2 trunk counts once and a leaning
+  trunk counts once. The optional biome filter is answered from the seed, so skipped chunks are never
+  generated. The per-chunk map and the same summary are written to
+  `<world>/isekai/survey/blocks-<target>-r<radius>.json`. This one does generate terrain to disk.
 
 ### Fixed
 

@@ -11,6 +11,7 @@ import com.kuronami.isekaiapi.command.sub.SurveyCommand;
 import com.kuronami.isekaiapi.command.sub.ValidateCommand;
 import com.kuronami.isekaiapi.command.sub.VersionCommand;
 import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -31,7 +32,8 @@ import org.jetbrains.annotations.ApiStatus;
  *       {@code /isekai validate dimension <id>} (runtime profile + worldshape diagnosis)</li>
  *   <li>{@link PreviewCommand}  — {@code /isekai preview range <id> [dim]}</li>
  *   <li>{@link DumpCommand}     — {@code /isekai dump worldgen} / {@code ore <id>} / {@code structure <id>}</li>
- *   <li>{@link SurveyCommand}   — {@code /isekai survey <structure> [radius]}</li>
+ *   <li>{@link SurveyCommand}   — {@code /isekai survey <structure> [radius]} and
+ *       {@code /isekai survey blocks <block|#tag> [radius] [center] [biome <biome|#tag>]}</li>
  *   <li>{@link FitCommand}      — {@code /isekai fit <structure> [pos]}</li>
  * </ul>
  *
@@ -45,10 +47,11 @@ public final class IsekaiCommand {
 
     @SubscribeEvent
     public static void onRegister(RegisterCommandsEvent event) {
-        register(event.getDispatcher());
+        register(event.getDispatcher(), event.getBuildContext());
     }
 
-    private static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+    private static void register(CommandDispatcher<CommandSourceStack> dispatcher,
+                                 CommandBuildContext buildContext) {
         dispatcher.register(Commands.literal("isekai")
                 .requires(src -> src.hasPermission(2))
                 .then(VersionCommand.build())
@@ -58,7 +61,7 @@ public final class IsekaiCommand {
                 .then(ValidateCommand.build())
                 .then(PreviewCommand.build())
                 .then(DumpCommand.build())
-                .then(SurveyCommand.build())
+                .then(SurveyCommand.build(buildContext))
                 .then(FitCommand.build()));
         IsekaiApi.LOGGER.info("[Isekai] commands registered: /isekai version|reload|stats|query|validate|preview|dump|survey|fit");
     }
