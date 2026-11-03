@@ -9,6 +9,7 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
 ### Added
 
 - **`isekai_api:curved` trunk and `isekai_api:frond` crown.** A palm that bends while it climbs instead of rising straight and then walking sideways: each level adds one log on the lean side with a chance that grows with height (`bend`), the bent logs take the lean axis, and a single crown site sits on the top log. `frond` grows eight arched, drooping fronds (the diagonals as face-connected staircases) sampled per frond, so the top view is eight-pointed rather than a cross. `leaning` and `fan` are unchanged.
+- **`fluid_edge` can search a band of heights.** The optional `vertical_range` (`{"below": n, "above": n}`, both 0–64, default 0) widens the fluid search from the input Y to `Y-below … Y+above`. One modifier now expresses "no water within 12 blocks anywhere from sea level to 18 above it", which used to take a chain of one modifier plus one Y anchor per level. Omitting the field reads the input Y only, so existing packs behave exactly as before; the widened path also stops each column at its `MOTION_BLOCKING` height, so open sea costs one lookup per column instead of one per level.
 
 ### Fixed
 

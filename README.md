@@ -175,7 +175,7 @@ Beyond vanilla `count`/`in_square`/`rarity_filter`/etc.:
 - **`isekai_api:in_block_context`** — gate placement on the surrounding block context (match a block/tag, optionally require air above, optionally exclude in fluid).
 - **`isekai_api:spatial_predicate`** — gate placement on any `SpatialPredicate` (Y range, slope, near block, near biome…).
 - **`isekai_api:scatter`** — jitter the input into N samples within a radius, optionally rejecting any sample within `min_spacing` blocks of an already-accepted one. Replaces `count + in_square` whenever you want clustered features that don't stack on each other.
-- **`isekai_api:fluid_edge`** — accept positions within (or beyond) `max_distance` blocks of a fluid. Pure distance filter — use for placements that need a water-adjacent context without baking "shoreline" into the API.
+- **`isekai_api:fluid_edge`** — accept positions within (or beyond) `max_distance` blocks of a fluid. Pure distance filter — use for placements that need a water-adjacent context without baking "shoreline" into the API. The optional `vertical_range` (`{"below": n, "above": n}`, default both 0) searches a band of heights instead of one level, so a tree anchored at sea level sees a pool surface several blocks higher.
 - **`isekai_api:slope_filter`** — accept positions whose local heightmap slope falls in `[min, max]`. 0 = flat, 1 ≈ 45°+ cliff.
 
 ### Features — neutral geometric primitives
