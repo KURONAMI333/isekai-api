@@ -4,6 +4,16 @@ All notable changes to Isekai API follow this file. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/). Compatibility policy — how datapack
 and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
+## [Unreleased]
+
+### Added
+
+- **`isekai_api:curved` trunk and `isekai_api:frond` crown.** A palm that bends while it climbs instead of rising straight and then walking sideways: each level adds one log on the lean side with a chance that grows with height (`bend`), the bent logs take the lean axis, and a single crown site sits on the top log. `frond` grows eight arched, drooping fronds (the diagonals as face-connected staircases) sampled per frond, so the top view is eight-pointed rather than a cross. `leaning` and `fan` are unchanged.
+
+### Fixed
+
+- **A `frond` crown lifted by `offset` no longer hangs off the trunk.** Leaf distance follows face contact, so lifting the crown above the top log left every frond reached only through a diagonal: the whole crown sat past the sixth step and decayed as soon as it was ticked, while untouched leaves kept their generation-time pin and hid it. The lift cells are now filled with leaves and the lift is spent from the same six-step budget as the fronds.
+
 ## [3.0.0] — 2026-10-29
 
 ### Breaking changes

@@ -24,8 +24,12 @@ import org.jetbrains.annotations.ApiStatus;
  * <ul>
  *   <li>{@code isekai_api:leaning} — a curving/leaning trunk (palm, wind-bent), see
  *       {@link LeaningTrunkPlacer}.</li>
+ *   <li>{@code isekai_api:curved} — a trunk that bends while it climbs, see
+ *       {@link CurvedTrunkPlacer}.</li>
  *   <li>{@code isekai_api:sphere} — an ellipsoid leaf crown with edge jitter, see
  *       {@link SphereFoliagePlacer}.</li>
+ *   <li>{@code isekai_api:frond} — eight arched, drooping fronds around the tip, see
+ *       {@link FrondFoliagePlacer}.</li>
  *   <li>{@code isekai_api:none} — no leaves at all, for bare trunks, see
  *       {@link NoneFoliagePlacer}.</li>
  * </ul>
@@ -40,10 +44,14 @@ public final class IsekaiTreePlacers {
 
     public static final Supplier<TrunkPlacerType<LeaningTrunkPlacer>> LEANING =
             TRUNK_PLACERS.register("leaning", () -> new TrunkPlacerType<>(LeaningTrunkPlacer.CODEC));
+    public static final Supplier<TrunkPlacerType<CurvedTrunkPlacer>> CURVED =
+            TRUNK_PLACERS.register("curved", () -> new TrunkPlacerType<>(CurvedTrunkPlacer.CODEC));
     public static final Supplier<TrunkPlacerType<BranchingTrunkPlacer>> BRANCHING =
             TRUNK_PLACERS.register("branching", () -> new TrunkPlacerType<>(BranchingTrunkPlacer.CODEC));
     public static final Supplier<FoliagePlacerType<SphereFoliagePlacer>> SPHERE =
             FOLIAGE_PLACERS.register("sphere", () -> new FoliagePlacerType<>(SphereFoliagePlacer.CODEC));
+    public static final Supplier<FoliagePlacerType<FrondFoliagePlacer>> FROND =
+            FOLIAGE_PLACERS.register("frond", () -> new FoliagePlacerType<>(FrondFoliagePlacer.CODEC));
     public static final Supplier<FoliagePlacerType<FanFoliagePlacer>> FAN =
             FOLIAGE_PLACERS.register("fan", () -> new FoliagePlacerType<>(FanFoliagePlacer.CODEC));
     public static final Supplier<FoliagePlacerType<ConeFoliagePlacer>> CONE =
@@ -60,6 +68,6 @@ public final class IsekaiTreePlacers {
     public static void register(IEventBus modBus) {
         TRUNK_PLACERS.register(modBus);
         FOLIAGE_PLACERS.register(modBus);
-        IsekaiApi.LOGGER.info("[Isekai] tree placers registered: leaning, branching (trunk); sphere, fan, cone, disc, weeping, none (foliage)");
+        IsekaiApi.LOGGER.info("[Isekai] tree placers registered: leaning, curved, branching (trunk); sphere, frond, fan, cone, disc, weeping, none (foliage)");
     }
 }

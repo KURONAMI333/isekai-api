@@ -447,8 +447,13 @@ Used as the `trunk_placer` / `foliage_placer` of a vanilla `minecraft:tree` conf
 |---|---|---|
 | `isekai_api:leaning` | `base_height`, `height_rand_a`, `height_rand_b` (int — shared); `min_height_for_leaves` (positive int, default 1); `lean_length` (IntProvider 1–16); `convert_ground` (bool, default true — false skips the dirt-under-trunk conversion so beach palms stay sandy); `tip_crown_only` (bool, default false — true returns only the bent-tip attachment so a fan crown sprays from one point); `slant_curve` (double 1.0–2.0, default 1.0 — each stalk step moves `round(slant_curve^step)` blocks sideways, so 1.0 is one block per step and 1.3 bends like a palm); `space_check` (bool, default true — an occupied block ends the lean and the crown stays on the trunk instead of floating where no log could be placed); `min_height` (int 1–16, default 4 — a tree whose trunk would be shorter places nothing) | rises straight, leans near the top, then continues as a near-horizontal stalk |
 | `isekai_api:branching` | `base_height`, `height_rand_a`, `height_rand_b` (int — shared); `branch_count` (int 1–6); `branch_length` (IntProvider 1–8); `branch_start_offset_from_top` (IntProvider 0–4, default 0 — how far below the trunk top branches sprout) | straight vertical trunk plus N upward-arcing branches; each branch tip becomes its own crown site, so paired with `disc`/`sphere` you get umbrella/forked silhouettes |
+| `isekai_api:curved` | `base_height`, `height_rand_a`, `height_rand_b` (int — shared); `bend` (double 0.0–2.0, default 1.0 — chance of a sideways step at the very top; at level `y` of `top` the chance is `bend * (y / top)^2`); `convert_ground` (bool, default true — false keeps the sand under a beach palm); `space_check` (bool, default true — an occupied cell ends the trunk at its last placed log); `min_height` (int 1–16, default 4 — a tree whose trunk would be shorter places nothing) | one stem that bends as it climbs: every level places its vertical log, then — with the height-weighted chance — one more log on the lean side of the same level. At most one block sideways per block up, so there is never a horizontal run; bent logs take the lean axis (`x`/`z`) and vertical ones keep `y`. One crown attachment, at the top log |
 
 `leaning`'s three newer fields are additive: a datapack that omits all of them gets exactly the old tree. `slant_curve` 1.0 walks one block sideways per step; raising it lengthens each successive step, so the same `lean_length` covers more ground and the bend accelerates instead of forming an L. **The stalk's horizontal travel is capped at 12 blocks from the origin** (the near-vertical lean counts too): an exponential stride would otherwise walk hundreds of blocks and leave the 3×3 chunks a feature is placed into, so `slant_curve` 2.0 with `lean_length` 16 stops at 12 instead of 131,071. A `lean_length` longer than the budget at `slant_curve` 1.0 (13–16) is cut at the same limit. `space_check` defaults to true because the old behaviour could attach a crown to a position where the trunk log was blocked by a neighbour — a palm growing into a dense stand ended up with leaves in mid-air. Set it to false only to reproduce that old shape deliberately. `min_height` is about the trunk, not about where leaves start (`min_height_for_leaves`), so it is what makes a deliberately short palm possible: raise it above `base_height` and the tree does not generate.
+
+`curved` is the other half of that family, for a palm whose trunk should not have an L in it at all. `leaning` rises straight and then walks sideways along one plane; `curved` drifts while it rises, so the stem is one arc and the crown sits on a leaning tip rather than at the end of a horizontal arm. The two shapes are separate types on purpose: `leaning` and `fan` shipped before this one, so their geometry stays exactly what it was and old datapacks keep their trees. The horizontal budget is the same 12 blocks. `bend` is the only shape knob — 0.0 is a straight trunk, 1.0 steps sideways at the top and almost never at the root, 1.6–2.0 saturates the upper third so the tree reads as strongly wind-bent. Because the sideways step is written as a second log at the same height, a bent level is two blocks across; that is what keeps the stem six-connected (a log one across and one up would only touch on an edge). The trunk always returns a single crown site at its top log, so it pairs with `frond` or `fan` and needs no `tip_crown_only`.
+
+Leaf distance counts face contact, not distance, so a crown has to touch the trunk: a crown whose lowest leaves sit a block above the top log, or beside it only diagonally, is more than six leaf steps from any log and turns to distance 7. `frond` therefore fills the `offset` lift and trims `offset + rise + length + droop` to six; a palm that loses its crown to decay is a lift or a reach past that budget, not a loading problem.
 
 ### Foliage placers (`foliage_placer`)
 
@@ -458,6 +463,7 @@ Common fields on every placer: `radius` (IntProvider — vanilla, often 0 since 
 |---|---|---|
 | `isekai_api:sphere` | `height` (int 0–16); `jitter` (float 0–1, default 0.2) | ellipsoid crown (height vs radius selects flat disc vs tall ball); edge cells dropped randomly by `jitter` |
 | `isekai_api:fan` | `crown_radius` (int 1–4, default 2); `hang` (int 0–3, default 1) | compact log-adjacent core + cardinal arms reaching out `crown_radius` and drooping `hang` past the tip — palm head |
+| `isekai_api:frond` | `length` (IntProvider 1–5, required — how far each frond reaches out); `droop` (IntProvider 0–3, default 0 — how many of its tip blocks fall); `rise` (int 0–2, default 1 — how many of the outward steps also climb) | eight fronds, one per cardinal **and** diagonal direction, each arching up while it extends and dropping at its tip. Lengths and droops are sampled per frond, so the eight arms differ; a diagonal frond advances one axis at a time and alternates, so every leaf shares a face with the previous one. The top view is eight-pointed, not a cross. `offset` lifts the crown above the trunk top and the lifted cells are filled with leaves, so the crown keeps face contact with the wood; the lift is capped at 2 blocks and counts against the six-step reach |
 | `isekai_api:cone` | `base_radius` (int 1–8); `height` (int 1–16); `taper` (`linear`\|`concave`, default linear); `jitter` (float 0–1, default 0.15) | conical crown; concave taper = conifer/cypress silhouette |
 | `isekai_api:disc` | `disc_radius` (int 1–8); `thickness` (int 1–4, default 1); `jitter` (float 0–1, default 0.2) | flat wide horizontal disc — umbrella/savanna |
 | `isekai_api:weeping` | `crown_radius` (int 2–6, default 3); `crown_thickness` (int 1–3, default 2); `strand_length` (IntProvider 1–6); `strand_chance` (float 0–1, default 0.4) | stacked discs + vertical leaf strands dripping from rim cells — willow/wisteria/sadesign review |
@@ -479,6 +485,28 @@ Minimal palm example:
                        "lean_length": { "type": "minecraft:uniform", "min_inclusive": 1, "max_inclusive": 2 },
                        "convert_ground": false, "tip_crown_only": true },
     "foliage_placer":{ "type": "isekai_api:fan", "radius": 0, "offset": 1, "crown_radius": 2, "hang": 1 }
+  }
+}
+```
+
+Same palm with a stem that bends while it climbs, and a crown of eight fronds:
+
+```jsonc
+// data/<ns>/worldgen/configured_feature/palm_curved.json
+{
+  "type": "minecraft:tree",
+  "config": {
+    "ignore_vines": true, "decorators": [], "force_dirt": false,
+    "trunk_provider":  { "type": "minecraft:simple_state_provider", "state": { "Name": "minecraft:jungle_log" } },
+    "foliage_provider":{ "type": "minecraft:simple_state_provider", "state": { "Name": "minecraft:jungle_leaves" } },
+    "dirt_provider":   { "type": "minecraft:simple_state_provider", "state": { "Name": "minecraft:dirt" } },
+    "minimum_size":    { "type": "minecraft:two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1 },
+    "trunk_placer":  { "type": "isekai_api:curved", "base_height": 7, "height_rand_a": 2, "height_rand_b": 1,
+                       "bend": 1.2, "convert_ground": false, "min_height": 5 },
+    "foliage_placer":{ "type": "isekai_api:frond", "radius": 0, "offset": 0,
+                       "length": { "type": "minecraft:uniform", "min_inclusive": 3, "max_inclusive": 4 },
+                       "droop": { "type": "minecraft:uniform", "min_inclusive": 0, "max_inclusive": 1 },
+                       "rise": 1 }
   }
 }
 ```

@@ -162,8 +162,8 @@ Used as the `trunk_placer` / `foliage_placer` of a vanilla `minecraft:tree` conf
 
 | | Placers |
 |---|---|
-| Trunks | `leaning` (palm/wind-bent, optional sandy beach mode, optional single-tip crown), `branching` (vertical + N upward branches, one crown per branch tip) |
-| Foliage | `sphere` (ellipsoid), `fan` (palm head), `cone` (linear or concave taper — conifer), `disc` (flat umbrella), `weeping` (stacked discs + hanging strands — willow) |
+| Trunks | `leaning` (palm/wind-bent, optional sandy beach mode, optional single-tip crown), `curved` (bends while it climbs, axis follows the bend, one crown at the tip), `branching` (vertical + N upward branches, one crown per branch tip) |
+| Foliage | `sphere` (ellipsoid), `fan` (palm head), `frond` (eight arched, drooping fronds), `cone` (linear or concave taper — conifer), `disc` (flat umbrella), `weeping` (stacked discs + hanging strands — willow) |
 
 See [docs/DATAPACK_REFERENCE.md](docs/DATAPACK_REFERENCE.md#tree-placers-isekai_api) for the full field list and a minimal palm example.
 
