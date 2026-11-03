@@ -3,6 +3,7 @@ package com.kuronami.isekaiapi.gametest.structure;
 import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.structure.AssembledPiece;
 import java.util.List;
+import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
@@ -16,6 +17,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
@@ -50,6 +54,10 @@ public final class AssembledGameTests {
     /** Patch for the "neighbour chunk first" test. */
     private static final int SLOT_B_X = 4200;
     private static final int SLOT_B_Z = 4200;
+
+    /** Patch for the "canopy over the origin" test. */
+    private static final int SLOT_C_X = 4400;
+    private static final int SLOT_C_Z = 4400;
 
     private static final ResourceLocation MARKER =
             ResourceLocation.fromNamespaceAndPath("isekai_api_test", "assembled_marker");
@@ -133,6 +141,81 @@ public final class AssembledGameTests {
         int placed = countMarker(level, origin);
         if (placed != 1) {
             helper.fail("the origin chunk placed " + placed + " marker block(s); expected 1");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * A tree crown over the origin column is not the ground. {@code WORLD_SURFACE_WG} counts
+     * leaves and logs, so before this fix a neighbouring palm's crown lifted the origin onto the
+     * canopy: the pool dug into open air and the pad spread its sand at tree height. The marker
+     * feature writes at the origin's Y, so one gold block at the terrain height (and none at the
+     * crown's height) is the whole assertion.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void aCanopyOverTheOriginColumnIsNotTheGround(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int x = SLOT_C_X;
+        int z = SLOT_C_Z;
+        LevelChunk chunk = level.getChunk(SectionPos.blockToSectionCoord(x),
+                SectionPos.blockToSectionCoord(z));
+        // WORLD_SURFACE_WG is a worldgen heightmap: LevelChunk#setBlockState updates the four
+        // runtime ones but not this one, and the game only keeps it while generating. Re-priming
+        // from the blocks answers what the generator would have had for the column.
+        Heightmap.primeHeightmaps(chunk, Set.of(Heightmap.Types.WORLD_SURFACE_WG));
+        // The flat test world is level, so read the ground from the column beside the one under
+        // test: an earlier run of this test leaves its canopy on the origin column.
+        int ground = origin(level, x + 1, z).getY();
+        clearMarkers(level, new BlockPos(x, ground, z));
+        for (int y = ground; y <= ground + 8; y++) {
+            level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 2);
+        }
+
+        BlockState canopy = Blocks.JUNGLE_LEAVES.defaultBlockState()
+                .setValue(LeavesBlock.PERSISTENT, true);
+        BlockState trunk = Blocks.JUNGLE_LOG.defaultBlockState();
+        level.setBlock(new BlockPos(x, ground, z), canopy, 2);
+        level.setBlock(new BlockPos(x, ground + 1, z), canopy, 2);
+        level.setBlock(new BlockPos(x, ground + 2, z), trunk, 2);
+
+        Heightmap.primeHeightmaps(chunk, Set.of(Heightmap.Types.WORLD_SURFACE_WG));
+
+        int covered = level.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z);
+        if (covered != ground + 3) {
+            helper.fail("the canopy did not reach the heightmap: ground " + ground
+                    + ", WORLD_SURFACE_WG " + covered
+                    + " — leaves and logs must count, or this test proves nothing");
+            return;
+        }
+
+        AssembledPiece piece = piece(helper, level, new BlockPos(x, ground, z));
+        if (piece == null) {
+            return;
+        }
+        BoundingBox box = piece.getBoundingBox();
+        piece.postProcess(level, level.structureManager(), level.getChunkSource().getGenerator(),
+                RandomSource.create(3L), box,
+                new ChunkPos(SectionPos.blockToSectionCoord(x), SectionPos.blockToSectionCoord(z)),
+                new BlockPos(x, ground, z));
+
+        int placed = 0;
+        int placedY = Integer.MIN_VALUE;
+        for (BlockPos pos : BlockPos.betweenClosed(
+                new BlockPos(x - 1, ground - 16, z - 1), new BlockPos(x + 9, ground + 16, z + 9))) {
+            if (level.getBlockState(pos).is(Blocks.GOLD_BLOCK)) {
+                placed++;
+                placedY = Math.max(placedY, pos.getY());
+            }
+        }
+        if (placed != 1) {
+            helper.fail("marker feature placed " + placed + " block(s); expected 1");
+            return;
+        }
+        if (placedY != ground) {
+            helper.fail("the feature ran at y=" + placedY + " with the crown at y="
+                    + (ground + 2) + "; expected the terrain height y=" + ground);
             return;
         }
         helper.succeed();

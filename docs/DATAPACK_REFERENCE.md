@@ -376,7 +376,9 @@ limits (see [A structure that never spawns](#a-structure-that-never-spawns--isek
 
 ### `isekai_api:assembled` — loose scatter of features at one origin (NOT coordinated landmarks)
 
-A `Structure` that places a list of `PlacedFeature`s at a single origin (Y snapped to live `WORLD_SURFACE_WG`). Use it **only** when the features are genuinely independent and don't need to line up — e.g. "scatter a few boulders and bushes near this point." It has **no** `terrain_adaptation`, no relative positioning between features, and no processors, so it is the wrong tool for a coordinated landmark; use the jigsaw+NBT path above for those.
+A `Structure` that places a list of `PlacedFeature`s at a single origin (Y snapped to the live ground height). Use it **only** when the features are genuinely independent and don't need to line up — e.g. "scatter a few boulders and bushes near this point." It has **no** `terrain_adaptation`, no relative positioning between features, and no processors, so it is the wrong tool for a coordinated landmark; use the jigsaw+NBT path above for those.
+
+The Y it snaps to is the ground, not whatever grows on it: `WORLD_SURFACE_WG` counts leaves and logs, so the origin is walked down past air, `#minecraft:leaves`, `#minecraft:logs` and replaceable plants to the first block that is terrain. Without the walk, a neighbouring tree whose crown covered the origin column lifted the whole feature list onto the canopy — a pool dug into open air, a pad spread its sand at tree height. Fluids stop the walk, so a feature placed over water still starts at the water surface.
 
 The feature list runs **once**, from the chunk that contains the origin. Vanilla calls a piece's `postProcess` for every chunk its bounding box overlaps (each with its own random), so without that guard a 33-block-wide assembled piece would re-place the whole list up to nine times and stack nine differently-shaped results on the same spot. Features may still write past the origin chunk (a pool whose rim reaches 10 blocks out) — that is the same neighbour write a `place` feature makes during decoration.
 

@@ -12,10 +12,12 @@ import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.StructureManager;
 import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
@@ -31,8 +33,10 @@ import java.util.Optional;
 
 /**
  * The {@link StructurePiece} backing {@link AssembledStructure}. At {@code postProcess} time
- * it snaps the origin's Y to the current {@code WORLD_SURFACE_WG} heightmap and invokes each
- * configured feature's {@code place(level, generator, random, origin)} in declaration order.
+ * it snaps the origin's Y to the live {@code WORLD_SURFACE_WG} heightmap — walking down past
+ * leaves, logs and replaceable plants so a neighbouring tree's crown is not taken for ground —
+ * and invokes each configured feature's {@code place(level, generator, random, origin)} in
+ * declaration order.
  *
  * <p>NBT persistence stores the feature list as {@link ResourceLocation} strings and the
  * origin XZ; at load time the pieces are reconstructed via the registry access from the
@@ -114,9 +118,9 @@ public final class AssembledPiece extends StructurePiece {
         // Snap Y to the live heightmap so the structure sits on the actual surface even if
         // terrain finalised differently from initial expectation. Use WORLD_SURFACE_WG (no
         // floor restriction) — consumers can write their own y_anchor into individual
-        // features if they need a different reference.
-        int y = level.getHeight(Heightmap.Types.WORLD_SURFACE_WG, originX, originZ);
-        BlockPos origin = new BlockPos(originX, y, originZ);
+        // features if they need a different reference. The heightmap counts leaves and logs,
+        // so walk down past anything growing on the ground first: see groundBelow.
+        BlockPos origin = new BlockPos(originX, groundBelow(level, originX, originZ), originZ);
 
         // Resolve features through the live registry — captures any datapack reload between
         // chunk gen and structure place (rare but possible during /reload).
@@ -130,6 +134,43 @@ public final class AssembledPiece extends StructurePiece {
             }
             holder.get().value().place(level, gen, random, origin);
         }
+    }
+
+    /**
+     * The Y the feature list runs at: the {@code WORLD_SURFACE_WG} height with the canopy and
+     * ground cover skipped.
+     *
+     * <p>The heightmap counts leaves and logs as surface, so a neighbour chunk's palm whose crown
+     * covers the origin column moved the origin up onto the crown: the pool then dug into open air
+     * (and failed containment), and the pad wrote its sand around tree height. Walking down from
+     * the heightmap to the first block that is not air, {@code #minecraft:leaves},
+     * {@code #minecraft:logs} or a replaceable plant puts the origin back on the ground. Fluids
+     * stop the walk, so a structure over water keeps the old {@code water top + 1} origin.
+     *
+     * <p>The walk starts at {@code y - 1}, which is the heightmap's surface block, and never goes
+     * below {@code minY + 1}, so it terminates on any terrain.
+     */
+    private static int groundBelow(WorldGenLevel level, int x, int z) {
+        int y = level.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z);
+        int floor = level.getMinBuildHeight() + 1;
+        while (y > floor) {
+            BlockState state = level.getBlockState(new BlockPos(x, y - 1, z));
+            if (state.getFluidState().isEmpty() && sitsOnTheGround(state)) {
+                y--;
+                continue;
+            }
+            break;
+        }
+        return y;
+    }
+
+    /** Air (including cave air), leaves, logs and replaceable plants: passes the origin upward. */
+    private static boolean sitsOnTheGround(BlockState state) {
+        return state.isAir()
+                || state.is(BlockTags.LEAVES)
+                || state.is(BlockTags.LOGS)
+                || state.is(BlockTags.REPLACEABLE)
+                || state.canBeReplaced();
     }
 
     private static BoundingBox makeBox(BlockPos origin) {

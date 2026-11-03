@@ -185,6 +185,12 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
 
 ### Fixed
 
+- **`isekai_api:assembled` puts its origin on the ground, not on a tree crown.** The origin's Y came
+  straight from `WORLD_SURFACE_WG`, which counts leaves and logs, so a neighbouring tree whose crown
+  covered the origin column lifted the whole feature list onto the canopy: a pool dug into open air
+  (and its containment check refused it) and a pad spread its sand at tree height. The Y now walks
+  down past air, `#minecraft:leaves`, `#minecraft:logs` and replaceable plants to the first block
+  that is terrain, and stops on fluids, so an over-water structure keeps its water-surface origin.
 - **`isekai_api:assembled` places its features once, not once per overlapping chunk.** A piece's
   `postProcess` runs for every chunk its box overlaps, each with its own random, so a
   three-chunk-wide assembled landmark could re-place the whole feature list up to nine times and
