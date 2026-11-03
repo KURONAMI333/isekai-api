@@ -1,6 +1,7 @@
 package com.kuronami.isekaiapi.tree;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.LevelSimulatedReader;
 import net.minecraft.world.level.block.LeavesBlock;
@@ -54,11 +55,19 @@ public final class LeafPlacing {
      * graph, a leaf with no chain of leaves to a log within 6 steps turns to distance 7 and decays.
      * For core leaves that are log-adjacent, call vanilla's {@code FoliagePlacer.tryPlaceLeaf}
      * directly from the placer subclass.
+     *
+     * <p>The boolean return is for geometry that walks in face steps: it is {@code true} when a
+     * leaf occupies {@code pos} afterwards — written here, or already there, because two fronds
+     * meeting in one cell are one connected chain — and {@code false} when a non-leaf block
+     * refused the cell. A caller that walks a chain has to stop on {@code false}: stepping past a
+     * blocked cell leaves the rest of the chain touching only on an edge, further than the six
+     * leaf steps the ticker recalculates, so those leaves decay on their first random tick.
      */
-    public static void placePinned(LevelSimulatedReader level, FoliagePlacer.FoliageSetter setter,
-                                   RandomSource random, TreeConfiguration config, BlockPos pos) {
+    public static boolean placePinned(LevelSimulatedReader level, FoliagePlacer.FoliageSetter setter,
+                                      RandomSource random, TreeConfiguration config, BlockPos pos) {
         if (!TreeFeature.validTreePos(level, pos)) {
-            return;
+            // a leaf already in the cell keeps the chain whole; any other block breaks it
+            return level.isStateAtPosition(pos, state -> state.is(BlockTags.LEAVES));
         }
         BlockState state = config.foliageProvider.getState(random, pos);
         if (state.hasProperty(BlockStateProperties.WATERLOGGED)) {
@@ -69,6 +78,7 @@ public final class LeafPlacing {
             state = state.setValue(LeavesBlock.DISTANCE, SAFE_PINNED_DISTANCE);
         }
         setter.set(pos, state);
+        return true;
     }
 
     /**

@@ -34,6 +34,11 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * <p>The end-to-end test drives the real {@link BlockSurveyRun} tick job over one chunk, so the
  * command path (queue, generate, count, summarise) is exercised rather than only
  * {@link BlockSurvey#count}.
+ *
+ * <p>{@link BlockSurveyRun} allows one run per server, and a {@code defaultBatch} holds up to fifty
+ * tests that start in the same tick. The three tests that call {@link BlockSurveyRun#start} are
+ * therefore given a batch of their own: sharing a batch with each other makes each of them see the
+ * other's run and fail on the refusal, and whether they share depends only on how many tests exist.
  */
 @GameTestHolder(IsekaiApi.MODID)
 public final class BlockSurveyGameTests {
@@ -118,7 +123,7 @@ public final class BlockSurveyGameTests {
      * {@link BlockSurvey#count} sees in that chunk, and the JSON must carry the chunk entry.
      */
     @PrefixGameTestTemplate(false)
-    @GameTest(template = "empty3x3x3", timeoutTicks = 400)
+    @GameTest(template = "empty3x3x3", timeoutTicks = 400, batch = "surveyRunSingleChunk")
     public static void surveyRunCountsTheChunkItWasGiven(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         int chunkX = (ORIGIN_X >> 4) + 1;
@@ -179,7 +184,7 @@ public final class BlockSurveyGameTests {
      * reason instead of doubling what each tick spends inside the generator.
      */
     @PrefixGameTestTemplate(false)
-    @GameTest(template = "empty3x3x3", timeoutTicks = 400)
+    @GameTest(template = "empty3x3x3", timeoutTicks = 400, batch = "surveyRunRefusal")
     public static void secondSurveyIsRefusedWhileOneRuns(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         AtomicReference<BlockSurvey.Result> done = new AtomicReference<>();
@@ -219,7 +224,7 @@ public final class BlockSurveyGameTests {
 
     /** A biome filter is answered from the seed; a biome the world never uses generates nothing. */
     @PrefixGameTestTemplate(false)
-    @GameTest(template = "empty3x3x3", timeoutTicks = 200)
+    @GameTest(template = "empty3x3x3", timeoutTicks = 200, batch = "surveyRunBiomeFilter")
     public static void biomeFilterSkipsChunksWithoutGeneratingThem(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         HolderSet<Biome> forest = HolderSet.direct(

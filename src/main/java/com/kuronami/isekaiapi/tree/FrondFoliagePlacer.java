@@ -31,6 +31,13 @@ import org.jetbrains.annotations.ApiStatus;
  * is trimmed at the tip when the JSON asks for more. Trimmed is deliberate — a longer frond would
  * place leaves that the first random tick removes, leaving a hole in the crown.
  *
+ * <p><b>A frond stops at the first cell it cannot fill.</b> Its leaves form one chain of face
+ * contact back to the trunk, so a cell taken by another block splits the chain: the leaves written
+ * past it hang on an edge, land past the sixth step, and decay on the first tick. The lift column
+ * above the trunk top stops the same way; when it does, the fronds start from the last cell that
+ * really holds a leaf. Two fronds crossing in one cell do not stop each other — the cell already
+ * holds a leaf, so the chain is unbroken.
+ *
  * <p>Leaf distance counts steps between blocks that share a <em>face</em>, so the crown has to touch
  * the trunk: a crown lifted one block too high hangs on a diagonal and every leaf in it is past the
  * sixth step. {@code offset} therefore keeps its shared meaning of "how far the crown sits above the
@@ -54,6 +61,15 @@ public class FrondFoliagePlacer extends FoliagePlacer {
     public static final int MAX_FROND_REACH = 6;
 
     /**
+     * Longest {@code length} a frond may be given, and so the furthest a frond reaches sideways
+     * past the crown site: {@code droop} only moves leaves down and {@code rise} only up.
+     *
+     * <p>A trunk placer that bends has to keep this much horizontal budget free for the crown; see
+     * {@link CurvedTrunkPlacer#MAX_HORIZONTAL_TRAVEL}.
+     */
+    public static final int MAX_FROND_LENGTH = 5;
+
+    /**
      * Most blocks {@code offset} may lift the crown above the trunk top.
      *
      * <p>The lift is filled with leaves so the crown keeps face contact with the trunk. Beyond two
@@ -73,7 +89,7 @@ public class FrondFoliagePlacer extends FoliagePlacer {
     public static final MapCodec<FrondFoliagePlacer> CODEC = RecordCodecBuilder.mapCodec(
             inst -> foliagePlacerParts(inst)
                     .and(inst.group(
-                            IntProvider.codec(1, 5).fieldOf("length")
+                            IntProvider.codec(1, MAX_FROND_LENGTH).fieldOf("length")
                                     .forGetter(p -> p.length),
                             IntProvider.codec(0, 3).optionalFieldOf("droop", ConstantInt.of(0))
                                     .forGetter(p -> p.droop),
@@ -116,19 +132,26 @@ public class FrondFoliagePlacer extends FoliagePlacer {
         int lift = Math.min(offset, MAX_CROWN_LIFT);
         // Fill the column between the top log and the crown so the fronds start from leaf-to-log
         // contact. Without it a lifted crown is diagonal-only to the trunk and the first tick that
-        // reaches it turns the whole crown to distance 7.
+        // reaches it turns the whole crown to distance 7. The column stops at the first cell that
+        // cannot hold a leaf: a leaf above a gap would be past the wood just the same, and the
+        // fronds have to start from the last cell that really holds one.
+        int lifted = 0;
         for (int i = 1; i <= lift; i++) {
-            LeafPlacing.placePinned(level, setter, random, config, trunkTop.above(i));
+            if (!LeafPlacing.placePinned(level, setter, random, config, trunkTop.above(i))) {
+                break;
+            }
+            lifted = i;
         }
-        BlockPos tip = trunkTop.above(lift);
+        BlockPos tip = trunkTop.above(lifted);
 
         for (int[] direction : DIRECTIONS) {
             int reach = this.length.sample(random);
             int fall = this.droop.sample(random);
             // offset + rise + reach + fall is the frond's cell count, and its last cell is exactly
             // that many leaf steps from the trunk. Trim the tip (droop first, then reach) past the
-            // reachable six so no leaf is placed only to decay.
-            int budget = Math.max(1, MAX_FROND_REACH - lift - this.rise);
+            // reachable six so no leaf is placed only to decay. The lift that was actually written
+            // is what counts: a blocked lift cell leaves the crown lower than the JSON asked.
+            int budget = Math.max(1, MAX_FROND_REACH - lifted - this.rise);
             reach = Math.min(reach, budget);
             fall = Math.min(fall, Math.max(0, budget - reach));
             placeFrond(level, setter, random, config, tip, direction[0], direction[1], reach, fall);
@@ -136,11 +159,13 @@ public class FrondFoliagePlacer extends FoliagePlacer {
     }
 
     /**
-     * Writes one frond from {@code tip}.
+     * Writes one frond from {@code tip}, stopping at the first cell that cannot take a leaf.
      *
      * <p>Every step moves exactly one axis by one block, so each leaf touches the previous one on a
      * face. A diagonal alternates its two axes and picks which comes first at random, so the
-     * staircases of the four diagonals do not all hug the same side of the line.
+     * staircases of the four diagonals do not all hug the same side of the line. Because the frond
+     * is one chain, a blocked cell ends it: leaves written past the block would touch the chain only
+     * on an edge and decay on the first tick, so the frond stops instead of jumping the gap.
      */
     private void placeFrond(LevelSimulatedReader level, FoliagePlacer.FoliageSetter setter,
                             RandomSource random, TreeConfiguration config, BlockPos tip,
@@ -152,7 +177,9 @@ public class FrondFoliagePlacer extends FoliagePlacer {
         for (int step = 0; step < reach; step++) {
             if (step < this.rise) {
                 cursor.move(0, 1, 0);
-                LeafPlacing.placePinned(level, setter, random, config, cursor);
+                if (!LeafPlacing.placePinned(level, setter, random, config, cursor)) {
+                    return;
+                }
             }
             if (diagonal) {
                 if (xNext) {
@@ -166,12 +193,16 @@ public class FrondFoliagePlacer extends FoliagePlacer {
             } else {
                 cursor.move(0, 0, z);
             }
-            LeafPlacing.placePinned(level, setter, random, config, cursor);
+            if (!LeafPlacing.placePinned(level, setter, random, config, cursor)) {
+                return;
+            }
         }
 
         for (int step = 0; step < fall; step++) {
             cursor.move(0, -1, 0);
-            LeafPlacing.placePinned(level, setter, random, config, cursor);
+            if (!LeafPlacing.placePinned(level, setter, random, config, cursor)) {
+                return;
+            }
         }
     }
 

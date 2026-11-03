@@ -32,7 +32,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * <p>Every test grows a real tree in the flat test world instead of calling {@code placeTrunk}
  * against a fake level, because the two things that were wrong before are visible only in the
  * blocks: the pillar axis of a bent log and the leaf distances the ticker resolves after
- * generation. Slots 40-46 are reserved for this class.
+ * generation. Slots 40-50 are reserved for this class.
  */
 @GameTestHolder(IsekaiApi.MODID)
 public final class CurvedPalmGameTests {
@@ -79,6 +79,30 @@ public final class CurvedPalmGameTests {
               "length": {"type": "minecraft:constant", "value": 4},
               "droop": {"type": "minecraft:constant", "value": 1},
               "rise": 1
+            }
+            """;
+
+    /** Two climbing steps per frond, so the six-step budget is tight against the droop. */
+    private static final String FROND_RISE_TWO = """
+            {
+              "type": "isekai_api:frond",
+              "radius": 0,
+              "offset": 0,
+              "length": {"type": "minecraft:constant", "value": 4},
+              "droop": {"type": "minecraft:constant", "value": 1},
+              "rise": 2
+            }
+            """;
+
+    /** The widest frond the type allows, at the tip plane: the diagonal staircases at full reach. */
+    private static final String FROND_LONG = """
+            {
+              "type": "isekai_api:frond",
+              "radius": 0,
+              "offset": 0,
+              "length": {"type": "minecraft:constant", "value": 5},
+              "droop": {"type": "minecraft:constant", "value": 2},
+              "rise": 0
             }
             """;
 
@@ -189,13 +213,14 @@ public final class CurvedPalmGameTests {
             travelled = Math.max(travelled, Math.abs(pos.getX() - origin.getX())
                     + Math.abs(pos.getZ() - origin.getZ()));
             // The horizontal log is the one-block step of a bent level, so the vertical log of the
-            // same level sits on the negative side of the same axis and keeps axis y.
+            // same level sits one block back along the same axis. Which side that is depends on the
+            // direction the stem happened to lean, so both ends of the axis have to be looked at.
             BlockPos back = pos.relative(axis == Direction.Axis.X ? Direction.WEST : Direction.NORTH);
-            BlockState behind = helper.getLevel().getBlockState(back);
-            if (!behind.is(BlockTags.LOGS)
-                    || behind.getValue(BlockStateProperties.AXIS) != Direction.Axis.Y) {
+            BlockPos forth = pos.relative(axis == Direction.Axis.X ? Direction.EAST : Direction.SOUTH);
+            if (!isVerticalLog(helper.getLevel(), back) && !isVerticalLog(helper.getLevel(), forth)) {
                 helper.fail("the bent log " + pos + " (axis " + axis + ") has no vertical log at "
-                        + back + ": " + behind);
+                        + back + " or " + forth + ": " + helper.getLevel().getBlockState(back)
+                        + " / " + helper.getLevel().getBlockState(forth));
                 return;
             }
         }
@@ -212,8 +237,12 @@ public final class CurvedPalmGameTests {
     }
 
     /**
-     * Frond leaves all resolve to six or fewer steps from a log, and none of them decays: the
-     * distance the ticker computes is the real one, not the pinned placeholder.
+     * Frond leaves all reach the trunk through face contact in six steps or fewer, and none of them
+     * decays: what the ticker will resolve is decided before the tick happens.
+     *
+     * <p>The check has to walk the neighbour graph, not read {@code LeavesBlock.DISTANCE}: a freshly
+     * grown leaf still holds the generation-time pin of 5 whatever the shape is, so a distance
+     * read at twenty ticks says nothing.
      */
     @PrefixGameTestTemplate(false)
     @GameTest(template = "empty3x3x3", timeoutTicks = 400)
@@ -223,46 +252,20 @@ public final class CurvedPalmGameTests {
             helper.fail("the curved palm reported no placement");
             return;
         }
+        requireCrownOnWood(helper, origin, "bent palm");
         int grown = leaves(helper.getLevel(), origin).size();
-        if (grown < 8) {
-            helper.fail("only " + grown + " leaves grew, so there is nothing to keep alive");
-            return;
-        }
         int chunkX = origin.getX() >> 4;
         int chunkZ = origin.getZ() >> 4;
         helper.getLevel().setChunkForced(chunkX, chunkZ, true);
-        helper.runAfterDelay(20, () -> {
-            List<BlockPos> first = leaves(helper.getLevel(), origin);
-            int tooFar = 0;
-            int furthest = 0;
-            for (BlockPos pos : first) {
-                int distance = helper.getLevel().getBlockState(pos).getValue(LeavesBlock.DISTANCE);
-                furthest = Math.max(furthest, distance);
-                if (distance > FrondFoliagePlacer.MAX_FROND_REACH) {
-                    tooFar++;
-                }
-            }
-            if (tooFar > 0) {
-                helper.fail(tooFar + " leaves resolved further than "
-                        + FrondFoliagePlacer.MAX_FROND_REACH + " steps (furthest " + furthest
-                        + "), so they will decay");
+        helper.runAfterDelay(300, () -> {
+            helper.getLevel().setChunkForced(chunkX, chunkZ, false);
+            int now = leaves(helper.getLevel(), origin).size();
+            if (now < grown) {
+                helper.fail((grown - now) + " of " + grown
+                        + " frond leaves decayed within 300 ticks");
                 return;
             }
-            if (furthest < 2) {
-                helper.fail("the farthest leaf is at distance " + furthest
-                        + ", so the fronds barely leave the trunk");
-                return;
-            }
-            helper.runAfterDelay(280, () -> {
-                helper.getLevel().setChunkForced(chunkX, chunkZ, false);
-                int now = leaves(helper.getLevel(), origin).size();
-                if (now < first.size()) {
-                    helper.fail((first.size() - now) + " of " + first.size()
-                            + " frond leaves decayed within 300 ticks");
-                    return;
-                }
-                helper.succeed();
-            });
+            helper.succeed();
         });
     }
 
@@ -388,7 +391,212 @@ public final class CurvedPalmGameTests {
         helper.succeed();
     }
 
+    // --- connected-crown checks for the cases that used to leave orphans -----------------
+
+    /**
+     * The six-step budget still holds when the climb comes out of it: {@code rise} 2 leaves four of
+     * the six steps for the reach, so the droop the JSON asks for has to be trimmed away instead of
+     * written past the sixth step.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void riseTwoCrownStaysOnWood(GameTestHelper helper) {
+        BlockPos origin = scene(helper, FIRST_SLOT + 7);
+        if (!TreeTestScenes.place(helper, tree(helper, STRAIGHT_TRUNK, FROND_RISE_TWO), origin)) {
+            helper.fail("the rise 2 palm reported no placement");
+            return;
+        }
+        requireCrownOnWood(helper, origin, "rise 2");
+        helper.succeed();
+    }
+
+    /**
+     * The diagonals at full reach: five steps out alternating two axes, which is where a placer that
+     * skips a cell shows up as a gap between two staircases.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void fullLengthDiagonalFrondsStayOnWood(GameTestHelper helper) {
+        BlockPos origin = scene(helper, FIRST_SLOT + 8);
+        if (!TreeTestScenes.place(helper, tree(helper, STRAIGHT_TRUNK, FROND_LONG), origin)) {
+            helper.fail("the long frond palm reported no placement");
+            return;
+        }
+        int furthest = 0;
+        for (BlockPos leaf : leaves(helper.getLevel(), origin)) {
+            furthest = Math.max(furthest, Math.abs(leaf.getX() - origin.getX())
+                    + Math.abs(leaf.getZ() - origin.getZ()));
+        }
+        if (furthest < 5) {
+            helper.fail("the longest frond reached only " + furthest
+                    + " blocks out, so the diagonal case is empty");
+            return;
+        }
+        requireCrownOnWood(helper, origin, "full length fronds");
+        helper.succeed();
+    }
+
+    /**
+     * A block in the middle of one frond ends that frond instead of letting it jump the gap: leaves
+     * written past the block touch the chain only on an edge, land past the sixth step, and decay on
+     * the first tick.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void blockedFrondStopsBeforeTheGap(GameTestHelper helper) {
+        BlockPos origin = scene(helper, FIRST_SLOT + 9);
+        BlockPos tip = origin.above(7);
+        // The +x frond climbs one block, then walks out; this stone is its third cell. It sits far
+        // enough out that no diagonal frond reaches the cells behind it, so a frond that jumped the
+        // gap would leave a genuinely unreachable island.
+        BlockPos wall = tip.offset(2, 1, 0);
+        helper.getLevel().setBlock(wall, Blocks.STONE.defaultBlockState(), 2);
+        if (!TreeTestScenes.place(helper, tree(helper, STRAIGHT_TRUNK, FROND), origin)) {
+            helper.fail("the blocked frond palm reported no placement");
+            return;
+        }
+        requireCrownOnWood(helper, origin, "blocked frond");
+        if (!helper.getLevel().getBlockState(tip.offset(1, 1, 0)).is(Blocks.OAK_LEAVES)) {
+            helper.fail("no leaf at " + tip.offset(1, 1, 0)
+                    + ", so the frond stopped before the wall and the case is untested");
+            return;
+        }
+        if (helper.getLevel().getBlockState(tip.offset(3, 1, 0)).is(Blocks.OAK_LEAVES)) {
+            helper.fail("a leaf sits at " + tip.offset(3, 1, 0) + ", past the wall at " + wall
+                    + ", so the frond jumped the gap");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * A stem that runs into a neighbour stops at the last log it placed, and the crown growing from
+     * that shorter tip still has to hang on the wood — the walled-off step sits beside the tip, so a
+     * frond of that side used to walk on past it.
+     *
+     * <p>The obstacle sits one block out, which the default {@code two_layers_feature_size} reads as
+     * "no room to grow": the feature would return before the trunk placer ran. These scenes therefore
+     * ask for {@link TreeTestScenes#OPEN_MINIMUM_SIZE}, so the trunk placer itself has to stop.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void blockedTrunkStopsWithItsCrownOnTheLastLog(GameTestHelper helper) {
+        int slot = FIRST_SLOT + 10;
+        // The lean direction and the level of the first sideways step both come out of the seed, so
+        // the test grows the same palm once undisturbed and walls off the step it really took.
+        BlockPos probeOrigin = scene(helper, slot);
+        if (!TreeTestScenes.place(helper,
+                treeBesideObstacles(helper, BENT_TRUNK, FROND_FLAT), probeOrigin)) {
+            helper.fail("the probe palm reported no placement");
+            return;
+        }
+        int probeLogs = scan(helper.getLevel(), probeOrigin, state -> state.is(BlockTags.LOGS)).size();
+        BlockPos step = firstSidewaysLog(helper.getLevel(),
+                scan(helper.getLevel(), probeOrigin, state -> state.is(BlockTags.LOGS)), probeOrigin);
+        if (step == null) {
+            helper.fail("the probe palm never stepped sideways, so there is no step to wall off");
+            return;
+        }
+
+        BlockPos origin = scene(helper, slot);
+        helper.getLevel().setBlock(step, Blocks.STONE.defaultBlockState(), 2);
+        if (!TreeTestScenes.place(helper,
+                treeBesideObstacles(helper, BENT_TRUNK, FROND_FLAT), origin)) {
+            helper.fail("the blocked palm reported no placement");
+            return;
+        }
+        int logs = scan(helper.getLevel(), origin, state -> state.is(BlockTags.LOGS)).size();
+        if (logs >= probeLogs) {
+            helper.fail("the wall at " + step + " did not stop the stem: " + logs
+                    + " logs against the open palm's " + probeLogs);
+            return;
+        }
+        requireCrownOnWood(helper, origin, "blocked trunk");
+        helper.succeed();
+    }
+
+    /**
+     * The stem's horizontal budget plus the widest frond has to fit the 16 blocks a feature's 3x3
+     * chunk region guarantees in each direction: a palm that reaches further writes into chunks the
+     * generator does not hold.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void trunkBudgetPlusWidestFrondFitsTheFeatureRegion(GameTestHelper helper) {
+        int widestReach = CurvedTrunkPlacer.MAX_HORIZONTAL_TRAVEL
+                + FrondFoliagePlacer.MAX_FROND_LENGTH;
+        if (widestReach > 16) {
+            helper.fail("a bent palm can reach " + widestReach
+                    + " blocks from its origin, past the 16 the 3x3 chunk region holds");
+            return;
+        }
+        helper.succeed();
+    }
+
     // --- scene helpers -------------------------------------------------------------
+
+    /**
+     * Every leaf in the scene must hang off the trunk through face contact within
+     * {@link FrondFoliagePlacer#MAX_FROND_REACH} steps.
+     *
+     * <p>This walks the real neighbour graph instead of reading {@code LeavesBlock.DISTANCE}: a
+     * leaf that has not ticked yet still holds the pinned 5, so a distance read on a freshly grown
+     * tree passes whatever shape it is. The failure this catches is the one that shows up later,
+     * when the ticker resolves the real distance and the leaf decays.
+     */
+    private static void requireCrownOnWood(GameTestHelper helper, BlockPos origin, String scene) {
+        ServerLevel level = helper.getLevel();
+        List<BlockPos> logs = scan(level, origin, state -> state.is(BlockTags.LOGS));
+        List<BlockPos> grown = leaves(level, origin);
+        if (logs.isEmpty()) {
+            helper.fail(scene + ": no log grew, so there is no wood to hang the crown on");
+            return;
+        }
+        if (grown.size() < 8) {
+            helper.fail(scene + ": only " + grown.size()
+                    + " leaves grew, too few to check the crown");
+            return;
+        }
+        java.util.Map<BlockPos, Integer> steps = faceStepsFromLogs(level, grown);
+        for (BlockPos leaf : grown) {
+            Integer distance = steps.get(leaf);
+            if (distance == null) {
+                helper.fail(scene + ": leaf " + leaf + " shares no face with the trunk or with"
+                        + " another reachable leaf, so the crown hangs on a diagonal and will decay");
+                return;
+            }
+            if (distance > FrondFoliagePlacer.MAX_FROND_REACH) {
+                helper.fail(scene + ": leaf " + leaf + " is " + distance + " face steps from the"
+                        + " trunk, past " + FrondFoliagePlacer.MAX_FROND_REACH + ", so it will decay");
+                return;
+            }
+        }
+    }
+
+    /** The log of the lowest bent level: where the stem first left the vertical. */
+    private static BlockPos firstSidewaysLog(ServerLevel level, List<BlockPos> logs, BlockPos origin) {
+        BlockPos best = null;
+        int bestReach = -1;
+        for (BlockPos pos : logs) {
+            if (level.getBlockState(pos).getValue(BlockStateProperties.AXIS) == Direction.Axis.Y) {
+                continue;
+            }
+            int reach = Math.abs(pos.getX() - origin.getX())
+                    + Math.abs(pos.getZ() - origin.getZ());
+            if (best == null || pos.getY() < best.getY()
+                    || pos.getY() == best.getY() && reach > bestReach) {
+                best = pos;
+                bestReach = reach;
+            }
+        }
+        return best;
+    }
+
+    private static boolean isVerticalLog(ServerLevel level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        return state.is(BlockTags.LOGS)
+                && state.getValue(BlockStateProperties.AXIS) == Direction.Axis.Y;
+    }
 
     /**
      * Face-step distance from the nearest log to every leaf reachable through logs and leaves.
@@ -442,6 +650,16 @@ public final class CurvedPalmGameTests {
     private static ConfiguredFeature<?, ?> tree(GameTestHelper helper, String trunkJson,
                                                 String foliageJson) {
         return TreeTestScenes.parseTree(helper, "", foliageJson, trunkJson);
+    }
+
+    /**
+     * The same tree, parsed with a {@code minimum_size} that ignores the neighbours, so a test can
+     * build an obstacle beside the trunk without the feature refusing to grow at all.
+     */
+    private static ConfiguredFeature<?, ?> treeBesideObstacles(GameTestHelper helper, String trunkJson,
+                                                               String foliageJson) {
+        return TreeTestScenes.parseTree(helper, "", foliageJson, trunkJson,
+                TreeTestScenes.OPEN_MINIMUM_SIZE);
     }
 
     /** Every block around a tree that matches {@code match}, in the scan box. */

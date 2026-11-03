@@ -42,19 +42,24 @@ import org.jetbrains.annotations.ApiStatus;
  * <p>{@code bend} is the chance of a sideways step at the very top, so it sets how hard the stem
  * curves: at level {@code y} of {@code top} the chance is {@code bend * (y / top)^2}. A value of
  * 1.0 always steps sideways at the top and almost never near the root; 0.0 is a straight trunk;
- * 2.0 saturates the upper third. {@code convert_ground} and {@code min_height} mean what they mean
- * on {@link LeaningTrunkPlacer} — {@code false} keeps a beach palm's sand, and a tree whose trunk
- * would be shorter than {@code min_height} places nothing at all. {@code space_check} stops the
- * trunk at the last log it could actually place, so the crown stays on wood.
+ * the chance reaches 1 at {@code y / top = 1 / sqrt(bend)}, so 2.0 steps sideways on almost every
+ * level of the upper third and 1.0 only at the very tip. {@code convert_ground} and
+ * {@code min_height} mean what they mean on {@link LeaningTrunkPlacer} — {@code false} keeps a
+ * beach palm's sand, and a tree whose trunk would be shorter than {@code min_height} places
+ * nothing at all. {@code space_check} stops the trunk at the last log it could actually place, so
+ * the crown stays on wood.
  *
  * <p>The trunk emits a single crown attachment, at its top log: a palm's crown sprays from one
  * point, so this placer is always "tip only" and has no {@code tip_crown_only} switch.
  *
- * <p><b>Horizontal travel is capped at {@value #MAX_HORIZONTAL_TRAVEL} blocks from the origin</b>,
- * the same budget {@code isekai_api:leaning} uses. The feature stage hands a generator a 3x3 chunk
- * region, which always covers 16 blocks in each direction from an origin in the middle chunk, so 12
- * can be walked without a bounds check. The cap also bounds how far a crown can reach past the
- * trunk: an origin plus 12 plus a frond still stays inside the region.
+ * <p><b>Horizontal travel is capped at {@value #MAX_HORIZONTAL_TRAVEL} blocks from the origin:</b>
+ * one block less than {@code isekai_api:leaning}'s. The feature stage hands a generator a 3x3
+ * chunk region, which always covers 16 blocks in each direction from an origin in the middle
+ * chunk, and the crown hangs off the tip: {@code 11 + 5} is exactly the 16 a frond of the widest
+ * {@code length} ({@link FrondFoliagePlacer#MAX_FROND_LENGTH}) can use. A bent trunk that walked
+ * the full 12 would put the far side of its crown 17 blocks out, one block past what the region
+ * holds. A wider crown than {@code frond} — a vanilla placer with a large {@code radius}, say —
+ * is the datapack's own budget to keep.
  */
 @ApiStatus.Internal
 public class CurvedTrunkPlacer extends TrunkPlacer {
@@ -63,14 +68,22 @@ public class CurvedTrunkPlacer extends TrunkPlacer {
     private static final int DEFAULT_MIN_HEIGHT = 4;
 
     /**
-     * Horizontal blocks one tree may travel from its origin.
-     *
-     * <p>Same number and same reason as {@link LeaningTrunkPlacer#MAX_HORIZONTAL_TRAVEL}: the
-     * feature stage gives a generator a 3x3 chunk region, which always covers 16 blocks in every
-     * direction from an origin inside the middle chunk. Kept as one constant so a palm cannot walk
-     * past what the region holds, whichever trunk made it.
+     * Blocks a feature's 3x3 chunk region always covers in each horizontal direction from an
+     * origin in the middle chunk. Same guarantee {@link LeaningTrunkPlacer#MAX_HORIZONTAL_TRAVEL}
+     * is built on.
      */
-    public static final int MAX_HORIZONTAL_TRAVEL = LeaningTrunkPlacer.MAX_HORIZONTAL_TRAVEL;
+    private static final int REGION_HORIZONTAL_REACH = 16;
+
+    /**
+     * Horizontal blocks one tree may travel from its origin, leaving room for the widest frond.
+     *
+     * <p>{@code 16 - }{@link FrondFoliagePlacer#MAX_FROND_LENGTH}: unlike {@code leaning}, whose
+     * crown drapes along the horizontal arm, this trunk's crown sits at the far end of the drift
+     * and reaches further outward from it. The cap counts the whole tree, not just the wood, so an
+     * origin plus the drift plus a frond stays inside the region the feature may write into.
+     */
+    public static final int MAX_HORIZONTAL_TRAVEL =
+            REGION_HORIZONTAL_REACH - FrondFoliagePlacer.MAX_FROND_LENGTH;
 
     public static final MapCodec<CurvedTrunkPlacer> CODEC = RecordCodecBuilder.mapCodec(
             inst -> inst.group(
@@ -170,9 +183,10 @@ public class CurvedTrunkPlacer extends TrunkPlacer {
             double sideways = this.bend * reach * reach;
             if (travelled < MAX_HORIZONTAL_TRAVEL && random.nextFloat() < sideways) {
                 cursor.move(lean);
-                travelled++;
                 if (this.placeLog(level, blockSetter, random, cursor, config,
                         withAxis(lean.getAxis()))) {
+                    // only a log that really exists uses the budget; a blocked step is undone
+                    travelled++;
                     tip = cursor.immutable();
                 } else {
                     // blocked sideways: step back so the rest of the stem stays on placed wood

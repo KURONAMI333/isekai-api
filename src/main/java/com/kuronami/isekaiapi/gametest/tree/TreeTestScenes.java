@@ -65,6 +65,33 @@ final class TreeTestScenes {
             """;
 
     /**
+     * Default {@code minimum_size}: the trunk column plus one extra layer one block up, which is
+     * what a small crown needs. A test that wants to put a solid block beside the trunk has to pass
+     * a looser size, because this one makes the tree refuse to grow instead.
+     */
+    private static final String DEFAULT_MINIMUM_SIZE = """
+            {
+              "type": "minecraft:two_layers_feature_size",
+              "limit": 1,
+              "lower_size": 0,
+              "upper_size": 1
+            }
+            """;
+
+    /**
+     * A {@code minimum_size} that asks for no free space beside the trunk, so a test can build an
+     * obstacle next to it without the feature giving up before the trunk placer runs.
+     */
+    static final String OPEN_MINIMUM_SIZE = """
+            {
+              "type": "minecraft:two_layers_feature_size",
+              "limit": 0,
+              "lower_size": 0,
+              "upper_size": 0
+            }
+            """;
+
+    /**
      * A vanilla {@code minecraft:tree} configured feature, with the decorator array, the foliage
      * placer and the trunk placer substituted in. Written as datapack JSON on purpose: the decorator
      * and placer types have to be reachable through the real configured-feature codec, not only
@@ -89,12 +116,7 @@ final class TreeTestScenes {
                 },
                 "force_dirt": false,
                 "ignore_vines": true,
-                "minimum_size": {
-                  "type": "minecraft:two_layers_feature_size",
-                  "limit": 1,
-                  "lower_size": 0,
-                  "upper_size": 1
-                },
+                "minimum_size": __MINIMUM_SIZE__,
                 "trunk_placer": __TRUNK__,
                 "trunk_provider": {
                   "type": "minecraft:simple_state_provider",
@@ -136,10 +158,22 @@ final class TreeTestScenes {
      */
     static ConfiguredFeature<?, ?> parseTree(GameTestHelper helper, String decoratorJson,
                                              String foliageJson, String trunkJson) {
+        return parseTree(helper, decoratorJson, foliageJson, trunkJson, DEFAULT_MINIMUM_SIZE);
+    }
+
+    /**
+     * Parses a tree with an explicit {@code minimum_size} as well. A test that plants a solid block
+     * beside the trunk needs {@link #OPEN_MINIMUM_SIZE}: the default size makes the feature reject
+     * any spot with a neighbour that close, and then the trunk placer never runs.
+     */
+    static ConfiguredFeature<?, ?> parseTree(GameTestHelper helper, String decoratorJson,
+                                             String foliageJson, String trunkJson,
+                                             String minimumSizeJson) {
         String json = TREE_JSON
                 .replace("__DECORATORS__", decoratorJson)
                 .replace("__FOLIAGE__", foliageJson)
-                .replace("__TRUNK__", trunkJson);
+                .replace("__TRUNK__", trunkJson)
+                .replace("__MINIMUM_SIZE__", minimumSizeJson);
         RegistryOps<JsonElement> ops = RegistryOps.create(JsonOps.INSTANCE, helper.getLevel().registryAccess());
         return ConfiguredFeature.DIRECT_CODEC.parse(ops, JsonParser.parseString(json))
                 .getOrThrow(message -> new IllegalStateException("minecraft:tree decode failed: " + message));
