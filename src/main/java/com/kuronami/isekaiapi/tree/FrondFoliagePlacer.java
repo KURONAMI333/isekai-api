@@ -35,8 +35,10 @@ import org.jetbrains.annotations.ApiStatus;
  * contact back to the trunk, so a cell taken by another block splits the chain: the leaves written
  * past it hang on an edge, land past the sixth step, and decay on the first tick. The lift column
  * above the trunk top stops the same way; when it does, the fronds start from the last cell that
- * really holds a leaf. Two fronds crossing in one cell do not stop each other — the cell already
- * holds a leaf, so the chain is unbroken.
+ * really holds a leaf. A cell that already holds leaves is not such a cell: vanilla's
+ * {@code replaceable_by_trees} tag contains {@code #minecraft:leaves}, so the frond writes its own
+ * leaf over it, whether that leaf came from another frond of this crown or from a neighbouring
+ * tree, and the chain stays whole.
  *
  * <p>Leaf distance counts steps between blocks that share a <em>face</em>, so the crown has to touch
  * the trunk: a crown lifted one block too high hangs on a diagonal and every leaf in it is past the

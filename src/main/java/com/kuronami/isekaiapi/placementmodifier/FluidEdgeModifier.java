@@ -132,8 +132,19 @@ public class FluidEdgeModifier extends PlacementModifier {
      * level. Every level the cap leaves in range is still probed exactly, so fluid under a roof —
      * a pond below a canopy, a flooded cave — is found like any other.
      *
-     * <p>That heightmap is maintained by every block write both during generation (every step from
-     * carvers on primes and updates it) and on a live level, unlike the {@code _WG} variants.
+     * <p>That cap is only sound while the heightmap is current, and during generation it is:
+     * {@code ProtoChunk.setBlockState} updates every type in
+     * {@code getPersistedStatus().heightmapsAfter()}; {@code ChunkStatus.CARVERS} — the status of
+     * the chunks around the one being decorated — and every status after it carry
+     * {@code FINAL_HEIGHTMAPS}, which contains {@code MOTION_BLOCKING}. A feature writes into the
+     * eight neighbouring chunks (the features step allows a write radius of 1), and those writes
+     * update their heightmaps the same way, so a column primed earlier cannot keep a stale height
+     * after water was put in it. A column that is not primed yet is primed from the blocks on the
+     * first {@code ChunkAccess.getHeight} read, and {@code ChunkStatusTasks.generateFeatures}
+     * primes the middle chunk before any feature runs. {@code Heightmap.update} ignores a change
+     * more than one block below the tracked surface, which is the one direction that could hide a
+     * fluid above the cap, so it does not undermine it. Unlike the {@code _WG} variants, which the
+     * surface step stops maintaining, this one stays right for the whole life of the chunk.
      * Keeping the single-level path free of it also keeps its reads identical to the behaviour
      * packs already rely on.
      */

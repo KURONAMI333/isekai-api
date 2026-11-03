@@ -46,6 +46,25 @@ public final class CurvedPalmGameTests {
     /** Air cleared above the platform: trunk plus crown plus the drooping tips. */
     private static final int SCAN_HEIGHT = 20;
 
+    /**
+     * Blocks a feature's 3x3 chunk region always covers in each horizontal direction from an origin
+     * in the middle chunk: the reach {@link CurvedTrunkPlacer#MAX_HORIZONTAL_TRAVEL} is built on.
+     */
+    private static final int REGION_REACH = 16;
+
+    /** Box scanned for the tall stems: one block past the region edge, so an overflow is seen. */
+    private static final int REGION_SCAN_RADIUS = REGION_REACH + 1;
+
+    /** Air cleared for a 30-log stem and its crown. */
+    private static final int TALL_SCENE_HEIGHT = 33;
+
+    /**
+     * Seeds the tall-stem tests grow. A short stem cannot spend an 11-block sideways budget, so the
+     * region check only means something with a stem tall enough to try: these four are drawn so that
+     * at least one of them fills the budget.
+     */
+    private static final long[] TALL_SEEDS = {0x5EEDL, 0x0BEEFL, 0x51D3L, 0x2E4BL};
+
     /** A crown with a fixed frond length, so the shape checks are reproducible. */
     private static final String FROND = """
             {
@@ -121,6 +140,30 @@ public final class CurvedPalmGameTests {
 
     /** A straight stem, so the crown is the only thing shaped in the test. */
     private static final String STRAIGHT_TRUNK = BENT_TRUNK.replace("\"bend\": 1.0", "\"bend\": 0.0");
+
+    /**
+     * The tallest stem the type allows, bending as hard as it can: 30 levels with a sideways chance
+     * that reaches 1 in the upper third. This is the only shape that can spend the whole 11-block
+     * budget, so it is what the region check grows.
+     */
+    private static final String TALL_BENT_TRUNK = """
+            {
+              "type": "isekai_api:curved",
+              "base_height": 30,
+              "height_rand_a": 0,
+              "height_rand_b": 0,
+              "bend": 2.0,
+              "convert_ground": false,
+              "min_height": 4
+            }
+            """;
+
+    /**
+     * The same stem with {@code space_check} off: a blocked sideways step is stepped back instead of
+     * ending the trunk, which is the only way to see whether that blocked step spent budget.
+     */
+    private static final String TALL_OPEN_TRUNK = TALL_BENT_TRUNK
+            .replace("\"convert_ground\": false,", "\"convert_ground\": false,\n  \"space_check\": false,");
 
     private CurvedPalmGameTests() {}
 
@@ -516,20 +559,176 @@ public final class CurvedPalmGameTests {
     }
 
     /**
-     * The stem's horizontal budget plus the widest frond has to fit the 16 blocks a feature's 3x3
-     * chunk region guarantees in each direction: a palm that reaches further writes into chunks the
-     * generator does not hold.
+     * A palm grown from a real region-sized scene: the whole tree — wood and leaves — stays inside
+     * the 16 blocks a feature's 3x3 chunk region covers in each direction, and at least one of the
+     * seeds spends the stem's whole sideways budget, so the check reaches the edge it guards.
+     *
+     * <p>The short stems the other tests grow cannot travel 11 blocks: {@code BENT_TRUNK} has 8
+     * levels, so a constant-only comparison here would stay true whatever the stem did. This test
+     * grows the tallest stem the type allows, with the widest frond, and reads the blocks back.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3", timeoutTicks = 1200)
+    public static void tallestStemAndCrownStayInsideTheFeatureRegion(GameTestHelper helper) {
+        int spentTheBudget = 0;
+        for (int i = 0; i < TALL_SEEDS.length; i++) {
+            long seed = TALL_SEEDS[i];
+            String scene = "seed " + Long.toHexString(seed);
+            BlockPos origin = scene(helper, FIRST_SLOT + 20 + i, REGION_SCAN_RADIUS,
+                    TALL_SCENE_HEIGHT);
+            if (!TreeTestScenes.place(helper, tree(helper, TALL_BENT_TRUNK, FROND_LONG),
+                    origin, seed)) {
+                helper.fail(scene + ": the tall palm reported no placement");
+                return;
+            }
+            List<BlockPos> logs = scan(helper.getLevel(), origin, REGION_SCAN_RADIUS,
+                    TALL_SCENE_HEIGHT, state -> state.is(BlockTags.LOGS));
+            List<BlockPos> grown = leaves(helper.getLevel(), origin, REGION_SCAN_RADIUS,
+                    TALL_SCENE_HEIGHT);
+            if (logs.size() < 10 || grown.size() < 16) {
+                helper.fail(scene + ": " + logs.size() + " logs and " + grown.size()
+                        + " leaves grew, too little to measure the reach");
+                return;
+            }
+
+            int logReach = 0;
+            int travel = 0;
+            for (BlockPos log : logs) {
+                logReach = Math.max(logReach, horizontalChebyshev(log, origin));
+                travel = Math.max(travel, horizontalManhattan(log, origin));
+            }
+            int leafReach = 0;
+            for (BlockPos leaf : grown) {
+                leafReach = Math.max(leafReach, horizontalChebyshev(leaf, origin));
+            }
+            if (logReach > REGION_REACH || leafReach > REGION_REACH) {
+                helper.fail(scene + ": the tree reached " + logReach + " blocks with its wood and "
+                        + leafReach + " with its leaves, past the " + REGION_REACH
+                        + " the 3x3 chunk region holds (logs " + logs.size() + ")");
+                return;
+            }
+            if (travel == CurvedTrunkPlacer.MAX_HORIZONTAL_TRAVEL) {
+                spentTheBudget++;
+            }
+        }
+        if (spentTheBudget == 0) {
+            helper.fail("none of the " + TALL_SEEDS.length + " tall palms travelled "
+                    + CurvedTrunkPlacer.MAX_HORIZONTAL_TRAVEL + " blocks sideways, so no crown ever"
+                    + " reached the region edge and this test checks nothing");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * A sideways step that runs into a wall does not spend the stem's budget: the stem steps back,
+     * climbs, and takes the step one level up, so it still walks the full
+     * {@link CurvedTrunkPlacer#MAX_HORIZONTAL_TRAVEL} blocks.
+     *
+     * <p>Budgets that count a failed attempt would leave this tree one block short. The wall is put
+     * on the first sideways cell of a stem grown once undisturbed with the same seed, which is the
+     * only cell the stem is known to attempt; {@code space_check} is off so the wall redirects the
+     * stem instead of ending it.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3", timeoutTicks = 1200)
+    public static void blockedSidewaysStepKeepsTheTravelBudget(GameTestHelper helper) {
+        for (int i = 0; i < TALL_SEEDS.length; i++) {
+            long seed = TALL_SEEDS[i];
+            String scene = "seed " + Long.toHexString(seed);
+            int probeSlot = FIRST_SLOT + 30 + i * 2;
+            BlockPos probeOrigin = scene(helper, probeSlot, REGION_SCAN_RADIUS, TALL_SCENE_HEIGHT);
+            if (!TreeTestScenes.place(helper,
+                    treeBesideObstacles(helper, TALL_OPEN_TRUNK, FROND_LONG), probeOrigin, seed)) {
+                helper.fail(scene + ": the probe palm reported no placement");
+                return;
+            }
+            List<BlockPos> probeLogs = scan(helper.getLevel(), probeOrigin, REGION_SCAN_RADIUS,
+                    TALL_SCENE_HEIGHT, state -> state.is(BlockTags.LOGS));
+            int probeTravel = 0;
+            BlockPos firstStep = null;
+            for (BlockPos log : probeLogs) {
+                probeTravel = Math.max(probeTravel, horizontalManhattan(log, probeOrigin));
+                if (horizontalManhattan(log, probeOrigin) == 1
+                        && !isVerticalLog(helper.getLevel(), log)) {
+                    firstStep = log;
+                }
+            }
+            if (probeTravel < CurvedTrunkPlacer.MAX_HORIZONTAL_TRAVEL || firstStep == null) {
+                // this seed never spends the budget, so it cannot show what a wall costs
+                continue;
+            }
+
+            BlockPos origin = scene(helper, probeSlot + 1, REGION_SCAN_RADIUS, TALL_SCENE_HEIGHT);
+            BlockPos relative = firstStep.subtract(probeOrigin);
+            BlockPos wall = origin.offset(relative.getX(), relative.getY(), relative.getZ());
+            helper.getLevel().setBlock(wall, Blocks.STONE.defaultBlockState(), 2);
+            if (!TreeTestScenes.place(helper,
+                    treeBesideObstacles(helper, TALL_OPEN_TRUNK, FROND_LONG), origin, seed)) {
+                helper.fail(scene + ": the blocked palm reported no placement");
+                return;
+            }
+            List<BlockPos> logs = scan(helper.getLevel(), origin, REGION_SCAN_RADIUS,
+                    TALL_SCENE_HEIGHT, state -> state.is(BlockTags.LOGS));
+            if (logs.stream().anyMatch(p -> p.equals(wall))) {
+                helper.fail(scene + ": the stem put a log into the walled cell " + wall
+                        + ", so the case is untested");
+                return;
+            }
+            int travel = 0;
+            for (BlockPos log : logs) {
+                travel = Math.max(travel, horizontalManhattan(log, origin));
+            }
+            if (travel < CurvedTrunkPlacer.MAX_HORIZONTAL_TRAVEL) {
+                helper.fail(scene + ": with one sideways step walled off the stem travelled only "
+                        + travel + " of its " + CurvedTrunkPlacer.MAX_HORIZONTAL_TRAVEL
+                        + " blocks, so the blocked step spent budget it did not use");
+                return;
+            }
+            helper.succeed();
+            return;
+        }
+        helper.fail("none of the " + TALL_SEEDS.length + " tall palms spent its sideways budget,"
+                + " so no step could be walled off");
+    }
+
+    /**
+     * A frond that runs into another tree's leaves takes the cells: vanilla's
+     * {@code replaceable_by_trees} tag contains {@code #minecraft:leaves}, so an existing leaf is a
+     * valid tree position and {@link com.kuronami.isekaiapi.tree.LeafPlacing#placePinned} writes the
+     * palm's own leaf over it. The palm does not stop at foreign leaves the way it stops at stone.
+     *
+     * <p>The scene is a straight palm whose +x arm and whose +x+z diagonal are pre-filled with jungle
+     * leaves. Every one of those cells has to end up as the palm's leaf, and the whole crown still
+     * has to hang off the trunk through face contact within six steps: that is what the ticker
+     * resolves once the generation-time pin is gone.
      */
     @PrefixGameTestTemplate(false)
     @GameTest(template = "empty3x3x3")
-    public static void trunkBudgetPlusWidestFrondFitsTheFeatureRegion(GameTestHelper helper) {
-        int widestReach = CurvedTrunkPlacer.MAX_HORIZONTAL_TRAVEL
-                + FrondFoliagePlacer.MAX_FROND_LENGTH;
-        if (widestReach > 16) {
-            helper.fail("a bent palm can reach " + widestReach
-                    + " blocks from its origin, past the 16 the 3x3 chunk region holds");
+    public static void frondTakesForeignLeavesAndKeepsTheCrownConnected(GameTestHelper helper) {
+        BlockPos origin = scene(helper, FIRST_SLOT + 11);
+        BlockPos tip = origin.above(7);
+        BlockPos[] foreign = {
+                tip.offset(2, 0, 0), tip.offset(3, 0, 0),   // on the +x arm
+                tip.offset(1, 0, 1),                        // where the +x+z diagonal crosses
+        };
+        for (BlockPos pos : foreign) {
+            helper.getLevel().setBlock(pos, Blocks.JUNGLE_LEAVES.defaultBlockState(), 2);
+        }
+        if (!TreeTestScenes.place(helper,
+                treeBesideObstacles(helper, STRAIGHT_TRUNK, FROND_FLAT), origin)) {
+            helper.fail("the palm beside the foreign leaves reported no placement");
             return;
         }
+        for (BlockPos pos : foreign) {
+            BlockState state = helper.getLevel().getBlockState(pos);
+            if (!state.is(Blocks.OAK_LEAVES)) {
+                helper.fail("the cell " + pos + " holds " + state
+                        + " instead of the palm's leaf, so the frond did not take the foreign leaf");
+                return;
+            }
+        }
+        requireCrownOnWood(helper, origin, "foreign leaves");
         helper.succeed();
     }
 
@@ -634,12 +833,17 @@ public final class CurvedPalmGameTests {
 
     /** Builds the slot's platform and clears a wide, tall volume so a rerun starts equal. */
     private static BlockPos scene(GameTestHelper helper, int slot) {
+        return scene(helper, slot, SCAN_RADIUS, SCAN_HEIGHT);
+    }
+
+    /** The same scene with an explicit box, for the stems that grow past the usual crown. */
+    private static BlockPos scene(GameTestHelper helper, int slot, int radius, int height) {
         BlockPos origin = TreeTestScenes.prepare(helper, slot);
         ServerLevel level = helper.getLevel();
-        for (int dx = -SCAN_RADIUS; dx <= SCAN_RADIUS; dx++) {
-            for (int dz = -SCAN_RADIUS; dz <= SCAN_RADIUS; dz++) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
                 level.setBlock(origin.offset(dx, -1, dz), Blocks.GRASS_BLOCK.defaultBlockState(), 2);
-                for (int dy = 0; dy <= SCAN_HEIGHT; dy++) {
+                for (int dy = 0; dy <= height; dy++) {
                     level.setBlock(origin.offset(dx, dy, dz), Blocks.AIR.defaultBlockState(), 2);
                 }
             }
@@ -665,10 +869,16 @@ public final class CurvedPalmGameTests {
     /** Every block around a tree that matches {@code match}, in the scan box. */
     private static List<BlockPos> scan(ServerLevel level, BlockPos origin,
                                        java.util.function.Predicate<BlockState> match) {
+        return scan(level, origin, SCAN_RADIUS, SCAN_HEIGHT, match);
+    }
+
+    /** The same scan with an explicit box. */
+    private static List<BlockPos> scan(ServerLevel level, BlockPos origin, int radius, int height,
+                                       java.util.function.Predicate<BlockState> match) {
         List<BlockPos> found = new ArrayList<>();
         for (BlockPos pos : BlockPos.betweenClosed(
-                origin.offset(-SCAN_RADIUS, 0, -SCAN_RADIUS),
-                origin.offset(SCAN_RADIUS, SCAN_HEIGHT, SCAN_RADIUS))) {
+                origin.offset(-radius, 0, -radius),
+                origin.offset(radius, height, radius))) {
             if (match.test(level.getBlockState(pos))) {
                 found.add(pos.immutable());
             }
@@ -678,6 +888,20 @@ public final class CurvedPalmGameTests {
 
     private static List<BlockPos> leaves(ServerLevel level, BlockPos origin) {
         return scan(level, origin, state -> state.getBlock() instanceof LeavesBlock);
+    }
+
+    private static List<BlockPos> leaves(ServerLevel level, BlockPos origin, int radius, int height) {
+        return scan(level, origin, radius, height, state -> state.getBlock() instanceof LeavesBlock);
+    }
+
+    /** Largest horizontal offset on either axis: what the 3x3 chunk region is measured in. */
+    private static int horizontalChebyshev(BlockPos pos, BlockPos origin) {
+        return Math.max(Math.abs(pos.getX() - origin.getX()), Math.abs(pos.getZ() - origin.getZ()));
+    }
+
+    /** Horizontal blocks walked from the origin: what the stem's sideways budget counts. */
+    private static int horizontalManhattan(BlockPos pos, BlockPos origin) {
+        return Math.abs(pos.getX() - origin.getX()) + Math.abs(pos.getZ() - origin.getZ());
     }
 
     private static BlockPos highest(List<BlockPos> positions) {

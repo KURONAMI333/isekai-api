@@ -182,9 +182,61 @@ public final class FluidEdgeGameTests {
         helper.succeed();
     }
 
+    /**
+     * Both ends of {@code vertical_range} are inclusive: the band that reaches the water by exactly
+     * its depth finds it, and one level less does not, above the input and below it.
+     *
+     * <p>The two existing checks bracket the range with a wide margin (9 finds, 3 misses). This one
+     * sits on the boundary, where an off-by-one lives: a band that ends one level short of the
+     * water has to report nothing, and one that just touches it has to report the water.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void verticalRangeBoundsAreInclusiveOnBothSides(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        int waterY = origin.getY() + BAND_OFFSET + BAND_SPACING * 3;
+        buildPond(level, origin, waterY, false);
+        if (!hasWater(level, origin, waterY)) return;
+        PlacementContext ctx = placementContext(level);
+        HolderSet<Fluid> water = waterFluids(level);
+
+        // The input sits above the pond, so the depth is what {@code below} has to cover.
+        BlockPos above = new BlockPos(origin.getX() + AWAY, waterY + ABOVE_WATER, origin.getZ());
+        expect(helper, band(water, ABOVE_WATER, 0), ctx, above, true,
+                "below = " + ABOVE_WATER + " (the water's own depth)");
+        expect(helper, band(water, ABOVE_WATER - 1, 0), ctx, above, false,
+                "below = " + (ABOVE_WATER - 1) + " (one level short)");
+
+        // Now the input sits under the pond, so the water is what {@code above} has to reach.
+        BlockPos below = new BlockPos(origin.getX() + AWAY, waterY - ABOVE_WATER, origin.getZ());
+        expect(helper, band(water, 0, ABOVE_WATER), ctx, below, true,
+                "above = " + ABOVE_WATER + " (the water's own height)");
+        expect(helper, band(water, 0, ABOVE_WATER - 1), ctx, below, false,
+                "above = " + (ABOVE_WATER - 1) + " (one level short)");
+
+        // A span that only has room in one direction must not reach through the other.
+        expect(helper, band(water, ABOVE_WATER, 0), ctx, below, false,
+                "below = " + ABOVE_WATER + " above the input");
+        helper.succeed();
+    }
+
     // =====================================================================
     // Helpers
     // =====================================================================
+
+    private static FluidEdgeModifier band(HolderSet<Fluid> water, int below, int above) {
+        return new FluidEdgeModifier(water, 12, FluidEdgeModifier.Mode.NEAR,
+                new FluidEdgeModifier.VerticalSpan(below, above));
+    }
+
+    private static void expect(GameTestHelper helper, FluidEdgeModifier modifier, PlacementContext ctx,
+                               BlockPos pos, boolean accepted, String what) {
+        if (accepts(modifier, ctx, pos) != accepted) {
+            helper.fail("fluid_edge with " + what + " " + (accepted ? "missed" : "found")
+                    + " the water at " + pos + " (span " + modifier.verticalRange() + ")");
+        }
+    }
 
     /** A 3x3 pond with a stone floor, built inside the arena footprint but above it. */
     private static void buildPond(ServerLevel level, BlockPos origin, int waterY, boolean canopy) {

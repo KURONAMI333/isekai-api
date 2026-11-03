@@ -56,17 +56,26 @@ public final class LeafPlacing {
      * For core leaves that are log-adjacent, call vanilla's {@code FoliagePlacer.tryPlaceLeaf}
      * directly from the placer subclass.
      *
+     * <p>An existing leaf in the target cell does not stop the placement. Vanilla's
+     * {@code minecraft:replaceable_by_trees} tag starts with {@code #minecraft:leaves}, and
+     * {@code TreeFeature.validTreePos} accepts air or anything in that tag, so a cell that already
+     * holds leaves takes the provider's leaf like an air cell does. That is what happens where two
+     * fronds meet in one cell and where a frond runs into another tree's crown: the leaf written
+     * last stands, with the pin, and the chain stays whole. Only a block outside the tag (stone,
+     * wood, water) refuses the cell.
+     *
      * <p>The boolean return is for geometry that walks in face steps: it is {@code true} when a
-     * leaf occupies {@code pos} afterwards — written here, or already there, because two fronds
-     * meeting in one cell are one connected chain — and {@code false} when a non-leaf block
-     * refused the cell. A caller that walks a chain has to stop on {@code false}: stepping past a
-     * blocked cell leaves the rest of the chain touching only on an edge, further than the six
-     * leaf steps the ticker recalculates, so those leaves decay on their first random tick.
+     * leaf occupies {@code pos} afterwards — written here, over an air cell or over an existing
+     * leaf — and {@code false} when a non-leaf block refused the cell. A caller that walks a chain
+     * has to stop on {@code false}: stepping past a blocked cell leaves the rest of the chain
+     * touching only on an edge, further than the six leaf steps the ticker recalculates, so those
+     * leaves decay on their first random tick.
      */
     public static boolean placePinned(LevelSimulatedReader level, FoliagePlacer.FoliageSetter setter,
                                       RandomSource random, TreeConfiguration config, BlockPos pos) {
         if (!TreeFeature.validTreePos(level, pos)) {
-            // a leaf already in the cell keeps the chain whole; any other block breaks it
+            // Unreachable while leaves are inside replaceable_by_trees; a pack that narrows the tag
+            // would land here, and a leaf that is not replaceable still keeps the chain whole.
             return level.isStateAtPosition(pos, state -> state.is(BlockTags.LEAVES));
         }
         BlockState state = config.foliageProvider.getState(random, pos);
