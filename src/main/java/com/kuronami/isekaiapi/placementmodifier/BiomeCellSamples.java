@@ -13,7 +13,7 @@ import java.util.Arrays;
  * <p>A search asks the same cells over and over: one candidate walks every cell of its disc, and
  * the next candidate in the same chunk walks almost the same disc. A biome sample is not free — the
  * nether measures about 450 ns on this machine — and a chunk of 40 candidates with no biome in
- * range costs 77,000 samples, about 28 ms. The cells it asks number in the thousands instead, so
+ * range costs 77,000 samples, about 29 ms. The cells it asks number in the thousands instead, so
  * remembering them turns the second candidate's walk into array lookups.
  *
  * <p>Keys are biome cells, not blocks. The caller rounds a block position to its cell before asking

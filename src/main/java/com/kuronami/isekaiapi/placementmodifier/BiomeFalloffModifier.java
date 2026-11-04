@@ -61,9 +61,10 @@ public class BiomeFalloffModifier extends PlacementModifier {
                     : DataResult.error(() -> "step must be 4, 8 or 16, got " + v));
 
     /**
-     * How far above and below the input position to look for the biome, in blocks. Same shape and
-     * bounds as {@code fluid_edge}'s field: both ends inclusive, {@code {"below": 0, "above": 18}}
-     * covers 19 levels from the input Y.
+     * How far above and below the input position to look for the biome, in blocks. Same JSON shape
+     * and bounds as {@code fluid_edge}'s field, but sampled every four blocks (one biome cell):
+     * {@code {"below": 0, "above": 16}} reads Y, Y+4, Y+8, Y+12 and Y+16, and a value of 1–3 adds
+     * nothing.
      */
     public record VerticalSpan(int below, int above) {
         public static final VerticalSpan NONE = new VerticalSpan(0, 0);

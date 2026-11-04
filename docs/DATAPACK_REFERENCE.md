@@ -251,7 +251,10 @@ Cost is biome samples per candidate position (`step` 4):
 
 The worst case is a position with no such biome anywhere inside the radius — every one of them is
 rejected, which is what the search is paying for. `step` 8 quarters the count and `step` 16 takes
-a sixteenth, at the price of placing the border on a coarser grid.
+a sixteenth, at a price: the search reads only the cells on its own `step`-block grid, so a strip of
+the biome narrower than `step` can fall between two reads and be missed. With `step` 8 or 16 the
+"always accepted within `full_distance`" row holds only for biomes wider than the step; at `step` 4
+every cell is read and it holds exactly.
 
 Those are counts, so here is the clock. Measured on 1.21.1 against the nether's own
 `MultiNoiseBiomeSource`, where one biome sample costs about 450–640 ns, with the example below
@@ -272,7 +275,7 @@ the chunk next door has warmed the table.
 Two rules follow. Put this modifier after the cheap ones — `count` first, then anything that needs
 a heightmap or a block lookup — because its cost is paid per candidate that reaches it, not per
 chunk. And above `max_distance` 64, consider `step` 8: 128 blocks at `step` 4 is 16,045 samples per
-position against 4,011 at `step` 8, with the border landing on an 8-block grid instead of a 4-block
+position against 3,985 at `step` 8, with the border landing on an 8-block grid instead of a 4-block
 one.
 
 The biome is read from the dimension's `BiomeSource`, not from the chunks around the position: a
