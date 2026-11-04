@@ -253,6 +253,28 @@ The worst case is a position with no such biome anywhere inside the radius — e
 rejected, which is what the search is paying for. `step` 8 quarters the count and `step` 16 takes
 a sixteenth, at the price of placing the border on a coarser grid.
 
+Those are counts, so here is the clock. Measured on 1.21.1 against the nether's own
+`MultiNoiseBiomeSource`, where one biome sample costs about 450–640 ns, with the example below
+(`max_distance` 64, `full_distance` 8, `exponent` 1.6, `vertical_range` `{below:24, above:8}`),
+`count` 40 per chunk and `minecraft:crimson_forest` as the target:
+
+| where the chunk is | samples per chunk | ms per chunk |
+|---|---|---|
+| inside the forest | 40 | 0.03 |
+| 24 blocks past the border | 14,058 | 5.2 |
+| 200+ blocks away, no crimson forest in range | 76,741 | 29.2 |
+
+The 40 candidates of one chunk ask the same biome cells over and over, so the modifier remembers
+them per thread — 16,384 cells, dropped whole when the table fills or the world or sampler changes.
+The same three sites then take 0.01 / 0.51 / 0.89 ms per chunk cold, and 0.01 / 0.48 / 0.39 ms once
+the chunk next door has warmed the table.
+
+Two rules follow. Put this modifier after the cheap ones — `count` first, then anything that needs
+a heightmap or a block lookup — because its cost is paid per candidate that reaches it, not per
+chunk. And above `max_distance` 64, consider `step` 8: 128 blocks at `step` 4 is 16,045 samples per
+position against 4,011 at `step` 8, with the border landing on an 8-block grid instead of a 4-block
+one.
+
 The biome is read from the dimension's `BiomeSource`, not from the chunks around the position: a
 feature can only read the 3x3 chunks it is decorating, which is smaller than the radius it has to
 measure, and the source also gives the same answer in every chunk of one biome so the falloff does
