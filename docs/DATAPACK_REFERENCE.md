@@ -194,13 +194,90 @@ Go in a placed feature's modifier list.
 | `isekai_api:spatial_predicate` | `predicate` (SpatialPredicate) | place only where the predicate holds |
 | `isekai_api:scatter` | `count` (IntProvider), `radius` (int 1–32, default 8), `min_spacing` (int 0–32, default 0), `max_attempts_multiplier` (int 1–8, default 3) | jitter the input into `count` XZ samples within `radius`; if `min_spacing > 0`, reject samples within `min_spacing` blocks of an already-accepted one. Pair with a heightmap/Y-anchor modifier downstream. Use over `count + in_square` whenever you want clustered features that don't stack on each other. |
 | `isekai_api:fluid_edge` | `fluid` (fluid id / list / `#tag`), `max_distance` (int 1–16, default 4), `mode` (`near`\|`far`, default `near`), `vertical_range` (`below` / `above`, int 0–64 each, default 0/0) | accept positions where a matching fluid is (`near`) or isn't (`far`) within `max_distance` blocks in XZ. `vertical_range` widens the search to the band `Y-below … Y+above`; both ends are inclusive, so `{"below": 6}` finds water exactly 6 levels down and `{"below": 5}` does not. Omitted, only the input Y is read, as before. Geometric distance filter — pure membership test, no theme. |
-
-`fluid_edge` reads each column of the band from that column's `MOTION_BLOCKING` height downwards, so a fluid under a roof (a pond below a canopy, a flooded cave) is read level by level instead of being hidden by its column top. Nothing to configure: the heightmap is the ceiling of the scan, and vanilla keeps it current for blocks written during generation and in a live level alike.
 | `isekai_api:column_relative` | `top` / `bottom` (SurfaceAnchor, default `world_surface` / `world_floor`), `from_depth` / `to_depth` (double), `scale` (`blocks`\|`proportional`, default `blocks`), `reference_thickness` (int 1–4096, default 128), `distribution` (HeightDistribution, default `uniform`) | place at a **depth into the column's own terrain** instead of an absolute Y. `0.0` is the free space above the body, `1.0` the free space below it. `blocks` measures a fixed block distance from whichever end the band is nearer to (so an ore keeps its distance from the surface whatever the body's size); `proportional` measures a fraction of the body's own thickness (so the layout stretches with it). A column that holds several separate bodies gets one placement in each of them, at the same depth. Normally emitted by `isekai_api:column_local` rather than written by hand. |
 | `isekai_api:slope_filter` | `min_slope` / `max_slope` (double 0–1, defaults 0/1), `sample_radius` (int 1–8, default 2), `heightmap` (Heightmap type, default `WORLD_SURFACE_WG`) | accept positions where the local heightmap slope (max neighbour-height-delta over `sample_radius`, normalised) falls within `[min_slope, max_slope]`. 0 = flat, 1 ≈ 45°+ cliff. |
 | `isekai_api:dimension_guard` | `dimension` (any dimension id — vanilla or modded) | place only in that dimension. Prepended automatically to every feature `apply_worldshape` injects; write it by hand when a placed feature is shared across dimensions and must not run in one of them. |
+| `isekai_api:biome_falloff` | `biome` (biome id / list / `#tag`), `max_distance` (int 4–128), `full_distance` (int 0–`max_distance`, default 0), `exponent` (float 0.25–8, default 1.0), `vertical_range` (`below` / `above`, int 0–64 each, default 0/0), `step` (`4` \| `8` \| `16`, default 4) | accept with probability `t^exponent`, `t = (max_distance - d) / (max_distance - full_distance)`, where `d` is the horizontal distance to the nearest cell of `biome`: always inside `full_distance`, never past `max_distance`. Density thins toward the border instead of stopping at a line. `full_distance = max_distance` gives a hard radius. |
+
+`fluid_edge` reads each column of the band from that column's `MOTION_BLOCKING` height downwards, so a fluid under a roof (a pond below a canopy, a flooded cave) is read level by level instead of being hidden by its column top. Nothing to configure: the heightmap is the ceiling of the scan, and vanilla keeps it current for blocks written during generation and in a live level alike.
 
 (`IntProvider` = a vanilla int provider: a bare int like `5`, or `{"type":"minecraft:uniform","min_inclusive":0,"max_inclusive":8}` — flat fields, no `value:` wrapper in 1.21.1.)
+
+### `biome_falloff` — thinning out away from a biome
+
+```json
+{"type":"isekai_api:biome_falloff", "biome":"minecraft:crimson_forest",
+ "max_distance":48, "full_distance":8, "exponent":1.5,
+ "vertical_range":{"below":24,"above":8}, "step":4}
+```
+
+A position's acceptance rate depends only on its horizontal distance `d` to the nearest cell of
+`biome`:
+
+| `d` | probability |
+|---|---|
+| `d <= full_distance` | 1 |
+| `full_distance < d <= max_distance` | `t^exponent`, `t = (max_distance - d) / (max_distance - full_distance)` |
+| `d > max_distance` | 0 |
+
+`exponent` 1 is linear. Above 1 the biome's own edge stays dense and density falls away sooner —
+at half the band, `exponent` 2 gives a quarter instead of a half. Below 1 a long tail keeps a
+little of the biome far out. The point of the curve is the border: a hard cutoff puts one pack of
+features right up to a line and nothing on the other side, and that line reads as a seam. Here the
+density thins toward the border, so the seam is not visible. If you do want a hard radius, set
+`full_distance` equal to `max_distance`.
+
+`vertical_range` searches `Y-below … Y+above` at the same `(x, z)` (four blocks per step, nearest
+level first) and takes any hit. Give it width in dimensions whose biome changes with altitude —
+in the nether a crimson forest sits above the lava sea and a soul sand valley under it, so a
+single level only ever sees the slice at the candidate's own Y. Horizontal distance is still the
+only thing that sets the probability; the band only decides where the biome can be found.
+
+The distance is never measured. One uniform draw becomes a radius
+`full_distance + (max_distance - full_distance) * (1 - u^(1/exponent))`, and the search walks
+outward ring by ring (Chebyshev rings of the `step` lattice, cells farther than the radius
+skipped) until it hits the biome. Acceptance is `radius >= d`, which happens with probability
+`t^exponent` — the table above — and a position next to the biome stops after a few samples.
+Cost is biome samples per candidate position (`step` 4):
+
+| `max_distance` | `vertical_range` | no biome in range (worst case) | average when the biome is at `d = max/2` |
+|---|---|---|---|
+| 32 | `{0,0}` | 197 | 36 |
+| 64 | `{0,0}` | 797 | 150 |
+| 128 | `{0,0}` | 3,209 | 615 |
+| 32 | `{0,16}` | 985 | 176 |
+| 64 | `{0,16}` | 3,985 | 747 |
+| 128 | `{0,16}` | 16,045 | 3,074 |
+
+The worst case is a position with no such biome anywhere inside the radius — every one of them is
+rejected, which is what the search is paying for. `step` 8 quarters the count and `step` 16 takes
+a sixteenth, at the price of placing the border on a coarser grid.
+
+The biome is read from the dimension's `BiomeSource`, not from the chunks around the position: a
+feature can only read the 3x3 chunks it is decorating, which is smaller than the radius it has to
+measure, and the source also gives the same answer in every chunk of one biome so the falloff does
+not flicker along a chunk border. If the source cannot be read, the position is rejected — allowing
+would place at full density everywhere, the opposite of what the pack asked for.
+
+Example — mushroom caps floating on the nether's lava sea, thinning out as the crimson forest gets
+farther away. The feature itself belongs to the pack; Isekai only supplies the placement filter.
+
+```json
+{
+  "feature": "mypack:crimson_cap",
+  "placement": [
+    {"type": "minecraft:count", "count": 40},
+    {"type": "isekai_api:scatter", "count": 1, "radius": 24},
+    {"type": "minecraft:heightmap", "heightmap": "MOTION_BLOCKING"},
+    {"type": "isekai_api:biome_falloff",
+     "biome": "minecraft:crimson_forest",
+     "max_distance": 64, "full_distance": 8, "exponent": 1.6,
+     "vertical_range": {"below": 24, "above": 8}}
+  ]
+}
+```
+
+`MOTION_BLOCKING` counts fluids, so in a lava-sea column it returns the Y just above the lava.
 
 ---
 
@@ -620,6 +697,11 @@ The legacy `isekai:` prefix is accepted as a deprecated alias.
 | `isekai_api:and` | `all` (list) |
 | `isekai_api:or` | `any` (list) |
 | `isekai_api:not` | `inner` (predicate) |
+
+`near_biome` is enforced at structure-placement time only. Inside a placed feature,
+`isekai_api:spatial_predicate` cannot read a biome source, so `near_biome` lets every position
+through there — it always passes. To filter feature placement by biome, use
+`isekai_api:biome_falloff`, with `full_distance` equal to `max_distance` if you want a hard radius.
 
 ### RemapStrategy (`ore_strategy`, `structure_strategy`, `mob_spawn_strategy`, `mob_spawn_strategy_by_category`)
 
