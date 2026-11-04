@@ -27,6 +27,7 @@ import org.jetbrains.annotations.ApiStatus;
  *   <li>{@code isekai_api:column_relative} — depth into the column's own terrain, for
  *       worldshapes whose altitude varies per column</li>
  *   <li>{@code isekai_api:dimension_guard} — place only in the declared dimension</li>
+ *   <li>{@code isekai_api:biome_falloff} — thin out with horizontal distance from a biome</li>
  * </ul>
  */
 @ApiStatus.Internal
@@ -62,10 +63,13 @@ public final class IsekaiPlacementModifiers {
     public static final Supplier<PlacementModifierType<DimensionGuardPlacementModifier>> DIMENSION_GUARD =
             TYPES.register("dimension_guard", () -> () -> DimensionGuardPlacementModifier.CODEC);
 
+    public static final Supplier<PlacementModifierType<BiomeFalloffModifier>> BIOME_FALLOFF =
+            TYPES.register("biome_falloff", () -> () -> BiomeFalloffModifier.CODEC);
+
     private IsekaiPlacementModifiers() {}
 
     public static void register(IEventBus modBus) {
         TYPES.register(modBus);
-        IsekaiApi.LOGGER.info("[Isekai] placement modifiers registered: surface_relative, fluid_relative, in_block_context, spatial_predicate, scatter, fluid_edge, slope_filter, column_relative, dimension_guard");
+        IsekaiApi.LOGGER.info("[Isekai] placement modifiers registered: surface_relative, fluid_relative, in_block_context, spatial_predicate, scatter, fluid_edge, slope_filter, column_relative, dimension_guard, biome_falloff");
     }
 }
