@@ -89,7 +89,7 @@ A standard floating-island `final_density` wraps `band_density` in `blend_densit
 
 ## Biome sources (`isekai_api:`)
 
-Two biome sources for different placement strategies — pick whichever fits your world. Both go in a dimension's `generator.biome_source`.
+Three biome sources for different placement strategies — pick whichever fits your world. All go in a dimension's `generator.biome_source`.
 
 ### `isekai_api:rule` — by spatial rule
 
@@ -125,7 +125,26 @@ Places biomes by matching the vanilla climate axes (temperature / humidity / con
 
 Ranges use the vanilla `Climate.Parameter` codec — `[min, max]` or a single value (treated as a point on that axis).
 
-### BiomeZone (`isekai_api:`) — used inside `rule.zone`
+### `isekai_api:override` — replace a footprint, keep the base
+
+Wraps another biome source and replaces the biome inside zone footprints. Every position no zone claims is answered by `base`, so the base's own rules, seed and climate sampling keep working; this is how you add an island or a single-biome region to otherwise vanilla terrain.
+
+```jsonc
+{
+  "type": "isekai_api:override",
+  "base": { "type": "minecraft:multi_noise", "preset": "minecraft:overworld" },
+  "overrides": [
+    { "zone": { "type": "isekai_api:box", "min_x": -256, "max_x": 256, "min_z": -256, "max_z": 256 },
+      "biome": "minecraft:jungle" },
+    { "zone": { "type": "isekai_api:chunk_box", "min_chunk_x": -3, "max_chunk_x": 3, "min_chunk_z": -3, "max_chunk_z": 3 },
+      "biome": "minecraft:cherry_grove" }
+  ]
+}
+```
+
+Zones are evaluated in declaration order and the first match wins, so put the tightest footprint first. The replacement happens before terrain: it changes the surface biome (surface blocks, vegetation, structure and feature eligibility, spawns, sky and fog colour), not the shape the base generator produced, so a patch over an ocean stays ocean-shaped. It applies to newly generated chunks only.
+
+### BiomeZone (`isekai_api:`) — used inside `rule.zone` and `override.overrides[].zone`
 
 Coordinates are authored in **block** space. Evaluated at biome-grid resolution (one sample per 4 blocks), coordinates only — no terrain context.
 
@@ -137,6 +156,8 @@ Coordinates are authored in **block** space. Evaluated at biome-grid resolution 
 | `isekai_api:y_between` | `min`, `max` (int, min < max) | min ≤ block Y < max |
 | `isekai_api:within_distance` | `radius` (double ≥ 0), `center_x`, `center_z` (int, default 0) | XZ distance from center ≤ radius |
 | `isekai_api:beyond_distance` | `radius` (double ≥ 0), `center_x`, `center_z` (int, default 0) | XZ distance > radius |
+| `isekai_api:box` | `min_x`, `max_x`, `min_z`, `max_z` (int), `min_y` / `max_y` (int, optional) | block X/Z inside the inclusive box; Y inside `min_y..max_y` when given, unbounded when omitted |
+| `isekai_api:chunk_box` | `min_chunk_x`, `max_chunk_x`, `min_chunk_z`, `max_chunk_z` (int) | chunk X/Z inside the inclusive range, full height |
 | `isekai_api:and` | `all` (list of zones) | all match |
 | `isekai_api:or` | `any` (list of zones) | any match |
 | `isekai_api:not` | `inner` (zone) | inner does not match |

@@ -1,12 +1,14 @@
 package com.kuronami.isekaiapi.lifecycle;
 
 import com.kuronami.isekaiapi.IsekaiApi;
+import com.kuronami.isekaiapi.biomesource.OverrideBiomeSource;
 import com.kuronami.isekaiapi.biomesource.RuleBiomeSource;
 import com.kuronami.isekaiapi.impl.IsekaiInternal;
 import com.kuronami.isekaiapi.impl.VanillaRuleSnapshot;
 import com.kuronami.isekaiapi.validation.IsekaiValidator;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.biome.BiomeSource;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
@@ -29,7 +31,8 @@ import org.jetbrains.annotations.ApiStatus;
  *   <li>{@code ServerStoppingEvent} — invalidates the cached snapshot so the next world
  *       (possibly a different datapack set) re-scans rather than reusing a stale one.</li>
  *   <li>{@code LevelEvent.Load} — hands the world seed to the level's {@code isekai_api:rule}
- *       biome source, the one point in 1.21.1 where a {@code BiomeSource} can obtain it.</li>
+ *       and {@code isekai_api:override} biome sources, the one point in 1.21.1 where a
+ *       {@code BiomeSource} can obtain it.</li>
  *   <li>{@code AddReloadListenerEvent} — registers the two
  *       {@link IsekaiReloadListener} instances (worldshape / layered_worldshape JSON
  *       loading) plus {@link SnapshotRefreshListener} (rebuild the snapshot on every
@@ -101,8 +104,8 @@ public final class IsekaiLifecycle {
     }
 
     /**
-     * Hand the world seed to every {@code isekai_api:rule} biome source in the level that just
-     * loaded.
+     * Hand the world seed to every {@code isekai_api:rule} / {@code isekai_api:override} biome
+     * source in the level that just loaded.
      *
      * <p>This is the only point where a {@code BiomeSource} can learn the seed. 1.21.1 routes the
      * seed through {@code RandomState} — {@code ChunkMap} builds one from {@code level.getSeed()}
@@ -119,33 +122,55 @@ public final class IsekaiLifecycle {
     @SubscribeEvent
     public static void onLevelLoad(LevelEvent.Load event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
-        var biomeSource = level.getChunkSource().getGenerator().getBiomeSource();
-        if (biomeSource instanceof RuleBiomeSource source) {
-            source.bindWorldSeed(level.getSeed());
-            IsekaiApi.LOGGER.info("[Isekai] {}: rule biome source bound to the world seed",
-                    level.dimension().location());
+        BiomeSource biomeSource = level.getChunkSource().getGenerator().getBiomeSource();
+        if (needsSeed(biomeSource)) {
+            bindSeed(biomeSource, level.getSeed());
+            IsekaiApi.LOGGER.info("[Isekai] {}: biome source bound to the world seed ({})",
+                    level.dimension().location(), biomeSource.getClass().getSimpleName());
         } else {
-            IsekaiApi.LOGGER.debug("[Isekai] {}: biome source is {}, no rule zones to seed",
+            IsekaiApi.LOGGER.debug("[Isekai] {}: biome source is {}, no zones to seed",
                     level.dimension().location(), biomeSource.getClass().getSimpleName());
         }
     }
 
     /**
-     * Report any {@code isekai_api:rule} biome source that reached a running server without a
-     * world seed. Such a source falls back to the pattern it would draw in a world seeded 0, i.e.
-     * the same layout for every player — the exact failure this seeding exists to prevent, and one
-     * that is invisible until two people compare screenshots. A log line is the cheapest way to
-     * make it diagnosable, so it is worth the one pass over the level list.
+     * Whether this source (or an Isekai source it wraps) still needs {@code bindWorldSeed}. A
+     * source already bound by a nested call is left alone; binding twice would be harmless but
+     * would log every level as if fresh.
+     */
+    private static boolean needsSeed(BiomeSource source) {
+        if (source instanceof RuleBiomeSource rule) return !rule.isBound();
+        if (source instanceof OverrideBiomeSource override) return !override.isBound();
+        return false;
+    }
+
+    /** Bind whichever of Isekai's sources is at the top; each forwards the seed inward. */
+    private static void bindSeed(BiomeSource source, long worldSeed) {
+        if (source instanceof RuleBiomeSource rule) {
+            rule.bindWorldSeed(worldSeed);
+        } else if (source instanceof OverrideBiomeSource override) {
+            override.bindWorldSeed(worldSeed);
+        }
+    }
+
+    /**
+     * Report any {@code isekai_api:rule} / {@code isekai_api:override} biome source that reached
+     * a running server without a world seed. Such a source falls back to the pattern it would
+     * draw in a world seeded 0, i.e. the same layout for every player — the exact failure this
+     * seeding exists to prevent, and one that is invisible until two people compare screenshots.
+     * A log line is the cheapest way to make it diagnosable, so it is worth the one pass over the
+     * level list.
      */
     @SubscribeEvent
     public static void onServerStarted(net.neoforged.neoforge.event.server.ServerStartedEvent event) {
         for (ServerLevel level : event.getServer().getAllLevels()) {
-            if (level.getChunkSource().getGenerator().getBiomeSource() instanceof RuleBiomeSource source
-                    && !source.isBound()) {
-                IsekaiApi.LOGGER.warn("[Isekai] {}: rule biome source never received the world seed — "
-                        + "its noise zones will draw the same pattern in every world. This dimension "
-                        + "was created outside the normal level-load path.", level.dimension().location());
-            }
+            BiomeSource biomeSource = level.getChunkSource().getGenerator().getBiomeSource();
+            if (!needsSeed(biomeSource)) continue;
+            String kind = biomeSource instanceof OverrideBiomeSource ? "override" : "rule";
+            IsekaiApi.LOGGER.warn("[Isekai] {}: {} biome source never received the world seed — "
+                    + "its seed-dependent zones will draw the same pattern in every world. This "
+                    + "dimension was created outside the normal level-load path.",
+                    level.dimension().location(), kind);
         }
     }
 

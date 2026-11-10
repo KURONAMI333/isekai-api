@@ -20,6 +20,10 @@ import org.jetbrains.annotations.ApiStatus;
  *   <li>{@code isekai_api:rule} — assigns biomes by evaluating
  *       {@link com.kuronami.isekaiapi.api.biomesource.BiomeZone} rules in order. See
  *       {@link RuleBiomeSource}.</li>
+ *   <li>{@code isekai_api:climate_zones} — maps climate noise onto biome zones. See
+ *       {@link ClimateZonesBiomeSource}.</li>
+ *   <li>{@code isekai_api:override} — replaces the biome inside zone footprints of another
+ *       source, delegating everything else to it. See {@link OverrideBiomeSource}.</li>
  * </ul>
  */
 @ApiStatus.Internal
@@ -34,10 +38,13 @@ public final class IsekaiBiomeSources {
     public static final Supplier<MapCodec<? extends BiomeSource>> CLIMATE_ZONES =
             CODECS.register("climate_zones", () -> ClimateZonesBiomeSource.CODEC);
 
+    public static final Supplier<MapCodec<? extends BiomeSource>> OVERRIDE =
+            CODECS.register("override", () -> OverrideBiomeSource.CODEC);
+
     private IsekaiBiomeSources() {}
 
     public static void register(IEventBus modBus) {
         CODECS.register(modBus);
-        IsekaiApi.LOGGER.info("[Isekai] biome sources registered: rule, climate_zones");
+        IsekaiApi.LOGGER.info("[Isekai] biome sources registered: rule, climate_zones, override");
     }
 }
