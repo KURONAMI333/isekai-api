@@ -4,6 +4,7 @@ import com.kuronami.isekaiapi.api.biomesource.BiomeZone;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSource;
@@ -123,6 +124,15 @@ public class OverrideBiomeSource extends BiomeSource {
     @Override
     protected MapCodec<? extends BiomeSource> codec() {
         return IsekaiBiomeSources.OVERRIDE.get();
+    }
+
+    /**
+     * Forward the F3 lines to the wrapped source, so a wrapped {@code minecraft:multi_noise} keeps
+     * showing its climate values (and the override is transparent on the debug screen too).
+     */
+    @Override
+    public void addDebugInfo(List<String> info, BlockPos pos, Climate.Sampler sampler) {
+        base.addDebugInfo(info, pos, sampler);
     }
 
     @Override

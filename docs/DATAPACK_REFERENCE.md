@@ -129,20 +129,33 @@ Ranges use the vanilla `Climate.Parameter` codec — `[min, max]` or a single va
 
 Wraps another biome source and replaces the biome inside zone footprints. Every position no zone claims is answered by `base`, so the base's own rules, seed and climate sampling keep working; this is how you add an island or a single-biome region to otherwise vanilla terrain.
 
+A complete `data/minecraft/dimension/overworld.json` that keeps the vanilla overworld and pins the 7×7 chunks around the origin to cherry grove, inside a 513×513-block jungle square:
+
 ```jsonc
 {
-  "type": "isekai_api:override",
-  "base": { "type": "minecraft:multi_noise", "preset": "minecraft:overworld" },
-  "overrides": [
-    { "zone": { "type": "isekai_api:box", "min_x": -256, "max_x": 256, "min_z": -256, "max_z": 256 },
-      "biome": "minecraft:jungle" },
-    { "zone": { "type": "isekai_api:chunk_box", "min_chunk_x": -3, "max_chunk_x": 3, "min_chunk_z": -3, "max_chunk_z": 3 },
-      "biome": "minecraft:cherry_grove" }
-  ]
+  "type": "minecraft:overworld",
+  "generator": {
+    "type": "minecraft:noise",
+    "settings": "minecraft:overworld",
+    "biome_source": {
+      "type": "isekai_api:override",
+      "base": { "type": "minecraft:multi_noise", "preset": "minecraft:overworld" },
+      "overrides": [
+        { "zone": { "type": "isekai_api:chunk_box", "min_chunk_x": -3, "max_chunk_x": 3, "min_chunk_z": -3, "max_chunk_z": 3 },
+          "biome": "minecraft:cherry_grove" },
+        { "zone": { "type": "isekai_api:box", "min_x": -256, "max_x": 256, "min_z": -256, "max_z": 256 },
+          "biome": "minecraft:jungle" }
+      ]
+    }
+  }
 }
 ```
 
-Zones are evaluated in declaration order and the first match wins, so put the tightest footprint first. The replacement happens before terrain: it changes the surface biome (surface blocks, vegetation, structure and feature eligibility, spawns, sky and fog colour), not the shape the base generator produced, so a patch over an ocean stays ocean-shaped. It applies to newly generated chunks only.
+- **Order.** Overrides are evaluated top to bottom and the first match wins, so the smaller footprint goes first. In the example above, swapping the two entries would hide the cherry grove under the jungle square.
+- **What changes.** The biome is replaced before terrain is built, so the patch gets that biome's surface blocks, vegetation, feature and structure eligibility, spawns, and sky and fog colour. The terrain *shape* still comes from the base generator's climate noise: a patch over an ocean stays ocean-shaped.
+- **Which chunks.** Only chunks generated after the pack is active. A datapack's `dimension/` entry takes precedence over the dimension saved in `level.dat`, so adding the pack to an existing world works for new chunks, but worldgen registries load only at world start: restart the world (or server) after adding or editing the pack; `/reload` is not enough. Use vanilla `/fillbiome` to retag chunks that already exist.
+- **The world-settings warning.** Vanilla marks the nether and end as "experimental" when their biome source is not the stock one, so wrapping those shows the experimental-settings prompt on load. The overworld check does not look at a non-`multi_noise` source, so wrapping the overworld does not trigger it.
+- **F3.** The debug screen shows the wrapped source's lines (for `multi_noise`, its climate values).
 
 ### BiomeZone (`isekai_api:`) — used inside `rule.zone` and `override.overrides[].zone`
 
@@ -156,7 +169,7 @@ Coordinates are authored in **block** space. Evaluated at biome-grid resolution 
 | `isekai_api:y_between` | `min`, `max` (int, min < max) | min ≤ block Y < max |
 | `isekai_api:within_distance` | `radius` (double ≥ 0), `center_x`, `center_z` (int, default 0) | XZ distance from center ≤ radius |
 | `isekai_api:beyond_distance` | `radius` (double ≥ 0), `center_x`, `center_z` (int, default 0) | XZ distance > radius |
-| `isekai_api:box` | `min_x`, `max_x`, `min_z`, `max_z` (int), `min_y` / `max_y` (int, optional) | block X/Z inside the inclusive box; Y inside `min_y..max_y` when given, unbounded when omitted |
+| `isekai_api:box` | `min_x`, `max_x`, `min_z`, `max_z` (int), `min_y` / `max_y` (int, optional) | block X/Z inside the inclusive box; Y inside `min_y..max_y` when given, unbounded when omitted. Tested per 4-block biome cell at the cell's lowest corner, so a bound that is not a multiple of 4 snaps to the cell grid; use `chunk_box` or multiples of 4 for exact edges |
 | `isekai_api:chunk_box` | `min_chunk_x`, `max_chunk_x`, `min_chunk_z`, `max_chunk_z` (int) | chunk X/Z inside the inclusive range, full height |
 | `isekai_api:and` | `all` (list of zones) | all match |
 | `isekai_api:or` | `any` (list of zones) | any match |
