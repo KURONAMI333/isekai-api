@@ -140,4 +140,100 @@ public final class BiomeOverrideGameTests {
                 "minecraft:jungle");
         helper.succeed();
     }
+
+    /**
+     * Chunk -1 spans blocks -16..-1 (quarts -4..-1). An off-by-one in the floor of a negative
+     * coordinate would move that footprint by one chunk; the cells on both sides of the 0 / -1
+     * border and of the -1 / -2 border pin it.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void chunkBoxHoldsOnNegativeCoordinates(GameTestHelper helper) {
+        OverrideBiomeSource source = decode(helper, "{\"type\":\"isekai_api:override\"," + BASE
+                + ",\"overrides\":[{\"zone\":{\"type\":\"isekai_api:chunk_box\","
+                + "\"min_chunk_x\":-1,\"max_chunk_x\":-1,\"min_chunk_z\":-1,\"max_chunk_z\":-1},"
+                + "\"biome\":\"minecraft:jungle\"}]}");
+
+        assertBiome(helper, at(source, helper, -1, 0, -1), "quart (-1,0,-1) = block (-4,0,-4)",
+                "minecraft:jungle");
+        assertBiome(helper, at(source, helper, -4, 0, -4), "quart (-4,0,-4) = block (-16,0,-16)",
+                "minecraft:jungle");
+        assertBiome(helper, at(source, helper, 0, 0, -1), "quart (0,0,-1) = block (0,0,-4)",
+                "minecraft:plains");
+        assertBiome(helper, at(source, helper, -5, 0, -1), "quart (-5,0,-1) = block (-20,0,-4)",
+                "minecraft:plains");
+        assertBiome(helper, at(source, helper, -1, 0, -5), "quart (-1,0,-5) = block (-4,0,-20)",
+                "minecraft:plains");
+        helper.succeed();
+    }
+
+    /** Overlapping footprints: the entry written first wins, the later one only fills the rest. */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void theFirstMatchingOverrideWins(GameTestHelper helper) {
+        OverrideBiomeSource source = decode(helper, "{\"type\":\"isekai_api:override\"," + BASE
+                + ",\"overrides\":["
+                + "{\"zone\":{\"type\":\"isekai_api:chunk_box\","
+                + "\"min_chunk_x\":0,\"max_chunk_x\":0,\"min_chunk_z\":0,\"max_chunk_z\":0},"
+                + "\"biome\":\"minecraft:cherry_grove\"},"
+                + "{\"zone\":{\"type\":\"isekai_api:box\","
+                + "\"min_x\":-64,\"max_x\":63,\"min_z\":-64,\"max_z\":63},"
+                + "\"biome\":\"minecraft:jungle\"}]}");
+
+        assertBiome(helper, at(source, helper, 1, 0, 1), "quart (1,0,1), inside both",
+                "minecraft:cherry_grove");
+        assertBiome(helper, at(source, helper, 8, 0, 8), "quart (8,0,8), box only",
+                "minecraft:jungle");
+        assertBiome(helper, at(source, helper, 40, 0, 40), "quart (40,0,40), neither",
+                "minecraft:plains");
+        helper.succeed();
+    }
+
+    /**
+     * An override wrapping a rule source wrapping nothing Isekai: the seed has to reach the inner
+     * rule (or the server-start sweep would warn about it), the inner rule has to answer where the
+     * outer override does not claim, and the whole stack has to encode back to JSON and decode
+     * into the same answers.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void aNestedStackIsSeededAndRoundTrips(GameTestHelper helper) {
+        String json = "{\"type\":\"isekai_api:override\","
+                + "\"base\":{\"type\":\"isekai_api:rule\",\"fallback\":\"minecraft:plains\","
+                + "\"rules\":[{\"zone\":{\"type\":\"isekai_api:chunk_box\","
+                + "\"min_chunk_x\":2,\"max_chunk_x\":2,\"min_chunk_z\":0,\"max_chunk_z\":0},"
+                + "\"biome\":\"minecraft:desert\"}]},"
+                + "\"overrides\":[{\"zone\":{\"type\":\"isekai_api:chunk_box\","
+                + "\"min_chunk_x\":0,\"max_chunk_x\":0,\"min_chunk_z\":0,\"max_chunk_z\":0},"
+                + "\"biome\":\"minecraft:jungle\"}]}";
+        OverrideBiomeSource source = decode(helper, json);
+
+        if (!(source.base() instanceof com.kuronami.isekaiapi.biomesource.RuleBiomeSource inner)) {
+            helper.fail("the base did not decode as a rule source: " + source.base(),
+                    net.minecraft.core.BlockPos.ZERO);
+            return;
+        }
+        source.bindWorldSeed(42L);
+        if (!inner.isBound() || !source.isBound()) {
+            helper.fail("the seed did not reach the wrapped rule source (inner bound="
+                    + inner.isBound() + ")", net.minecraft.core.BlockPos.ZERO);
+        }
+
+        RegistryOps<com.google.gson.JsonElement> ops =
+                RegistryOps.create(JsonOps.INSTANCE, helper.getLevel().registryAccess());
+        com.google.gson.JsonElement encoded = BiomeSource.CODEC.encodeStart(ops, source)
+                .getOrThrow(msg -> new AssertionError("biome source did not encode: " + msg));
+        OverrideBiomeSource again = decode(helper, encoded.toString());
+
+        for (OverrideBiomeSource s : new OverrideBiomeSource[] {source, again}) {
+            String which = s == source ? "decoded" : "re-decoded";
+            assertBiome(helper, at(s, helper, 1, 0, 1), which + " quart (1,0,1), chunk 0",
+                    "minecraft:jungle");
+            assertBiome(helper, at(s, helper, 9, 0, 1), which + " quart (9,0,1), chunk 2",
+                    "minecraft:desert");
+            assertBiome(helper, at(s, helper, 5, 0, 1), which + " quart (5,0,1), chunk 1",
+                    "minecraft:plains");
+        }
+        helper.succeed();
+    }
 }
