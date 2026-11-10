@@ -11,6 +11,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * A neutral spatial condition for biome placement, mirroring the philosophy of
@@ -47,6 +48,8 @@ import java.util.List;
  *   <li>{@code y_between} {@code {min, max}} — min &le; block Y &lt; max.</li>
  *   <li>{@code within_distance} {@code {radius, [center_x], [center_z]}} — XZ distance &le; radius.</li>
  *   <li>{@code beyond_distance} {@code {radius, [center_x], [center_z]}} — XZ distance &gt; radius.</li>
+ *   <li>{@code box} {@code {min_x, max_x, min_z, max_z, [min_y], [max_y]}} — block-coordinate box, both ends inclusive.</li>
+ *   <li>{@code chunk_box} {@code {min_chunk_x, max_chunk_x, min_chunk_z, max_chunk_z}} — chunk-aligned box, full height.</li>
  *   <li>{@code and} {@code {all: [...]}} / {@code or} {@code {any: [...]}} / {@code not} {@code {inner}} — combinators.</li>
  *   <li>{@code noise_threshold} — true where a noise sample exceeds {@code threshold}.</li>
  *   <li>{@code edge_jitter} — perturbs the test coordinate by a small noise offset before delegating to {@code inner}.</li>
@@ -202,6 +205,73 @@ public interface BiomeZone {
             double dx = QuartPos.toBlock(qx) - centerX;
             double dz = QuartPos.toBlock(qz) - centerZ;
             return Math.sqrt(dx * dx + dz * dz) > radius;
+        }
+        @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
+    }
+
+    /**
+     * Matches inside an axis-aligned block-coordinate box, both ends inclusive. {@code min_y} and
+     * {@code max_y} are optional and independently so: omitted means unbounded in that direction,
+     * so an XZ-only footprint simply leaves both out.
+     *
+     * <p>Biomes are sampled on a 4-block grid, so a cell is inside the box when its representative
+     * block coordinate ({@code quart << 2}) is — a border that is not a multiple of 4 includes or
+     * excludes the straddling cell as a whole, never half of it.
+     * @since 3.1.0
+     */
+    record Box(int minX, int maxX, int minZ, int maxZ, Optional<Integer> minY, Optional<Integer> maxY)
+            implements BiomeZone {
+        public Box {
+            if (minX > maxX) throw new IllegalArgumentException(
+                    "box: min_x must be <= max_x: " + minX + " > " + maxX);
+            if (minZ > maxZ) throw new IllegalArgumentException(
+                    "box: min_z must be <= max_z: " + minZ + " > " + maxZ);
+            if (minY.isPresent() && maxY.isPresent() && minY.get() > maxY.get()) throw new IllegalArgumentException(
+                    "box: min_y must be <= max_y: " + minY.get() + " > " + maxY.get());
+        }
+        public static final MapCodec<Box> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+                Codec.INT.fieldOf("min_x").forGetter(Box::minX),
+                Codec.INT.fieldOf("max_x").forGetter(Box::maxX),
+                Codec.INT.fieldOf("min_z").forGetter(Box::minZ),
+                Codec.INT.fieldOf("max_z").forGetter(Box::maxZ),
+                Codec.INT.optionalFieldOf("min_y").forGetter(Box::minY),
+                Codec.INT.optionalFieldOf("max_y").forGetter(Box::maxY))
+                .apply(i, Box::new));
+        @Override public boolean test(int qx, int qy, int qz) {
+            int bx = QuartPos.toBlock(qx);
+            int by = QuartPos.toBlock(qy);
+            int bz = QuartPos.toBlock(qz);
+            if (bx < minX || bx > maxX || bz < minZ || bz > maxZ) return false;
+            if (minY.isPresent() && by < minY.get()) return false;
+            if (maxY.isPresent() && by > maxY.get()) return false;
+            return true;
+        }
+        @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
+    }
+
+    /**
+     * Matches inside a box expressed in chunk coordinates, both ends inclusive, at every height.
+     * Chunk borders land on biome-grid borders (16 is a multiple of 4), so the footprint is exact
+     * with no rounding choice to make — unlike {@link Box} with arbitrary block bounds.
+     * @since 3.1.0
+     */
+    record ChunkBox(int minChunkX, int maxChunkX, int minChunkZ, int maxChunkZ) implements BiomeZone {
+        public ChunkBox {
+            if (minChunkX > maxChunkX) throw new IllegalArgumentException(
+                    "chunk_box: min_chunk_x must be <= max_chunk_x: " + minChunkX + " > " + maxChunkX);
+            if (minChunkZ > maxChunkZ) throw new IllegalArgumentException(
+                    "chunk_box: min_chunk_z must be <= max_chunk_z: " + minChunkZ + " > " + maxChunkZ);
+        }
+        public static final MapCodec<ChunkBox> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+                Codec.INT.fieldOf("min_chunk_x").forGetter(ChunkBox::minChunkX),
+                Codec.INT.fieldOf("max_chunk_x").forGetter(ChunkBox::maxChunkX),
+                Codec.INT.fieldOf("min_chunk_z").forGetter(ChunkBox::minChunkZ),
+                Codec.INT.fieldOf("max_chunk_z").forGetter(ChunkBox::maxChunkZ))
+                .apply(i, ChunkBox::new));
+        @Override public boolean test(int qx, int qy, int qz) {
+            int cx = QuartPos.toBlock(qx) >> 4;
+            int cz = QuartPos.toBlock(qz) >> 4;
+            return cx >= minChunkX && cx <= maxChunkX && cz >= minChunkZ && cz <= maxChunkZ;
         }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
     }

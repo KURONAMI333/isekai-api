@@ -60,6 +60,39 @@ class BiomeZoneCodecTest {
         assertFalse(json.contains("\"isekai:"), json);
     }
 
+    @Test void boxDecodesWithAndWithoutVerticalBounds() {
+        assertEquals(new BiomeZone.Box(-64, 64, -32, 32, java.util.Optional.of(-16),
+                        java.util.Optional.of(96)),
+                decode("{\"type\":\"isekai_api:box\",\"min_x\":-64,\"max_x\":64,"
+                        + "\"min_z\":-32,\"max_z\":32,\"min_y\":-16,\"max_y\":96}"));
+        assertEquals(new BiomeZone.Box(0, 15, 0, 15, java.util.Optional.empty(),
+                        java.util.Optional.empty()),
+                decode("{\"type\":\"isekai_api:box\",\"min_x\":0,\"max_x\":15,"
+                        + "\"min_z\":0,\"max_z\":15}"));
+        assertEquals(new BiomeZone.Box(0, 15, 0, 15, java.util.Optional.of(64),
+                        java.util.Optional.empty()),
+                decode("{\"type\":\"isekai_api:box\",\"min_x\":0,\"max_x\":15,"
+                        + "\"min_z\":0,\"max_z\":15,\"min_y\":64}"));
+    }
+
+    @Test void chunkBoxRoundTrip() {
+        BiomeZone original = new BiomeZone.ChunkBox(-3, 3, -2, 5);
+        assertEquals(original, decode(encode(original)));
+        assertEquals(new BiomeZone.ChunkBox(0, 0, 0, 0),
+                decode("{\"type\":\"isekai_api:chunk_box\",\"min_chunk_x\":0,"
+                        + "\"max_chunk_x\":0,\"min_chunk_z\":0,\"max_chunk_z\":0}"));
+    }
+
+    @Test void invertedBoundsAreRejected() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new BiomeZone.Box(10, 0, 0, 10, java.util.Optional.empty(), java.util.Optional.empty()));
+        assertThrows(IllegalArgumentException.class,
+                () -> new BiomeZone.Box(0, 10, 10, 0, java.util.Optional.empty(), java.util.Optional.empty()));
+        assertThrows(IllegalArgumentException.class,
+                () -> new BiomeZone.Box(0, 10, 0, 10, java.util.Optional.of(96), java.util.Optional.of(-16)));
+        assertThrows(IllegalArgumentException.class, () -> new BiomeZone.ChunkBox(5, 4, 0, 0));
+    }
+
     @Test void nestedRoundTrip() {
         BiomeZone original = new BiomeZone.And(java.util.List.of(
                 new BiomeZone.YAbove(0), new BiomeZone.Not(new BiomeZone.WithinDistance(500.0, 10, 20))));

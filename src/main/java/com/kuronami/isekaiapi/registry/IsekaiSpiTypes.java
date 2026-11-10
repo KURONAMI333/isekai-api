@@ -87,6 +87,8 @@ public final class IsekaiSpiTypes {
         BIOME_ZONE_TYPES.register("y_between",       () -> BiomeZone.YBetween.MAP_CODEC);
         BIOME_ZONE_TYPES.register("within_distance", () -> BiomeZone.WithinDistance.MAP_CODEC);
         BIOME_ZONE_TYPES.register("beyond_distance", () -> BiomeZone.BeyondDistance.MAP_CODEC);
+        BIOME_ZONE_TYPES.register("box",             () -> BiomeZone.Box.MAP_CODEC);
+        BIOME_ZONE_TYPES.register("chunk_box",       () -> BiomeZone.ChunkBox.MAP_CODEC);
         BIOME_ZONE_TYPES.register("and",             () -> BiomeZone.And.MAP_CODEC);
         BIOME_ZONE_TYPES.register("or",              () -> BiomeZone.Or.MAP_CODEC);
         BIOME_ZONE_TYPES.register("not",             () -> BiomeZone.Not.MAP_CODEC);
