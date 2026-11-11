@@ -3,11 +3,17 @@ package com.kuronami.isekaiapi.api.biomesource;
 import com.kuronami.isekaiapi.registry.IsekaiDispatch;
 import com.kuronami.isekaiapi.registry.IsekaiSpiTypes;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
 import net.minecraft.core.QuartPos;
+import net.minecraft.core.RegistryCodecs;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
 import java.util.List;
@@ -53,7 +59,15 @@ import java.util.Optional;
  *   <li>{@code and} {@code {all: [...]}} / {@code or} {@code {any: [...]}} / {@code not} {@code {inner}} — combinators.</li>
  *   <li>{@code noise_threshold} — true where a noise sample exceeds {@code threshold}.</li>
  *   <li>{@code edge_jitter} — perturbs the test coordinate by a small noise offset before delegating to {@code inner}.</li>
+ *   <li>{@code base_biome} {@code {biome}} — the wrapped source's own answer at this position is one of {@code biome} (3.1.0).</li>
+ *   <li>{@code climate} {@code {temperature?, humidity?, continentalness?, erosion?, weirdness?, depth?}} — the vanilla climate sample falls inside the given axes (3.1.0).</li>
  * </ul>
+ *
+ * <p><b>World state.</b> Every variant above is pure coordinate geometry; the last two need
+ * something a coordinate cannot express and read it from {@link ZoneContext}, which only a
+ * {@code BiomeSource} can fill in. Without one (a standalone {@link #test} call, or inside
+ * {@code isekai_api:rule}) they answer false — see {@link ZoneContext} and
+ * {@link #test(int, int, int, ZoneContext)}.
  *
  * <p><b>World seed.</b> Noise-backed variants take their randomness from the world seed combined
  * with the zone's own {@code seed} field, so the same datapack produces a different pattern in
@@ -69,6 +83,27 @@ public interface BiomeZone {
      * @since 1.0.0
      */
     boolean test(int quartX, int quartY, int quartZ);
+
+    /**
+     * Test this zone at a biome-grid position with the world state a source can supply — the
+     * wrapped source's answer and the vanilla climate sample.
+     *
+     * <p>The biome source calls this one. The default delegates to the three-argument
+     * {@link #test(int, int, int)}, so every variant that is pure geometry — including third-party
+     * ones written before this method existed — keeps working and never sees the context. Only
+     * {@link BaseBiome} and {@link ClimateMatch} read it, and only the combinators that wrap them
+     * ({@link And}, {@link Or}, {@link Not}, {@link EdgeJitter}) forward it.
+     *
+     * <p>Calling the three-argument form directly is still a valid pure-geometry test; zones that
+     * need context answer {@code false} there rather than throwing, because "no world state" is a
+     * legitimate question to ask a zone.
+     *
+     * @param ctx the caller's world state; use {@link ZoneContext#NONE} when there is none
+     * @since 3.1.0
+     */
+    default boolean test(int quartX, int quartY, int quartZ, ZoneContext ctx) {
+        return test(quartX, quartY, quartZ);
+    }
 
     /** This variant's payload codec (no {@code "type"} field); must be the registered instance. @since 1.0.0 */
     MapCodec<? extends BiomeZone> codec();
@@ -124,6 +159,38 @@ public interface BiomeZone {
         z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
         z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
         return z ^ (z >>> 31);
+    }
+
+    /** Vanilla's "no constraint" on an axis: the full sampled range, {@code [-1, 1]}. */
+    Climate.Parameter UNCONSTRAINED_AXIS = Climate.Parameter.span(-1.0F, 1.0F);
+
+    /**
+     * Whether a vanilla climate sample falls inside every axis given. An absent axis is
+     * unconstrained. Values are compared as the quantised longs the sampler produces, exactly as
+     * vanilla's own multi-noise matching does.
+     *
+     * <p>Shared by {@link ClimateMatch} and {@code ClimateZonesBiomeSource.Rule}, so the
+     * {@code climate} zone and the {@code climate_zones} source agree on what "inside" means.
+     * @since 3.1.0
+     */
+    static boolean climateMatches(Climate.TargetPoint sample,
+                                  Optional<Climate.Parameter> temperature,
+                                  Optional<Climate.Parameter> humidity,
+                                  Optional<Climate.Parameter> continentalness,
+                                  Optional<Climate.Parameter> erosion,
+                                  Optional<Climate.Parameter> weirdness,
+                                  Optional<Climate.Parameter> depth) {
+        return containsAxis(temperature, sample.temperature())
+                && containsAxis(humidity, sample.humidity())
+                && containsAxis(continentalness, sample.continentalness())
+                && containsAxis(erosion, sample.erosion())
+                && containsAxis(weirdness, sample.weirdness())
+                && containsAxis(depth, sample.depth());
+    }
+
+    private static boolean containsAxis(Optional<Climate.Parameter> axis, long value) {
+        Climate.Parameter p = axis.orElse(UNCONSTRAINED_AXIS);
+        return value >= p.min() && value <= p.max();
     }
 
     /** Dispatching codec keyed on a {@code "type"} field, backed by the BiomeZone registry. */
@@ -286,6 +353,10 @@ public interface BiomeZone {
             for (var c : all) if (!c.test(x, y, z)) return false;
             return true;
         }
+        @Override public boolean test(int x, int y, int z, ZoneContext ctx) {
+            for (var c : all) if (!c.test(x, y, z, ctx)) return false;
+            return true;
+        }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
         @Override public List<BiomeZone> children() { return all; }
         @Override public BiomeZone withWorldSeed(long worldSeed) {
@@ -303,6 +374,10 @@ public interface BiomeZone {
             for (var c : any) if (c.test(x, y, z)) return true;
             return false;
         }
+        @Override public boolean test(int x, int y, int z, ZoneContext ctx) {
+            for (var c : any) if (c.test(x, y, z, ctx)) return true;
+            return false;
+        }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
         @Override public List<BiomeZone> children() { return any; }
         @Override public BiomeZone withWorldSeed(long worldSeed) {
@@ -316,6 +391,9 @@ public interface BiomeZone {
                 Codec.lazyInitialized(() -> CODEC).fieldOf("inner").forGetter(Not::inner))
                 .apply(i, Not::new));
         @Override public boolean test(int x, int y, int z) { return !inner.test(x, y, z); }
+        @Override public boolean test(int x, int y, int z, ZoneContext ctx) {
+            return !inner.test(x, y, z, ctx);
+        }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
         @Override public List<BiomeZone> children() { return List.of(inner); }
         @Override public BiomeZone withWorldSeed(long worldSeed) {
@@ -412,15 +490,98 @@ public interface BiomeZone {
             return seeded(inner.withWorldSeed(worldSeed), noise, seed, strength, sizeXz, worldSeed);
         }
         @Override public boolean test(int qx, int qy, int qz) {
+            return testJittered(qx, qy, qz, ZoneContext.NONE);
+        }
+        @Override public boolean test(int qx, int qy, int qz, ZoneContext ctx) {
+            return testJittered(qx, qy, qz, ctx);
+        }
+        private boolean testJittered(int qx, int qy, int qz, ZoneContext ctx) {
             double bx = QuartPos.toBlock(qx);
             double bz = QuartPos.toBlock(qz);
             double ox = xSampler.getValue(bx / sizeXz, 0.0, bz / sizeXz) * strength;
             double oz = zSampler.getValue(bx / sizeXz, 0.0, bz / sizeXz) * strength;
             int jqx = QuartPos.fromBlock((int) Math.round(bx + ox));
             int jqz = QuartPos.fromBlock((int) Math.round(bz + oz));
-            return inner.test(jqx, qy, jqz);
+            return inner.test(jqx, qy, jqz, ctx);
         }
         @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
         @Override public List<BiomeZone> children() { return List.of(inner); }
+    }
+
+    /**
+     * Match where the wrapped source's own answer at this position is one of {@code biome}.
+     *
+     * <p>This is how "replace the biome, but only inside the biomes I already have" is written:
+     * the base source decides the layout, and the zone selects the part of it to paint over. The
+     * answer comes from {@link ZoneContext}, filled by {@code isekai_api:override}; inside
+     * {@code isekai_api:rule} — and in a bare {@link #test(int, int, int)} call — there is no
+     * wrapped source, so the zone answers false.
+     *
+     * <p>Selection is by biome identity, so the referenced biomes must be ones the base source can
+     * actually produce. {@code biome} takes an id, a list of ids, or a {@code #tag}.
+     *
+     * <p>Wrapping this in {@code edge_jitter} alone moves the <em>query</em> position, not the
+     * boundary of the base biome: near a base border the base answer changes with the jitter, so
+     * the result can spill a few blocks past the parent biome. To keep the edge while still
+     * respecting it, put the jitter on the other side — {@code and(base_biome, edge_jitter(...))}.
+     * @since 3.1.0
+     */
+    record BaseBiome(HolderSet<Biome> biomes) implements BiomeZone {
+        public static final MapCodec<BaseBiome> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+                RegistryCodecs.homogeneousList(Registries.BIOME).fieldOf("biome").forGetter(BaseBiome::biomes))
+                .apply(i, BaseBiome::new));
+        @Override public boolean test(int qx, int qy, int qz) { return false; }
+        @Override public boolean test(int qx, int qy, int qz, ZoneContext ctx) {
+            return ctx.baseBiome(qx, qy, qz).map(biomes::contains).orElse(false);
+        }
+        @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
+    }
+
+    /**
+     * Match where the vanilla climate sample falls inside every axis given. Each axis is an
+     * optional {@code [min, max]} pair on the same {@code -1..1} scale the F3 screen and
+     * {@code multi_noise} presets use; an omitted axis is unconstrained. At least one axis is
+     * required — a {@code climate} zone with none would match everywhere, which is better written
+     * as {@code always}.
+     *
+     * <p>Matching is the vanilla comparison: the sample's quantised values are tested against the
+     * quantised bounds, so a boundary behaves exactly as it does in a {@code multi_noise} preset.
+     * {@code ClimateZonesBiomeSource} shares this comparison, so both agree on what "inside" means.
+     *
+     * <p>Reads the sampler through {@link ZoneContext}, so it works both under
+     * {@code isekai_api:override} (the vanilla climate stays valid even where the base biome is
+     * replaced) and under {@code isekai_api:rule}. Without a sampler it answers false.
+     *
+     * <p>The source samples climate once per position and reuses it across zones, so a stack of
+     * climate conditions costs one sample, not one per condition.
+     * @since 3.1.0
+     */
+    record ClimateMatch(Optional<Climate.Parameter> temperature, Optional<Climate.Parameter> humidity,
+                        Optional<Climate.Parameter> continentalness, Optional<Climate.Parameter> erosion,
+                        Optional<Climate.Parameter> weirdness, Optional<Climate.Parameter> depth)
+            implements BiomeZone {
+        private static final MapCodec<ClimateMatch> BASE = RecordCodecBuilder.mapCodec(i -> i.group(
+                Climate.Parameter.CODEC.optionalFieldOf("temperature").forGetter(ClimateMatch::temperature),
+                Climate.Parameter.CODEC.optionalFieldOf("humidity").forGetter(ClimateMatch::humidity),
+                Climate.Parameter.CODEC.optionalFieldOf("continentalness").forGetter(ClimateMatch::continentalness),
+                Climate.Parameter.CODEC.optionalFieldOf("erosion").forGetter(ClimateMatch::erosion),
+                Climate.Parameter.CODEC.optionalFieldOf("weirdness").forGetter(ClimateMatch::weirdness),
+                Climate.Parameter.CODEC.optionalFieldOf("depth").forGetter(ClimateMatch::depth))
+                .apply(i, ClimateMatch::new));
+        public static final MapCodec<ClimateMatch> MAP_CODEC = BASE.validate(ClimateMatch::checkAxes);
+        private static DataResult<ClimateMatch> checkAxes(ClimateMatch zone) {
+            if (zone.temperature().isEmpty() && zone.humidity().isEmpty() && zone.continentalness().isEmpty()
+                    && zone.erosion().isEmpty() && zone.weirdness().isEmpty() && zone.depth().isEmpty()) {
+                return DataResult.error(() -> "climate: at least one of temperature, humidity, continentalness,"
+                        + " erosion, weirdness, depth is required");
+            }
+            return DataResult.success(zone);
+        }
+        @Override public boolean test(int qx, int qy, int qz) { return false; }
+        @Override public boolean test(int qx, int qy, int qz, ZoneContext ctx) {
+            return ctx.climate(qx, qy, qz).map(sample -> BiomeZone.climateMatches(sample,
+                    temperature, humidity, continentalness, erosion, weirdness, depth)).orElse(false);
+        }
+        @Override public MapCodec<? extends BiomeZone> codec() { return MAP_CODEC; }
     }
 }

@@ -94,6 +94,8 @@ public final class IsekaiSpiTypes {
         BIOME_ZONE_TYPES.register("not",             () -> BiomeZone.Not.MAP_CODEC);
         BIOME_ZONE_TYPES.register("noise_threshold", () -> BiomeZone.NoiseThreshold.MAP_CODEC);
         BIOME_ZONE_TYPES.register("edge_jitter",     () -> BiomeZone.EdgeJitter.MAP_CODEC);
+        BIOME_ZONE_TYPES.register("base_biome",      () -> BiomeZone.BaseBiome.MAP_CODEC);
+        BIOME_ZONE_TYPES.register("climate",         () -> BiomeZone.ClimateMatch.MAP_CODEC);
     }
 
     // ---- SurfaceAnchor ---------------------------------------------------
