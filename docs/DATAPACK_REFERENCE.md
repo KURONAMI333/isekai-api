@@ -177,7 +177,7 @@ Coordinates are authored in **block** space. Evaluated at biome-grid resolution 
 | `isekai_api:noise_threshold` | `noise` (noise key/inline), `seed` (long, default 0), `threshold` (double, default 0), `size_xz` / `size_y` (double, default 64) | true where a noise sample exceeds `threshold` — organic biome masks |
 | `isekai_api:edge_jitter` | `inner` (zone), `noise` (noise key/inline), `seed` (long, default 0), `strength` (double 0–32, default 4), `size_xz` (double, default 32) | wraps `inner`, perturbs the test coordinate by a small noise offset before delegating — turns geometric borders into wavy organic ones |
 | `isekai_api:base_biome` | `biome` (id, list of ids, or `#tag`) | the wrapped source's own answer at this position is one of `biome`. Only meaningful inside `override`; inside `rule` (and in a bare zone test) there is no wrapped source, so it never matches |
-| `isekai_api:climate` | `temperature`, `humidity`, `continentalness`, `erosion`, `weirdness`, `depth` (each optional `[min, max]` or a single value; at least one required) | the vanilla climate sample falls inside every axis given, compared exactly as `climate_zones` and `multi_noise` compare it |
+| `isekai_api:climate` | `temperature`, `humidity`, `continentalness`, `erosion`, `weirdness`, `depth` (each optional `[min, max]` or a single value; at least one required) | the vanilla climate sample falls inside every axis given, on the quantised values `multi_noise` compares; an omitted axis matches any value |
 
 #### Selecting part of the base (`base_biome`, `climate`)
 
@@ -220,7 +220,7 @@ Pair it with `noise_threshold` to scatter a child biome as patches inside one pa
 
 `biome` takes one id, a list of ids, or a `#tag` (`#minecraft:is_nether` covers the whole dimension). Selection is by biome identity, so it can only pick biomes the base source actually produces; a biome that is not in the base's output never matches.
 
-**`climate` — place by the vanilla climate axes.** Same condition as one rule of `isekai_api:climate_zones`, usable anywhere a zone goes. It keeps working under `override` even where the base biome has been replaced, because the climate sample is independent of the biome:
+**`climate` — place by the vanilla climate axes.** The condition of one `isekai_api:climate_zones` rule, usable anywhere a zone goes. One difference: an omitted axis here matches any value, while `climate_zones` reads an omitted axis as `[-1, 1]` and so misses samples past it (depth goes above 1 underground). It keeps working under `override` even where the base biome has been replaced, because the climate sample is independent of the biome:
 
 ```jsonc
 { "zone": { "type": "isekai_api:climate", "temperature": [0.55, 1.0], "humidity": [-1.0, -0.1] },
