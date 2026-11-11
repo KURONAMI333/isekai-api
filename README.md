@@ -103,7 +103,7 @@ Vanilla density functions stay accessible via standard `minecraft:` keys — Ise
 
 ### Biome sources
 
-Density functions decide the *shape* of terrain; the biome source decides *which biome goes where*. Isekai offers two complementary biome sources — both go in a dimension's `biome_source` field, pick whichever fits.
+Density functions decide the *shape* of terrain; the biome source decides *which biome goes where*. Isekai offers three — all go in a dimension's `biome_source` field, pick whichever fits. Besides `rule` and `climate_zones` below, **`isekai_api:override`** wraps any biome source (vanilla `multi_noise` included) and replaces the biome inside zone footprints, leaving every other position to the base; see [DATAPACK_REFERENCE.md](docs/DATAPACK_REFERENCE.md).
 
 **`isekai_api:rule`** — places biomes by spatial `BiomeZone` rules (Y bands, radial distance, noise threshold, edge jitter, combinators), evaluated in declaration order; first match wins. Suited to layered / radial / explicitly-shaped worlds. Reference it from a dimension's `biome_source` field:
 
@@ -119,7 +119,7 @@ Density functions decide the *shape* of terrain; the biome source decides *which
 }
 ```
 
-`BiomeZone` is a neutral spatial condition evaluated at biome-grid resolution (one sample per 4 blocks, coordinates only — biome assignment happens before terrain exists). It dispatches on `"type"` with 11 variants:
+`BiomeZone` is a neutral spatial condition evaluated at biome-grid resolution (one sample per 4 blocks, before terrain exists). It dispatches on `"type"` with 13 variants:
 
 | Variant | Payload | Matches |
 |---|---|---|
@@ -132,10 +132,14 @@ Density functions decide the *shape* of terrain; the biome source decides *which
 | `isekai_api:and` | `{ all: [...] }` | all inner zones match |
 | `isekai_api:or` | `{ any: [...] }` | any inner zone matches |
 | `isekai_api:not` | `{ inner }` | inner zone does not match |
+| `isekai_api:base_biome` | `{ biome }` (id, list, or `#tag`) | the wrapped source's own answer is one of `biome` — inside `override` only |
+| `isekai_api:climate` | `{ temperature?, humidity?, continentalness?, erosion?, weirdness?, depth? }` | the vanilla climate sample falls inside every axis given |
 
 This makes arbitrary biome distributions expressible from datapack: vertical layers, concentric rings, half-and-half regions, etc.
 
 Two more variants, `isekai_api:noise_threshold` and `isekai_api:edge_jitter`, break those shapes up with noise. Their `seed` field is folded together with the **world seed**, so one pack draws a different pattern in every world and the same pattern for the same world seed — see [DATAPACK_REFERENCE.md](docs/DATAPACK_REFERENCE.md). Every other variant above is fixed geometry, unaffected by the seed.
+
+`base_biome` and `climate` read world state instead of the coordinate: the wrapped source's own answer (so an `override` patch follows the base's borders) and the vanilla climate sample (so a `climate_zones` rule can be used anywhere a zone goes). Only a biome source can supply that state, so `base_biome` answers false under `rule`.
 
 **`isekai_api:climate_zones`** — places biomes by matching the vanilla climate axes (temperature / humidity / continentalness / erosion / weirdness / depth) against per-rule range constraints. Same purpose as vanilla `minecraft:multi_noise` but each rule lists only the axes it cares about (others default to no constraint), and order is explicit (first match wins) instead of vanilla's nearest-point matching. Suited to Overworld-style multi-biome worlds where biome choice is climate-driven rather than position-driven.
 
@@ -230,7 +234,7 @@ Five composable interfaces let you adapt vanilla / modded rules to your worldsha
 - **`RemapStrategy`** (8 built-in variants) — `Identity` / `Linear` / `Inverted` / `FixedRange` / `CountScale` / `BandSplit(List<Band>)` / `ColumnLocal(...)` / `Pipe(List<RemapStrategy>)`. Map vanilla Y bands and feature counts onto your playable range. Every variant is JSON-encodable.
 - **`SurfaceAnchor`** (4 built-in variants) — `WorldSurface` / `BelowFluid(fluid)` / `FixedY(y)` / `WorldFloor(start, max_scan)`. Defines what "the surface" means in your worldshape.
 - **`TransitionRule`** — `Hard` / `Blend(blend_height)` / `Gap(gap_height)` for the seams between layers of a multi-layer worldshape.
-- **`BiomeZone`** (11 built-in variants) — the biome-placement conditions used by the `isekai_api:rule` biome source (see above): `always` / `y_above` / `y_below` / `y_between` / `within_distance` / `beyond_distance` / `noise_threshold` (organic noise mask) / `edge_jitter` (perturbs an inner zone's borders with a small noise offset) plus combinators `and` / `or` / `not`.
+- **`BiomeZone`** (13 built-in variants) — the biome-placement conditions used by the `isekai_api:rule` and `isekai_api:override` biome sources (see above): `always` / `y_above` / `y_below` / `y_between` / `within_distance` / `beyond_distance` / `noise_threshold` (organic noise mask) / `edge_jitter` (perturbs an inner zone's borders with a small noise offset) / `base_biome` (the wrapped source's own answer) / `climate` (the vanilla climate sample) plus combinators `and` / `or` / `not`.
 
 ### Biome / Structure modifier integration
 

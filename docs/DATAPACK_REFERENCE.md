@@ -159,7 +159,7 @@ A complete `data/minecraft/dimension/overworld.json` that keeps the vanilla over
 
 ### BiomeZone (`isekai_api:`) — used inside `rule.zone` and `override.overrides[].zone`
 
-Coordinates are authored in **block** space. Evaluated at biome-grid resolution (one sample per 4 blocks), coordinates only — no terrain context.
+Coordinates are authored in **block** space. Evaluated at biome-grid resolution (one sample per 4 blocks) before terrain exists, so no zone can probe terrain. Two zones read world state the enclosing source supplies instead — see the `base_biome` and `climate` notes below the table.
 
 | Type | Fields | Matches |
 |---|---|---|
@@ -176,6 +176,63 @@ Coordinates are authored in **block** space. Evaluated at biome-grid resolution 
 | `isekai_api:not` | `inner` (zone) | inner does not match |
 | `isekai_api:noise_threshold` | `noise` (noise key/inline), `seed` (long, default 0), `threshold` (double, default 0), `size_xz` / `size_y` (double, default 64) | true where a noise sample exceeds `threshold` — organic biome masks |
 | `isekai_api:edge_jitter` | `inner` (zone), `noise` (noise key/inline), `seed` (long, default 0), `strength` (double 0–32, default 4), `size_xz` (double, default 32) | wraps `inner`, perturbs the test coordinate by a small noise offset before delegating — turns geometric borders into wavy organic ones |
+| `isekai_api:base_biome` | `biome` (id, list of ids, or `#tag`) | the wrapped source's own answer at this position is one of `biome`. Only meaningful inside `override`; inside `rule` (and in a bare zone test) there is no wrapped source, so it never matches |
+| `isekai_api:climate` | `temperature`, `humidity`, `continentalness`, `erosion`, `weirdness`, `depth` (each optional `[min, max]` or a single value; at least one required) | the vanilla climate sample falls inside every axis given, compared exactly as `climate_zones` and `multi_noise` compare it |
+
+#### Selecting part of the base (`base_biome`, `climate`)
+
+The two zones at the end of the table read world state rather than the coordinate alone. The enclosing source fills it in once per position and reuses it across every zone: `override` supplies the wrapped source's own answer, and both `override` and `rule` supply the vanilla climate sample.
+
+**`base_biome` — repaint only inside the biomes that are already there.** The base source decides the layout and the zone selects the part of it to paint over, so a patch follows the base's own borders instead of a hand-drawn box. In the nether, every soul sand valley becomes crimson forest and nothing else moves:
+
+```jsonc
+{
+  "type": "isekai_api:override",
+  "base": { "type": "minecraft:multi_noise", "preset": "minecraft:nether" },
+  "overrides": [
+    { "zone": { "type": "isekai_api:base_biome", "biome": "minecraft:soul_sand_valley" },
+      "biome": "minecraft:crimson_forest" }
+  ]
+}
+```
+
+In the overworld, narrow it further with any other zone — here low-altitude forest only:
+
+```jsonc
+{ "zone": { "type": "isekai_api:and", "all": [
+    { "type": "isekai_api:base_biome", "biome": "minecraft:forest" },
+    { "type": "isekai_api:y_below", "y": 80 }
+  ] },
+  "biome": "minecraft:dark_forest" }
+```
+
+`biome` takes one id, a list of ids, or a `#tag` (`#minecraft:is_nether` covers the whole dimension). Selection is by biome identity, so it can only pick biomes the base source actually produces; a biome that is not in the base's output never matches.
+
+**`climate` — place by the vanilla climate axes.** Same condition as one rule of `isekai_api:climate_zones`, usable anywhere a zone goes. It keeps working under `override` even where the base biome has been replaced, because the climate sample is independent of the biome:
+
+```jsonc
+{ "zone": { "type": "isekai_api:climate", "temperature": [0.55, 1.0], "humidity": [-1.0, -0.1] },
+  "biome": "minecraft:desert" }
+```
+
+Omitting an axis leaves it unconstrained; a zone with no axes at all is rejected when the pack loads, because matching everywhere is written as `always`.
+
+**Two notes on `base_biome`.**
+
+- It only means something inside `isekai_api:override`. `isekai_api:rule` owns the whole biome map and has no wrapped source to ask, so there it answers false — an `and(base_biome, …)` under `rule` matches nothing.
+- `edge_jitter` alone moves the *query* position, not the base biome's border: near a border the base answer changes with the jitter, so the patch spills a few blocks past the parent biome. To keep the parent's border exact and only make the geometric edge wavy, put the jitter inside the condition instead — `and(base_biome, edge_jitter(...))`.
+
+**Cost.** Measured on the GameTest server over 200,000 random positions, ns per `getNoiseBiome`, median of three runs after a warm-up:
+
+| Source | ns/call |
+|---|---|
+| nether `multi_noise` alone | 118 |
+| `override` with no overrides | 117 |
+| 15 overrides of `and(base_biome, noise_threshold)` | 353 |
+| the same 15 entered in the reverse order | 340 |
+| 5 `climate`-only overrides | 83 |
+
+Wrapping costs nothing on its own, walking 15 zone stacks costs about 3×, and a stack that never asks for the base (`climate`, plain geometry) can come out cheaper than the bare source, because on a match the base is skipped. `base_biome` is memoised per position, so pairing it with other conditions in `and` costs one base sample, and the fall-through answer reuses that sample instead of asking twice.
 
 #### What `seed` means on the two noise zones
 
