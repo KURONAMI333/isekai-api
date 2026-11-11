@@ -59,8 +59,8 @@ import java.util.Optional;
  *   <li>{@code and} {@code {all: [...]}} / {@code or} {@code {any: [...]}} / {@code not} {@code {inner}} — combinators.</li>
  *   <li>{@code noise_threshold} — true where a noise sample exceeds {@code threshold}.</li>
  *   <li>{@code edge_jitter} — perturbs the test coordinate by a small noise offset before delegating to {@code inner}.</li>
- *   <li>{@code base_biome} {@code {biome}} — the wrapped source's own answer at this position is one of {@code biome} (3.1.0).</li>
- *   <li>{@code climate} {@code {temperature?, humidity?, continentalness?, erosion?, weirdness?, depth?}} — the vanilla climate sample falls inside the given axes (3.1.0).</li>
+ *   <li>{@code base_biome} {@code {biome}} — the wrapped source's own answer at this position is one of {@code biome} (3.0.0).</li>
+ *   <li>{@code climate} {@code {temperature?, humidity?, continentalness?, erosion?, weirdness?, depth?}} — the vanilla climate sample falls inside the given axes (3.0.0).</li>
  * </ul>
  *
  * <p><b>World state.</b> Every variant above is pure coordinate geometry; the last two need
@@ -99,7 +99,7 @@ public interface BiomeZone {
      * legitimate question to ask a zone.
      *
      * @param ctx the caller's world state; use {@link ZoneContext#NONE} when there is none
-     * @since 3.1.0
+     * @since 3.0.0
      */
     default boolean test(int quartX, int quartY, int quartZ, ZoneContext ctx) {
         return test(quartX, quartY, quartZ);
@@ -171,7 +171,7 @@ public interface BiomeZone {
      *
      * <p>Shared by {@link ClimateMatch} and {@code ClimateZonesBiomeSource.Rule}, so the
      * {@code climate} zone and the {@code climate_zones} source agree on what "inside" means.
-     * @since 3.1.0
+     * @since 3.0.0
      */
     static boolean climateMatches(Climate.TargetPoint sample,
                                   Optional<Climate.Parameter> temperature,
@@ -284,7 +284,7 @@ public interface BiomeZone {
      * <p>Biomes are sampled on a 4-block grid, so a cell is inside the box when its representative
      * block coordinate ({@code quart << 2}) is — a border that is not a multiple of 4 includes or
      * excludes the straddling cell as a whole, never half of it.
-     * @since 3.1.0
+     * @since 3.0.0
      */
     record Box(int minX, int maxX, int minZ, int maxZ, Optional<Integer> minY, Optional<Integer> maxY)
             implements BiomeZone {
@@ -320,7 +320,7 @@ public interface BiomeZone {
      * Matches inside a box expressed in chunk coordinates, both ends inclusive, at every height.
      * Chunk borders land on biome-grid borders (16 is a multiple of 4), so the footprint is exact
      * with no rounding choice to make — unlike {@link Box} with arbitrary block bounds.
-     * @since 3.1.0
+     * @since 3.0.0
      */
     record ChunkBox(int minChunkX, int maxChunkX, int minChunkZ, int maxChunkZ) implements BiomeZone {
         public ChunkBox {
@@ -524,7 +524,7 @@ public interface BiomeZone {
      * boundary of the base biome: near a base border the base answer changes with the jitter, so
      * the result can spill a few blocks past the parent biome. To keep the edge while still
      * respecting it, put the jitter on the other side — {@code and(base_biome, edge_jitter(...))}.
-     * @since 3.1.0
+     * @since 3.0.0
      */
     record BaseBiome(HolderSet<Biome> biomes) implements BiomeZone {
         public static final MapCodec<BaseBiome> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
@@ -554,7 +554,7 @@ public interface BiomeZone {
      *
      * <p>The source samples climate once per position and reuses it across zones, so a stack of
      * climate conditions costs one sample, not one per condition.
-     * @since 3.1.0
+     * @since 3.0.0
      */
     record ClimateMatch(Optional<Climate.Parameter> temperature, Optional<Climate.Parameter> humidity,
                         Optional<Climate.Parameter> continentalness, Optional<Climate.Parameter> erosion,

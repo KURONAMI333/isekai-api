@@ -541,6 +541,7 @@ public final class BiomeZoneContextGameTests {
         for (int i = 0; i < 5; i++) five.add(observed.get(i % observed.size()));
 
         List<String> entryList = new ArrayList<>();
+        List<String> noiseFirstList = new ArrayList<>();
         String[] markers = {"minecraft:plains", "minecraft:jungle", "minecraft:desert",
                 "minecraft:taiga", "minecraft:swamp"};
         for (int b = 0; b < 5; b++) {
@@ -549,17 +550,22 @@ public final class BiomeZoneContextGameTests {
                         + baseBiomeZone("\"" + five.get(b) + "\"")
                         + ",{\"type\":\"isekai_api:noise_threshold\",\"noise\":" + NOISE
                         + ",\"seed\":" + (v + 1) + "}]},\"biome\":\"" + markers[b] + "\"}");
+                noiseFirstList.add("{\"zone\":{\"type\":\"isekai_api:and\",\"all\":["
+                        + "{\"type\":\"isekai_api:noise_threshold\",\"noise\":" + NOISE
+                        + ",\"seed\":" + (v + 1) + "},"
+                        + baseBiomeZone("\"" + five.get(b) + "\"")
+                        + "]},\"biome\":\"" + markers[b] + "\"}");
             }
         }
         String baseBiomeEntries = String.join(",", entryList);
-        List<String> reversed = new ArrayList<>(entryList);
-        java.util.Collections.reverse(reversed);
-        String reversedEntries = String.join(",", reversed);
+        String noiseFirstEntries = String.join(",", noiseFirstList);
 
         StringBuilder climateEntries = new StringBuilder();
         for (int i = 0; i < 5; i++) {
-            float lo = -1.0F + i * 0.4F;
-            float hi = lo + 0.4F;
+            // Narrow bands, so most positions miss every override and fall through to the base:
+            // the case that pays for the climate sample and the base answer both.
+            float lo = -0.9F + i * 0.4F;
+            float hi = lo + 0.04F;
             if (climateEntries.length() != 0) climateEntries.append(',');
             climateEntries.append("{\"zone\":{\"type\":\"isekai_api:climate\",\"temperature\":[")
                     .append(lo).append(',').append(hi).append("]},\"biome\":\"")
@@ -571,9 +577,9 @@ public final class BiomeZoneContextGameTests {
         stacks.put("b override with 0 overrides", override(helper, NETHER_BASE, "[]"));
         stacks.put("c 15 and(base_biome, noise_threshold)", override(helper, NETHER_BASE,
                 "[" + baseBiomeEntries + "]"));
-        stacks.put("d same 15 entries reversed", override(helper, NETHER_BASE,
-                "[" + reversedEntries + "]"));
-        stacks.put("e 5 climate-only overrides", override(helper, NETHER_BASE,
+        stacks.put("d 15 and(noise_threshold, base_biome)", override(helper, NETHER_BASE,
+                "[" + noiseFirstEntries + "]"));
+        stacks.put("e 5 narrow climate-only overrides", override(helper, NETHER_BASE,
                 "[" + climateEntries + "]"));
 
         Random random = new Random(20261111L);

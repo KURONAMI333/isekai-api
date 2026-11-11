@@ -115,7 +115,7 @@ public class RuleBiomeSource extends BiomeSource {
     public Holder<Biome> getNoiseBiome(int quartX, int quartY, int quartZ, Climate.Sampler sampler) {
         // This source owns every position, so there is no wrapped base: only the climate is
         // available (base_biome answers false here).
-        ZoneContext ctx = ZoneContext.forClimate(sampler);
+        ZoneContext ctx = ZoneContext.forClimate(quartX, quartY, quartZ, sampler);
         for (Rule rule : activeRules) {
             if (rule.zone().test(quartX, quartY, quartZ, ctx)) {
                 return rule.biome();

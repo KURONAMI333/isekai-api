@@ -92,7 +92,26 @@ class BiomeZoneContextTest {
     void anEmptyContextAnswersNothing() {
         assertTrue(ZoneContext.NONE.baseBiome(0, 0, 0).isEmpty());
         assertTrue(ZoneContext.NONE.climate(0, 0, 0).isEmpty());
-        assertTrue(ZoneContext.NONE.cachedBaseBiome(0, 0, 0).isEmpty());
-        assertTrue(ZoneContext.forClimate(null).climate(0, 0, 0).isEmpty());
+        assertTrue(ZoneContext.NONE.cachedBaseBiome().isEmpty());
+        assertTrue(ZoneContext.forClimate(0, 0, 0, null).climate(0, 0, 0).isEmpty());
+    }
+
+    @Test
+    void onlyTheDecidedPositionIsRemembered() {
+        int[] calls = {0};
+        ZoneContext ctx = new ZoneContext(5, 0, 7, (x, y, z) -> {
+            calls[0]++;
+            return null;
+        }, null);
+        // A jittered query first: computed, not remembered.
+        ctx.baseBiome(6, 0, 7);
+        assertEquals(1, calls[0]);
+        assertTrue(ctx.cachedBaseBiome().isEmpty());
+        // The decided position: asked once, then reused.
+        ctx.baseBiome(5, 0, 7);
+        ctx.baseBiome(5, 0, 7);
+        assertEquals(2, calls[0]);
+        ctx.baseBiome(6, 0, 7);
+        assertEquals(3, calls[0]);
     }
 }
