@@ -206,6 +206,18 @@ In the overworld, narrow it further with any other zone — here low-altitude fo
   "biome": "minecraft:dark_forest" }
 ```
 
+Pair it with `noise_threshold` to scatter a child biome as patches inside one parent. Each child gets its own `size_xz` (patch size), `threshold` (higher = rarer) and `seed`, and every patch stays inside the parent, because a cell the base does not call warped forest fails the `and` before the noise is read:
+
+```jsonc
+{ "zone": { "type": "isekai_api:and", "all": [
+    { "type": "isekai_api:base_biome", "biome": "minecraft:warped_forest" },
+    { "type": "isekai_api:noise_threshold",
+      "noise": { "firstOctave": 0, "amplitudes": [1.0] },
+      "size_xz": 48, "threshold": 0.35, "seed": 1 }
+  ] },
+  "biome": "mypack:warped_glade" }
+```
+
 `biome` takes one id, a list of ids, or a `#tag` (`#minecraft:is_nether` covers the whole dimension). Selection is by biome identity, so it can only pick biomes the base source actually produces; a biome that is not in the base's output never matches.
 
 **`climate` — place by the vanilla climate axes.** Same condition as one rule of `isekai_api:climate_zones`, usable anywhere a zone goes. It keeps working under `override` even where the base biome has been replaced, because the climate sample is independent of the biome:
@@ -226,13 +238,13 @@ Omitting an axis leaves it unconstrained; a zone with no axes at all is rejected
 
 | Source | ns/call |
 |---|---|
-| nether `multi_noise` alone | 118 |
-| `override` with no overrides | 117 |
-| 15 overrides of `and(base_biome, noise_threshold)` | 353 |
-| the same 15 entered in the reverse order | 340 |
-| 5 `climate`-only overrides | 83 |
+| nether `multi_noise` alone | 122 |
+| `override` with no overrides | 122 |
+| 15 overrides of `and(base_biome, noise_threshold)` (3 children in each of 5 parents) | 327 |
+| the same 15 written `and(noise_threshold, base_biome)` | 923 |
+| 5 narrow `climate`-only overrides (most positions fall through to the base) | 161 |
 
-Wrapping costs nothing on its own, walking 15 zone stacks costs about 3×, and a stack that never asks for the base (`climate`, plain geometry) can come out cheaper than the bare source, because on a match the base is skipped. `base_biome` is memoised per position, so pairing it with other conditions in `and` costs one base sample, and the fall-through answer reuses that sample instead of asking twice.
+Wrapping costs nothing on its own. **Put `base_biome` first in `and`:** the base answer is computed once per position and shared by every override, so a cell outside the parent rejects each child with a set lookup, and only the children of the parent the cell is in read their noise. Written noise-first, every child reads its noise at every cell, which is the 3× above. A `climate` condition costs one climate sample per position on top of the base, shared across all `climate` zones; the fall-through answer reuses the base sample instead of asking twice.
 
 #### What `seed` means on the two noise zones
 

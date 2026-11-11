@@ -119,7 +119,7 @@ Density functions decide the *shape* of terrain; the biome source decides *which
 }
 ```
 
-`BiomeZone` is a neutral spatial condition evaluated at biome-grid resolution (one sample per 4 blocks, before terrain exists). It dispatches on `"type"` with 13 variants:
+`BiomeZone` is a neutral spatial condition evaluated at biome-grid resolution (one sample per 4 blocks, before terrain exists). It dispatches on `"type"` with 15 variants:
 
 | Variant | Payload | Matches |
 |---|---|---|
@@ -129,6 +129,8 @@ Density functions decide the *shape* of terrain; the biome source decides *which
 | `isekai_api:y_between` | `{ min, max }` | min ≤ block Y < max |
 | `isekai_api:within_distance` | `{ radius, [center_x], [center_z] }` | XZ distance from center ≤ radius |
 | `isekai_api:beyond_distance` | `{ radius, [center_x], [center_z] }` | XZ distance > radius |
+| `isekai_api:box` | `{ min_x, max_x, min_z, max_z, min_y?, max_y? }` | inside an inclusive block-space box |
+| `isekai_api:chunk_box` | `{ min_chunk_x, max_chunk_x, min_chunk_z, max_chunk_z }` | inside an inclusive chunk-aligned box, full height |
 | `isekai_api:and` | `{ all: [...] }` | all inner zones match |
 | `isekai_api:or` | `{ any: [...] }` | any inner zone matches |
 | `isekai_api:not` | `{ inner }` | inner zone does not match |
