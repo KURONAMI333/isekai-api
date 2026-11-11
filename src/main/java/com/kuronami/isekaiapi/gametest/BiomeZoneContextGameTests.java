@@ -164,30 +164,38 @@ public final class BiomeZoneContextGameTests {
     }
 
     /** How many cells the override marks, and how many of them sit outside the allowed base set. */
-    private record Containment(int cells, int markers, int outsideParent) {}
+    private record Containment(int cells, int parentCells, int markers, int outsideParent) {}
 
     private static Containment scanContainment(BiomeSource base, BiomeSource over,
                                                Climate.Sampler sampler,
                                                Predicate<Holder<Biome>> parent) {
         int cells = 0;
+        int parentCells = 0;
         int markers = 0;
         int outsideParent = 0;
         for (int y : Y_LEVELS) {
             for (int x = QUART_MIN; x <= QUART_MAX; x += QUART_STEP) {
                 for (int z = QUART_MIN; z <= QUART_MAX; z += QUART_STEP) {
                     cells++;
+                    boolean inParent = parent.test(base.getNoiseBiome(x, y, z, sampler));
+                    if (inParent) parentCells++;
                     if (!key(over.getNoiseBiome(x, y, z, sampler)).equals(MARKER)) continue;
                     markers++;
-                    if (!parent.test(base.getNoiseBiome(x, y, z, sampler))) outsideParent++;
+                    if (!inParent) outsideParent++;
                 }
             }
         }
-        return new Containment(cells, markers, outsideParent);
+        return new Containment(cells, parentCells, markers, outsideParent);
     }
 
     private static void assertContained(GameTestHelper helper, String variant, Containment result) {
         IsekaiApi.LOGGER.info("[isekai-zone-base-biome] {}: {} of {} cells marked, {} outside the parent",
                 variant, result.markers(), result.cells(), result.outsideParent());
+        if (result.parentCells() == result.cells()) {
+            helper.fail("base_biome (" + variant + "): every scanned cell is inside the parent, so"
+                    + " containment would hold even if the zone ignored the base",
+                    net.minecraft.core.BlockPos.ZERO);
+        }
         if (result.markers() == 0) {
             helper.fail("base_biome (" + variant + "): the override never fired in "
                     + result.cells() + " scanned cells", net.minecraft.core.BlockPos.ZERO);
@@ -233,9 +241,10 @@ public final class BiomeZoneContextGameTests {
                 scanContainment(base, byId, sampler, h -> key(h).equals(target)));
 
         OverrideBiomeSource byTag = override(helper, NETHER_BASE,
-                singleOverride(andBaseBiomeWithNoise("\"#minecraft:is_nether\""), MARKER));
-        assertContained(helper, "tag #minecraft:is_nether",
-                scanContainment(base, byTag, sampler, h -> h.is(BiomeTags.IS_NETHER)));
+                singleOverride(andBaseBiomeWithNoise("\"#minecraft:has_structure/bastion_remnant\""), MARKER));
+        // Four of the five nether biomes: basalt deltas is outside, so the tag must exclude it.
+        assertContained(helper, "tag #minecraft:has_structure/bastion_remnant",
+                scanContainment(base, byTag, sampler, h -> h.is(BiomeTags.HAS_BASTION_REMNANT)));
 
         String second = observed.size() > 1 ? observed.get(1) : target;
         if (observed.size() < 2) {
@@ -461,13 +470,19 @@ public final class BiomeZoneContextGameTests {
         OverrideBiomeSource over = override(helper, NETHER_BASE,
                 singleOverride(jittered, MARKER));
 
+        int cells = 0;
         int markers = 0;
         for (int y : Y_LEVELS) {
             for (int x = QUART_MIN; x <= QUART_MAX; x += QUART_STEP) {
                 for (int z = QUART_MIN; z <= QUART_MAX; z += QUART_STEP) {
+                    cells++;
                     if (key(over.getNoiseBiome(x, y, z, sampler)).equals(MARKER)) markers++;
                 }
             }
+        }
+        if (markers == cells) {
+            helper.fail("edge_jitter(base_biome " + target + ") matched every cell, so the inner"
+                    + " zone is not reading the base", net.minecraft.core.BlockPos.ZERO);
         }
         if (markers == 0) {
             helper.fail("edge_jitter(base_biome " + target + ") never fired, so the context did not"

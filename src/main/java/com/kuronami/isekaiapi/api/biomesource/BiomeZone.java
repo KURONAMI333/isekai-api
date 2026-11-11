@@ -161,16 +161,11 @@ public interface BiomeZone {
         return z ^ (z >>> 31);
     }
 
-    /** Vanilla's "no constraint" on an axis: the full sampled range, {@code [-1, 1]}. */
-    Climate.Parameter UNCONSTRAINED_AXIS = Climate.Parameter.span(-1.0F, 1.0F);
-
     /**
-     * Whether a vanilla climate sample falls inside every axis given. An absent axis is
-     * unconstrained. Values are compared as the quantised longs the sampler produces, exactly as
+     * Whether a vanilla climate sample falls inside every axis given. An absent axis matches any
+     * value, including samples past {@code ±1} (depth goes above 1 underground). Values are compared as the quantised longs the sampler produces, exactly as
      * vanilla's own multi-noise matching does.
      *
-     * <p>Shared by {@link ClimateMatch} and {@code ClimateZonesBiomeSource.Rule}, so the
-     * {@code climate} zone and the {@code climate_zones} source agree on what "inside" means.
      * @since 3.0.0
      */
     static boolean climateMatches(Climate.TargetPoint sample,
@@ -189,7 +184,8 @@ public interface BiomeZone {
     }
 
     private static boolean containsAxis(Optional<Climate.Parameter> axis, long value) {
-        Climate.Parameter p = axis.orElse(UNCONSTRAINED_AXIS);
+        if (axis.isEmpty()) return true;
+        Climate.Parameter p = axis.get();
         return value >= p.min() && value <= p.max();
     }
 
@@ -546,7 +542,6 @@ public interface BiomeZone {
      *
      * <p>Matching is the vanilla comparison: the sample's quantised values are tested against the
      * quantised bounds, so a boundary behaves exactly as it does in a {@code multi_noise} preset.
-     * {@code ClimateZonesBiomeSource} shares this comparison, so both agree on what "inside" means.
      *
      * <p>Reads the sampler through {@link ZoneContext}, so it works both under
      * {@code isekai_api:override} (the vanilla climate stays valid even where the base biome is
