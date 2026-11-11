@@ -1,6 +1,7 @@
 package com.kuronami.isekaiapi.biomesource;
 
 import com.kuronami.isekaiapi.api.biomesource.BiomeZone;
+import com.kuronami.isekaiapi.api.biomesource.ZoneContext;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -112,8 +113,11 @@ public class RuleBiomeSource extends BiomeSource {
 
     @Override
     public Holder<Biome> getNoiseBiome(int quartX, int quartY, int quartZ, Climate.Sampler sampler) {
+        // This source owns every position, so there is no wrapped base: only the climate is
+        // available (base_biome answers false here).
+        ZoneContext ctx = ZoneContext.forClimate(sampler);
         for (Rule rule : activeRules) {
-            if (rule.zone().test(quartX, quartY, quartZ)) {
+            if (rule.zone().test(quartX, quartY, quartZ, ctx)) {
                 return rule.biome();
             }
         }

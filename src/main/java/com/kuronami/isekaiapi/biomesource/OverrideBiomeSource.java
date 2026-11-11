@@ -1,6 +1,7 @@
 package com.kuronami.isekaiapi.biomesource;
 
 import com.kuronami.isekaiapi.api.biomesource.BiomeZone;
+import com.kuronami.isekaiapi.api.biomesource.ZoneContext;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -137,11 +138,17 @@ public class OverrideBiomeSource extends BiomeSource {
 
     @Override
     public Holder<Biome> getNoiseBiome(int quartX, int quartY, int quartZ, Climate.Sampler sampler) {
+        // One context per call: worldgen samples on several workers at once, so no field.
+        ZoneContext ctx = new ZoneContext(
+                (qx, qy, qz) -> base.getNoiseBiome(qx, qy, qz, sampler), sampler);
         for (Entry entry : activeOverrides) {
-            if (entry.zone().test(quartX, quartY, quartZ)) {
+            if (entry.zone().test(quartX, quartY, quartZ, ctx)) {
                 return entry.biome();
             }
         }
-        return base.getNoiseBiome(quartX, quartY, quartZ, sampler);
+        // A zone such as base_biome may already have asked the base at this exact position;
+        // reuse that answer instead of sampling it a second time.
+        return ctx.cachedBaseBiome(quartX, quartY, quartZ)
+                .orElseGet(() -> base.getNoiseBiome(quartX, quartY, quartZ, sampler));
     }
 }

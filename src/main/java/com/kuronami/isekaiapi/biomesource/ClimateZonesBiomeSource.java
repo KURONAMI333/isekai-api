@@ -1,5 +1,6 @@
 package com.kuronami.isekaiapi.biomesource;
 
+import com.kuronami.isekaiapi.api.biomesource.BiomeZone;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -50,9 +51,6 @@ import org.jetbrains.annotations.ApiStatus;
 @ApiStatus.Internal
 public class ClimateZonesBiomeSource extends BiomeSource {
 
-    /** Vanilla parameter representing "no constraint": the full sampled range, {@code [-1, 1]}. */
-    private static final Climate.Parameter UNCONSTRAINED = Climate.Parameter.span(-1.0F, 1.0F);
-
     public record Rule(
             Holder<Biome> biome,
             Optional<Climate.Parameter> temperature,
@@ -71,19 +69,14 @@ public class ClimateZonesBiomeSource extends BiomeSource {
                 Climate.Parameter.CODEC.optionalFieldOf("depth").forGetter(Rule::depth)
         ).apply(i, Rule::new));
 
-        /** True when the sample falls inside every axis this rule constrains. */
+        /**
+         * True when the sample falls inside every axis this rule constrains. Shares
+         * {@link BiomeZone#climateMatches} with the {@code isekai_api:climate} zone so both read a
+         * sample the same way.
+         */
         boolean matches(Climate.TargetPoint p) {
-            return contains(temperature, p.temperature())
-                    && contains(humidity, p.humidity())
-                    && contains(continentalness, p.continentalness())
-                    && contains(erosion, p.erosion())
-                    && contains(weirdness, p.weirdness())
-                    && contains(depth, p.depth());
-        }
-
-        private static boolean contains(Optional<Climate.Parameter> opt, long value) {
-            Climate.Parameter p = opt.orElse(UNCONSTRAINED);
-            return value >= p.min() && value <= p.max();
+            return BiomeZone.climateMatches(p, temperature, humidity, continentalness,
+                    erosion, weirdness, depth);
         }
     }
 
