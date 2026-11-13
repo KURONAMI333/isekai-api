@@ -1,6 +1,8 @@
 package com.kuronami.isekaiapi.command.sub;
 
 import com.kuronami.isekaiapi.IsekaiApi;
+import com.kuronami.isekaiapi.survey.BiomeSurvey;
+import com.kuronami.isekaiapi.survey.BiomeSurveyRun;
 import com.kuronami.isekaiapi.survey.BlockSurvey;
 import com.kuronami.isekaiapi.survey.BlockSurveyRun;
 import com.kuronami.isekaiapi.survey.StructureSurvey;
@@ -36,7 +38,7 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code /isekai survey} — the two questions an author asks when a datapack does not show up.
+ * {@code /isekai survey} — the questions an author asks when a datapack does not show up.
  *
  * <ul>
  *   <li>{@code /isekai survey <structure> [radius]} — how often a structure actually appears, and
@@ -47,9 +49,13 @@ import org.jetbrains.annotations.Nullable;
  *       there; see {@link BlockSurvey} for what "one tree" means. Generation is synchronous on the
  *       server thread (tens of ms per fresh chunk), so TPS drops while it runs and only one survey
  *       runs at a time.</li>
+ *   <li>{@code /isekai survey biomes <radius> [center <x y z>] [y <y>]} — how much of the disc is
+ *       each biome, how big the patches are, and where the six climate axes sit. Nothing is
+ *       generated: the biome source and the climate sampler answer per coordinate, so it runs on a
+ *       worker thread while the server ticks; see {@link BiomeSurvey}.</li>
  * </ul>
  *
- * <p>Both write JSON to {@code <world>/isekai/survey/} and print the same numbers to chat.
+ * <p>All three write JSON to {@code <world>/isekai/survey/} and print the same numbers to chat.
  */
 @ApiStatus.Internal
 public final class SurveyCommand {
@@ -70,6 +76,7 @@ public final class SurveyCommand {
     public static LiteralArgumentBuilder<CommandSourceStack> build(CommandBuildContext context) {
         return Commands.literal("survey")
                 .then(blocks(context))
+                .then(biomes())
                 .then(Commands.argument("structure", ResourceLocationArgument.id())
                         .suggests((ctx, builder) -> {
                             ctx.getSource().registryAccess()
@@ -121,6 +128,91 @@ public final class SurveyCommand {
         block.then(radius);
 
         return Commands.literal("blocks").then(block);
+    }
+
+    /**
+     * {@code biomes <radius> [center <x y z>] [y <y>]}.
+     *
+     * <p>{@code radius} is required here, unlike the other two surveys, and is in blocks: a biome disc
+     * is cheap to read but the radius decides the run's cost (radius 4096 is 3.3 million cells), so a
+     * default would hide that. {@code center} defaults to where the command runs. {@code y} defaults
+     * to the centre's Y and picks the plane the biome is read at, because vanilla biomes are 3D
+     * (cave biomes, the nether's vertical bands), so one plane is always a slice rather than the
+     * column.
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> biomes() {
+        RequiredArgumentBuilder<CommandSourceStack, Integer> radius = Commands.argument("radius",
+                IntegerArgumentType.integer(BiomeSurvey.MIN_RADIUS_BLOCKS,
+                        BiomeSurvey.MAX_RADIUS_BLOCKS));
+        radius.executes(ctx -> biomes(ctx, IntegerArgumentType.getInteger(ctx, "radius"), null, null));
+
+        RequiredArgumentBuilder<CommandSourceStack, Integer> yAfterCenter =
+                Commands.argument("y", IntegerArgumentType.integer());
+        yAfterCenter.executes(ctx -> biomes(ctx, IntegerArgumentType.getInteger(ctx, "radius"),
+                BlockPosArgument.getBlockPos(ctx, "center"),
+                IntegerArgumentType.getInteger(ctx, "y")));
+        radius.then(Commands.literal("center")
+                .then(Commands.argument("center", BlockPosArgument.blockPos())
+                        .executes(ctx -> biomes(ctx, IntegerArgumentType.getInteger(ctx, "radius"),
+                                BlockPosArgument.getBlockPos(ctx, "center"), null))
+                        .then(Commands.literal("y").then(yAfterCenter))));
+
+        RequiredArgumentBuilder<CommandSourceStack, Integer> yOnly =
+                Commands.argument("y", IntegerArgumentType.integer());
+        yOnly.executes(ctx -> biomes(ctx, IntegerArgumentType.getInteger(ctx, "radius"), null,
+                IntegerArgumentType.getInteger(ctx, "y")));
+        radius.then(Commands.literal("y").then(yOnly));
+
+        return Commands.literal("biomes").then(radius);
+    }
+
+    private static int biomes(CommandContext<CommandSourceStack> ctx, int radius,
+                              @Nullable BlockPos center, @Nullable Integer y) {
+        CommandSourceStack source = ctx.getSource();
+        BlockPos middle = center != null ? center : BlockPos.containing(source.getPosition());
+        int planeY = y != null ? y : middle.getY();
+        BiomeSurvey.Params params =
+                new BiomeSurvey.Params(middle.getX(), planeY, middle.getZ(), radius);
+        ServerLevel level = source.getLevel();
+        String refusal = BiomeSurveyRun.refusalReason(level.getServer());
+        if (refusal != null) {
+            source.sendFailure(Component.literal("survey biomes: " + refusal));
+            return 0;
+        }
+        int started = BiomeSurveyRun.start(level, params,
+                result -> reportBiomes(source, params, result),
+                error -> source.sendFailure(Component.literal("survey biomes failed: "
+                        + error.getMessage())));
+        if (started != 1) {
+            source.sendFailure(Component.literal("survey biomes could not start"));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal("survey biomes: reading radius " + radius
+                + " blocks around " + middle.getX() + "," + planeY + "," + middle.getZ()
+                + " on a worker thread; nothing is generated, so the server keeps ticking."), false);
+        return 1;
+    }
+
+    private static void reportBiomes(CommandSourceStack source, BiomeSurvey.Params params,
+                                     BiomeSurvey.Result result) {
+        Path file = null;
+        try {
+            Path dir = source.getServer().getWorldPath(LevelResource.ROOT)
+                    .resolve("isekai").resolve("survey");
+            Files.createDirectories(dir);
+            file = dir.resolve(BiomeSurvey.fileName(params));
+            Files.writeString(file, result.toJsonString());
+        } catch (IOException e) {
+            IsekaiApi.LOGGER.error("[Isekai] survey write failed", e);
+            source.sendFailure(Component.literal("survey write failed: " + e.getMessage()));
+        }
+        for (String line : result.summary()) {
+            source.sendSuccess(() -> Component.literal(line), false);
+        }
+        if (file != null) {
+            Path written = file;
+            source.sendSuccess(() -> Component.literal("  written to " + written), false);
+        }
     }
 
     private static int blocks(CommandContext<CommandSourceStack> ctx, int radius,
