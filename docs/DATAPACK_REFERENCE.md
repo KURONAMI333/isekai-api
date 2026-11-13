@@ -1404,6 +1404,27 @@ Each chunk is counted as soon as its own `FEATURES` stage finishes, before its n
 
 The written file keeps one entry per counted chunk, so the distribution can be mapped afterwards: `<world>/isekai/survey/blocks-<target>-r<radius>.json`, plus `-<biome>` when a filter is given. Measured on a fresh vanilla world: `minecraft:forest` averages **6.7 trees per chunk** at both radius 8 (157 chunks) and radius 16 (260 chunks), with 1.2–1.3% empty chunks and about 19% of all trees in the busiest 10% of chunks. Vanilla `trees_birch_and_oak` makes ten placement attempts per chunk and some fail on slope or space, so compare against measured numbers like these rather than the attempt count — and always compare runs with the same biome filter, since an unfiltered square includes ocean and plains and drops the mean (5.0 at radius 8 in the same world).
 
+### Measuring biome shares, patch size and climate — `/isekai survey biomes`
+
+```
+/isekai survey biomes <radius> [center <x y z>] [y <y>]
+```
+
+```
+/isekai survey biomes 512
+/isekai survey biomes 2048 center 0 64 0 y 32
+```
+
+`survey biomes` answers what neither other survey can: what the seed's biome map looks like around a point, with no world to walk. It reads the biome source and the climate sampler per coordinate — the same answer chunk generation would write — so **nothing is generated and no chunk is loaded**. The scan runs on a worker thread and only the report comes back to the server thread, so the server keeps ticking. One `biomes` survey runs per server at a time; a second is refused with the radius and centre of the one in flight. A `blocks` survey may run alongside it, because that one holds the server thread rather than this slot.
+
+`radius` is in blocks and is required (16..4096). Unlike the other two surveys there is no default, because the radius alone decides the cost: radius 4096 samples 3.3 million cells, radius 512 samples 51,000. `center` defaults to where you run it and `y` defaults to the centre's Y. Biomes are 3D (cave biomes, the nether's vertical bands), so the whole report is one horizontal plane at that Y, not a column.
+
+**Share** is a count, not an estimate: every 4x4 column inside the disc is sampled once, so "20% desert" means 20% of the sampled cells. **Patch size** groups face-connected cells of one biome into clusters and reports each cluster's area as the diameter of a circle with the same area, `2*sqrt(area_blocks/pi)` — a round patch of radius 64 reads as 128, and a long strip reads as the width it would have at that area. A cluster that touches the rim of the disc is counted but left out of the median and p90, because its true size continues past where the scan stopped; the report says how many were excluded. A half-plane of one biome therefore shows as one cluster with both diameters at 0.
+
+**Climate** reports the six vanilla noise axes at the sampled positions, unquantized, as the 1st, 5th, 10th, 25th, 50th, 75th, 90th, 95th and 99th percentiles. The JSON uses the code names (`temperature`, `humidity`, `continentalness`, `erosion`, `depth`, `weirdness`) and the chat line adds the F3 name, because F3 shows `vegetation` and `ridges` where the code says humidity and weirdness. Above 262,144 samples the scan takes every nth cell for the climate arrays only — the biome share stays exact at every cell — and writes that `climate_stride` into the JSON and the chat line.
+
+The file is `<world>/isekai/survey/biomes-r<radius>-<x>_<y>_<z>.json`, with `dimension`, `center`, `radius_blocks`, `sampled_cells`, `cell_blocks`, `cell_area_blocks`, `climate_stride`, `biomes[]` (`biome`, `cells`, `share`), `clusters[]` (`biome`, `clusters`, `measured_clusters`, `edge_clusters`, `median_diameter_blocks`, `p90_diameter_blocks`), `climate{}` (each axis with its `f3_name`, `samples` and `percentiles`) and `elapsed_ms`. Measured on the nether preset in a GameTest server on a MacBook Air: radius 2048 is 823,592 cells with `climate_stride` 2 and takes **about 0.3 s** (278, 367 and 535 ms across three runs); radius 512 is 51,468 cells.
+
 ---
 
 ## World preset overrides — the Nether/End trap
