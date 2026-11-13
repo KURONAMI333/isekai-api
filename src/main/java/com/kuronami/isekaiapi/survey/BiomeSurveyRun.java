@@ -96,6 +96,9 @@ public final class BiomeSurveyRun {
             return 0;
         }
         future.whenComplete((result, error) -> server.execute(() -> {
+            // After the server stops, execute() runs the task inline on this worker instead of
+            // queueing it; onServerStopped has already cleared the slot, so drop the report.
+            if (!run.running || server.isStopped()) return;
             run.running = false;
             RUNS.remove(server, run);
             if (error != null) {
@@ -123,8 +126,8 @@ public final class BiomeSurveyRun {
     public static void onServerStopped(ServerStoppedEvent event) {
         BiomeSurveyRun run = RUNS.remove(event.getServer());
         if (run != null) {
-            // The worker keeps reading until it finishes; its callback is dropped because the
-            // server no longer executes tasks.
+            // The worker keeps reading until it finishes; its callback sees running == false
+            // and drops the report.
             run.running = false;
         }
     }

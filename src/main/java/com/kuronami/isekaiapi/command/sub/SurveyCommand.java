@@ -200,7 +200,7 @@ public final class SurveyCommand {
             Path dir = source.getServer().getWorldPath(LevelResource.ROOT)
                     .resolve("isekai").resolve("survey");
             Files.createDirectories(dir);
-            file = dir.resolve(BiomeSurvey.fileName(params));
+            file = dir.resolve(BiomeSurvey.fileName(result.dimension(), params));
             Files.writeString(file, result.toJsonString());
         } catch (IOException e) {
             IsekaiApi.LOGGER.error("[Isekai] survey write failed", e);

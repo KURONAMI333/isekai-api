@@ -461,9 +461,13 @@ public final class BiomeSurvey {
         return sortedValues[low] * (1.0 - fraction) + sortedValues[high] * fraction;
     }
 
-    /** File name under {@code <world>/isekai/survey/}; the centre is in the name so runs do not overwrite. */
-    public static String fileName(Params params) {
-        return "biomes-r" + params.radiusBlocks() + "-" + params.centerX() + "_"
+    /**
+     * File name under {@code <world>/isekai/survey/}. The dimension, radius and centre are all in
+     * the name, so the same command run in another dimension does not overwrite the first report.
+     */
+    public static String fileName(String dimension, Params params) {
+        String dim = dimension.replace(':', '_').replace('/', '_');
+        return "biomes-" + dim + "-r" + params.radiusBlocks() + "-" + params.centerX() + "_"
                 + params.centerY() + "_" + params.centerZ() + ".json";
     }
 
