@@ -918,6 +918,82 @@ the topmost body that is meant.
 }
 ```
 
+#### A ceiling 66 blocks away — worked example
+
+Vanilla has no placement modifier for a ceiling underside, and `minecraft:environment_scan`
+caps `max_steps` at 32, so a roof at y 186 is out of reach from the playable band.
+`isekai_api:world_floor` takes `max_scan` up to 4096. The placed feature below hangs glowstone
+from the roof and skips every column whose first air is lower than y 120:
+
+```json
+{
+  "feature": "minecraft:glowstone_blob",
+  "placement": [
+    { "type": "minecraft:count", "count": 1 },
+    { "type": "minecraft:in_square" },
+    { "type": "minecraft:biome" },
+    { "type": "isekai_api:dimension_guard", "dimension": "minecraft:the_nether" },
+    {
+      "type": "isekai_api:surface_relative",
+      "anchor": { "type": "isekai_api:fixed_y", "y": 186 },
+      "offset": 0
+    },
+    {
+      "type": "minecraft:block_predicate_filter",
+      "predicate": {
+        "type": "minecraft:matching_blocks",
+        "blocks": [
+          "minecraft:bedrock",
+          "minecraft:netherrack",
+          "minecraft:basalt",
+          "minecraft:blackstone"
+        ]
+      }
+    },
+    {
+      "type": "isekai_api:surface_relative",
+      "anchor": {
+        "type": "isekai_api:world_floor",
+        "start": { "type": "isekai_api:fixed_y", "y": 186 },
+        "max_scan": 66
+      },
+      "offset": 0
+    }
+  ]
+}
+```
+
+`in_square` picks the column; the first `surface_relative` climbs to y 186; the predicate
+filter inspects that cell; the second `surface_relative` runs the downward scan from its own
+`start` (it does not continue from wherever the previous modifier left the position), and an
+`offset` of 0 hands the found Y on unchanged.
+
+**Counting is inclusive at both ends.** `max_scan: 66` tests y 186, 185, … 120 — 67 cells.
+With the ceiling solid from 186 down to 121, the underside is y 120 and sits at exactly the
+last step, so 66 is the minimum that reaches it. One more block of ceiling (solid through 120,
+air at 119) needs 67; at 66 the scan finds nothing and the placement is skipped rather than
+misplaced. Size the budget to `start - target_underside`, not to the number of air blocks.
+
+**Air at the start is the trap.** If the start cell is already air, the scan has not entered a
+body yet and keeps descending, so it returns the underside of the next solid thing below —
+a shelf, a floating island, or whatever lies beneath a lava sea, instead of the roof. The
+`block_predicate_filter` above is the fix: it rejects the column when y 186 is air, before the
+scan runs, and accepts only ceiling materials. `minecraft:fixed_placement` is not a substitute,
+because its position is chunk-bound and does not follow the candidate column.
+
+**Only true air ends the scan.** The anchor tests `isAir()`, so lava and water are solid stops,
+not free space: a lava sea between the roof and the floor does not become the placement Y, and
+the scan continues below it. This is another reason to give the budget the full distance rather
+than the distance to the first gap.
+
+**The feature still applies its own rule.** Vanilla `minecraft:glowstone_blob` requires
+netherrack, basalt or blackstone directly above the origin. A bedrock underside passes the
+predicate but yields no blob, which is why `minecraft:bedrock` is in the accepted list (it keeps
+the gate from rejecting real roof columns) while the roof's netherrack layer does the work.
+
+This exact chain is decoded and exercised by `IsekaiCeilingScanGameTests`, including the
+boundary cases for 65/66/67 steps and the air-start rejection.
+
 ### TransitionRule (layered worldshapes)
 
 | Type | Fields |
