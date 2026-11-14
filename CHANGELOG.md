@@ -17,7 +17,7 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
 
 ### Changed
 
-- **A nether or end on an `isekai_api:` biome source no longer opens behind the experimental-settings prompt.** Vanilla accepts only its stock biome source and noise settings there, so a mod that shipped an Isekai nether inside its own jar still asked players to confirm "experimental settings" when the world was created and first opened. Isekai API now reports such a dimension as stable when it keeps the stock dimension type key and a `minecraft:noise` generator; its own noise settings are allowed. Other causes keep the prompt: a non-Isekai source with its own noise settings, a swapped dimension type key, a dimension count other than three, and `dimension_type` / `noise_settings` entries from a user datapack.
+- **A nether or end on an `isekai_api:` biome source no longer opens behind the experimental-settings prompt.** Vanilla accepts only its stock biome source and noise settings there, so a mod that shipped an Isekai nether inside its own jar still asked players to confirm "experimental settings" when the world was created and first opened. Isekai API now reports such a dimension as stable when it keeps the stock dimension type key and a `minecraft:noise` generator; its own noise settings are allowed. Other causes keep the prompt: a non-Isekai source with its own noise settings, a swapped dimension type key, a dimension count other than three, and any worldgen registry entry (`dimension_type`, `noise_settings`, biomes, features) from a user datapack.
 
 ### Fixed
 
