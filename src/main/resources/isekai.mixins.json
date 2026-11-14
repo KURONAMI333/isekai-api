@@ -13,7 +13,9 @@
     "PlacedFeatureScopeMixin",
     "ProtoChunkDimensionMixin",
     "ServerLifecycleHooksReconcileMixin",
-    "StructureFindValidGenerationPointMixin"
+    "StructureFindValidGenerationPointMixin",
+    "WorldDimensionsInvoker",
+    "WorldDimensionsStabilityMixin"
   ],
   "client": [
     "ClientLevelSkyColorMixin"
