@@ -48,66 +48,88 @@ public final class IsekaiRemapImpl implements IsekaiRemap {
     private final Map<ResourceKey<Level>, List<WorldshapeDescriptor>> singleLayer = new ConcurrentHashMap<>();
     private final Map<ResourceKey<Level>, List<LayeredDescriptor>> multiLayer = new ConcurrentHashMap<>();
 
+    /**
+     * Guards every mutator together with the rebuild of {@link #declaredDimensions}, so a
+     * rebuild can never publish a set that predates the write it races with. Reads of
+     * {@code declaredDimensions} take no lock.
+     */
+    private final Object declaredLock = new Object();
+
+    /** Immutable union of both map key sets, rebuilt on every mutation. */
+    private volatile Set<ResourceKey<Level>> declaredDimensions = Set.of();
+
     @Override
     public void declareWorldshape(WorldshapeDescriptor descriptor) {
-        singleLayer.compute(descriptor.dimension(), (k, existing) -> {
-            List<WorldshapeDescriptor> current = existing == null ? List.of() : existing;
-            int index = indexOfScope(current, descriptor);
-            if (index < 0) {
-                List<WorldshapeDescriptor> next = new ArrayList<>(current.size() + 1);
-                next.addAll(current);
-                next.add(descriptor);
-                IsekaiApi.LOGGER.info("[Isekai] declareWorldshape: dim={}, range={}, priority={}",
-                        descriptor.dimension(), descriptor.playableRange(), descriptor.priority());
-                return List.copyOf(next);
-            }
+        synchronized (declaredLock) {
+            singleLayer.compute(descriptor.dimension(), (k, existing) -> {
+                List<WorldshapeDescriptor> current = existing == null ? List.of() : existing;
+                int index = indexOfScope(current, descriptor);
+                if (index < 0) {
+                    List<WorldshapeDescriptor> next = new ArrayList<>(current.size() + 1);
+                    next.addAll(current);
+                    next.add(descriptor);
+                    IsekaiApi.LOGGER.info("[Isekai] declareWorldshape: dim={}, range={}, priority={}",
+                            descriptor.dimension(), descriptor.playableRange(), descriptor.priority());
+                    return List.copyOf(next);
+                }
 
-            WorldshapeDescriptor sameScope = current.get(index);
-            if (sameScope.priority() > descriptor.priority()) {
+                WorldshapeDescriptor sameScope = current.get(index);
+                if (sameScope.priority() > descriptor.priority()) {
+                    IsekaiApi.LOGGER.warn(
+                            "[Isekai] Skipping declareWorldshape for {}: existing priority {} > new priority {}",
+                            descriptor.dimension(), sameScope.priority(), descriptor.priority());
+                    return current;
+                }
                 IsekaiApi.LOGGER.warn(
-                        "[Isekai] Skipping declareWorldshape for {}: existing priority {} > new priority {}",
+                        "[Isekai] Replacing single-layer descriptor for {} (priority {} -> {})",
                         descriptor.dimension(), sameScope.priority(), descriptor.priority());
-                return current;
-            }
-            IsekaiApi.LOGGER.warn(
-                    "[Isekai] Replacing single-layer descriptor for {} (priority {} -> {})",
-                    descriptor.dimension(), sameScope.priority(), descriptor.priority());
-            List<WorldshapeDescriptor> next = new ArrayList<>(current);
-            next.set(index, descriptor);
-            return List.copyOf(next);
-        });
+                List<WorldshapeDescriptor> next = new ArrayList<>(current);
+                next.set(index, descriptor);
+                return List.copyOf(next);
+            });
+            rebuildDeclaredDimensions();
+        }
     }
 
     @Override
     public void declareLayeredWorldshape(ResourceKey<Level> dimension,
                                           List<LayeredDescriptor> layers) {
-        multiLayer.put(dimension, List.copyOf(layers));
+        synchronized (declaredLock) {
+            multiLayer.put(dimension, List.copyOf(layers));
+            rebuildDeclaredDimensions();
+        }
         IsekaiApi.LOGGER.info("[Isekai] declareLayeredWorldshape: dim={}, layers={}",
                 dimension, layers.size());
     }
 
     @Override
     public void updateWorldshape(ResourceKey<Level> dimension, WorldshapeDescriptor newDescriptor) {
-        singleLayer.compute(dimension, (k, existing) -> {
-            List<WorldshapeDescriptor> current = existing == null ? List.of() : existing;
-            int index = indexOfScope(current, newDescriptor);
-            if (index < 0) {
-                List<WorldshapeDescriptor> next = new ArrayList<>(current.size() + 1);
-                next.addAll(current);
-                next.add(newDescriptor);
+        synchronized (declaredLock) {
+            singleLayer.compute(dimension, (k, existing) -> {
+                List<WorldshapeDescriptor> current = existing == null ? List.of() : existing;
+                int index = indexOfScope(current, newDescriptor);
+                if (index < 0) {
+                    List<WorldshapeDescriptor> next = new ArrayList<>(current.size() + 1);
+                    next.addAll(current);
+                    next.add(newDescriptor);
+                    return List.copyOf(next);
+                }
+                List<WorldshapeDescriptor> next = new ArrayList<>(current);
+                next.set(index, newDescriptor);
                 return List.copyOf(next);
-            }
-            List<WorldshapeDescriptor> next = new ArrayList<>(current);
-            next.set(index, newDescriptor);
-            return List.copyOf(next);
-        });
+            });
+            rebuildDeclaredDimensions();
+        }
         IsekaiApi.LOGGER.info("[Isekai] updateWorldshape: dim={}", dimension);
     }
 
     @Override
     public void removeWorldshape(ResourceKey<Level> dimension) {
-        singleLayer.remove(dimension);
-        multiLayer.remove(dimension);
+        synchronized (declaredLock) {
+            singleLayer.remove(dimension);
+            multiLayer.remove(dimension);
+            rebuildDeclaredDimensions();
+        }
         IsekaiApi.LOGGER.info("[Isekai] removeWorldshape: dim={}", dimension);
     }
 
@@ -248,9 +270,18 @@ public final class IsekaiRemapImpl implements IsekaiRemap {
 
     @Override
     public Set<ResourceKey<Level>> getDeclaredDimensions() {
+        return declaredDimensions;
+    }
+
+    /**
+     * Republish the union of both key sets. Callers hold {@link #declaredLock}; the field is
+     * volatile so readers see a fully built immutable set or the previous one, never a
+     * half-filled collection.
+     */
+    private void rebuildDeclaredDimensions() {
         Set<ResourceKey<Level>> all = new HashSet<>(singleLayer.keySet());
         all.addAll(multiLayer.keySet());
-        return Set.copyOf(all);
+        declaredDimensions = Set.copyOf(all);
     }
 
     /**
@@ -262,8 +293,11 @@ public final class IsekaiRemapImpl implements IsekaiRemap {
     public void clearAll() {
         int cleared = singleLayer.values().stream().mapToInt(List::size).sum()
                 + multiLayer.size();
-        singleLayer.clear();
-        multiLayer.clear();
+        synchronized (declaredLock) {
+            singleLayer.clear();
+            multiLayer.clear();
+            rebuildDeclaredDimensions();
+        }
         if (cleared > 0) {
             IsekaiApi.LOGGER.debug("[Isekai] cleared {} worldshape declaration(s) on shutdown", cleared);
         }
