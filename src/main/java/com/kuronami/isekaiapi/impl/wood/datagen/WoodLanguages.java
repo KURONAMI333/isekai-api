@@ -15,8 +15,9 @@ import org.jetbrains.annotations.ApiStatus;
  * {@link com.kuronami.isekaiapi.api.wood.WoodSetDataGen}.
  *
  * <p>English part names follow vanilla's word order ({@code Stripped Maple Log}); Japanese ones
- * follow vanilla's {@code 樹皮を剥いだメープルの原木}. Only these two locales have a part-name
- * grammar, so a set that needs another language generates its own names.
+ * copy vanilla's phrasing, including its irregular potted-sapling form
+ * ({@code 植えられたメープルの苗木}). Only these two locales have a part-name grammar, so a set
+ * that needs another language generates its own names.
  */
 @ApiStatus.Internal
 public final class WoodLanguages {
@@ -134,7 +135,7 @@ public final class WoodLanguages {
             case HANGING_SIGN -> base + "の吊り看板";
             case LEAVES -> base + "の葉";
             case SAPLING -> base + "の苗木";
-            case POTTED_SAPLING -> base + "の苗木入り植木鉢";
+            case POTTED_SAPLING -> "植えられた" + base + "の苗木";
             case BOAT -> base + "のボート";
             case CHEST_BOAT -> "チェスト付きの" + base + "のボート";
         };
