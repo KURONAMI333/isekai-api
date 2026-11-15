@@ -32,8 +32,9 @@ import org.jetbrains.annotations.ApiStatus;
  *       {@code /isekai validate dimension <id>} (runtime profile + worldshape diagnosis)</li>
  *   <li>{@link PreviewCommand}  — {@code /isekai preview range <id> [dim]}</li>
  *   <li>{@link DumpCommand}     — {@code /isekai dump worldgen} / {@code ore <id>} / {@code structure <id>}</li>
- *   <li>{@link SurveyCommand}   — {@code /isekai survey <structure> [radius]} and
- *       {@code /isekai survey blocks <block|#tag> [radius] [center] [biome <biome|#tag>]}</li>
+ *   <li>{@link SurveyCommand}   — {@code /isekai survey <structure> [radius]},
+ *       {@code /isekai survey blocks <block|#tag> [radius] [center] [biome <biome|#tag>]}, and
+ *       {@code /isekai survey biomes <radius> [center <x y z>] [y <y>]}</li>
  *   <li>{@link FitCommand}      — {@code /isekai fit <structure> [pos]}</li>
  * </ul>
  *

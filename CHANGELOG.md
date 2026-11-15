@@ -17,10 +17,16 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
 
 ### Changed
 
+- **`structure_spawn_overrides` is scoped to the structure, not the dimension.** It writes the structure's own spawn settings, so a descriptor that sets it also changes that structure in every other dimension. The datapack reference now says so in the scope table; the other override keys keep their dimension scope.
 - **A nether or end on an `isekai_api:` biome source no longer opens behind the experimental-settings prompt.** Vanilla accepts only its stock biome source and noise settings there, so a mod that shipped an Isekai nether inside its own jar still asked players to confirm "experimental settings" when the world was created and first opened. Isekai API now reports such a dimension as stable when it keeps the stock dimension type key and a `minecraft:noise` generator; its own noise settings are allowed. Other causes keep the prompt: a non-Isekai source with its own noise settings, a swapped dimension type key, a dimension count other than three, and any worldgen registry entry (`dimension_type`, `noise_settings`, biomes, features) from a user datapack.
 
 ### Fixed
 
+- **`/isekai validate dimension` no longer generates the chunk it inspects.** A non-overworld dimension whose (0,0) chunk has not been generated reports `spawn SKIP` (the column is not sampled) instead of reading the heightmap and blocks, both of which generate that chunk.
+- **A wall sign is audited under its own language key.** The species audit built each block's key from `getDescriptionId()`, and vanilla's wall sign returns the standing sign's name, so the wall key was never checked while the standing key was checked twice. A missing `<ns>:<species>_wall_sign` name (and a wall hanging sign's) is now reported.
+- **A pool lines around logs and leaves instead of burying them.** The rim now uses vanilla `LakeFeature`'s rule and only overwrites cells that are solid and outside `minecraft:lava_pool_stone_cannot_replace`, so a pool that reaches a tree banks around the trunk; a widened `shore_width` follows the same rule.
+- **`leaning` with `space_check` stops at a blocked cell in the vertical trunk.** The trunk used to skip the log and keep climbing, leaving the crown on air and the stalk attached above the hole; the crown now goes on the last log that exists.
+- **The Japanese name of a potted sapling follows vanilla's word order**: `植えられた〈樹種〉の苗木` for `block.<ns>:potted_<species>_sapling`, as in `植えられたオークの苗木`.
 - **A `frond` crown lifted by `offset` no longer hangs off the trunk.** Leaf distance follows face contact, so lifting the crown above the top log left every frond reached only through a diagonal: the whole crown sat past the sixth step and decayed as soon as it was ticked, while untouched leaves kept their generation-time pin and hid it. The lift cells are now filled with leaves and the lift is spent from the same six-step budget as the fronds.
 
 ## [3.0.0] — 2026-10-29

@@ -416,7 +416,7 @@ Geometric placement primitives — use as `type` inside a configured_feature JSO
 | Type | Fields | Effect |
 |---|---|---|
 | `isekai_api:cluster` | `block` (BlockStateProvider), `size` (IntProvider 1–256), `can_replace_solid` (bool, default false) | random-walk BFS from origin, places `size` connected blocks. Use for moss patches, dirt veins, fungus spreads, ore clusters — any "blob of N connected blocks". |
-| `isekai_api:pool` | `fluid` (BlockState), `rim_block` (BlockStateProvider), `xz_radius` (IntProvider 1–64, values above 14 are clamped — flat form `{"type":"minecraft:uniform","min_inclusive":3,"max_inclusive":5}`), `depth` (int 1–32, default 2), `shore_width` (int 0–6, default 0) | a bounded body of fluid dug into the terrain, using vanilla `LakeFeature`'s algorithm. Outline is the union of 4–7 random ellipsoids, so no two are alike and none is a circle. Lines the whole shell with `rim_block`, not just the floor. `shore_width` repeats that rim outward N more rings (a beach); `0` is the single-ring bank every existing datapack already has. **Refuses to place unless the terrain can contain the fluid** — see below. Avoids `waterlogged_vegetation_patch`'s grass→dirt drowning trap: the rim block is whatever you pass, never drowned grass. |
+| `isekai_api:pool` | `fluid` (BlockState), `rim_block` (BlockStateProvider), `xz_radius` (IntProvider 1–64, values above 14 are clamped — flat form `{"type":"minecraft:uniform","min_inclusive":3,"max_inclusive":5}`), `depth` (int 1–32, default 2), `shore_width` (int 0–6, default 0) | a bounded body of fluid dug into the terrain, using vanilla `LakeFeature`'s algorithm. Outline is the union of 4–7 random ellipsoids, so no two are alike and none is a circle. Lines the whole shell with `rim_block`, not just the floor. Logs and leaves are never overwritten, so a pool that reaches a tree banks around the trunk instead of burying it (vanilla's `lava_pool_stone_cannot_replace` rule). `shore_width` repeats that rim outward N more rings (a beach); `0` is the single-ring bank every existing datapack already has. **Refuses to place unless the terrain can contain the fluid** — see below. Avoids `waterlogged_vegetation_patch`'s grass→dirt drowning trap: the rim block is whatever you pass, never drowned grass. |
 
 ### `pool` — containment, and what it costs you
 
@@ -1195,6 +1195,7 @@ structure, mob spawn and carver rules now apply only in the descriptor's dimensi
 | `exclusions.mob_spawns`, `additions.mob_spawns`, `mob_spawn_strategy`, `mob_spawn_strategy_by_category` | the descriptor's dimension, for the matched biomes | runtime spawn-list read; exclusions also at `FinalizeSpawnEvent` |
 | `exclusions.carvers`, `additions.carvers` | the descriptor's dimension **on `NoiseBasedChunkGenerator`**; biome-wide on other generators | `NoiseBasedChunkGenerator#applyCarvers` |
 | `atmosphere` climate/effects, `creature_generation_probability`, `mob_spawn_costs` | the shared biome — cannot differ by dimension | biome modifier |
+| `content_overrides.structure_spawn_overrides` | the structure's registry entry — cannot differ by dimension, so it also applies to the same structure in other dimensions | structure modifier (`Phase.MODIFY`), which has no dimension context |
 | `content_overrides.block_overrides` | the descriptor's dimension | the surface rule's `dimension` key |
 
 ### `exclusions` — what it removes, and what it holds back
@@ -1290,7 +1291,9 @@ Prints one line per check, including `spawn OK`/`WARN`/`ERROR`/`SKIP` for a dime
 declared worldshape: buried, no footing within 32 blocks, or lava is an error; standing under
 water is a warning; an unloaded dimension is skipped. The start point is the overworld shared
 spawn, or the (0,0) `MOTION_BLOCKING_NO_LEAVES` heightmap position for other dimensions; the line
-names which one was used.
+names which one was used. A non-overworld dimension whose (0,0) chunk has not been generated is
+reported as `SKIP` instead of sampled: the heightmap and block reads a spawn verdict needs would
+generate that chunk, and a diagnosis must not create world data.
 
 ---
 
