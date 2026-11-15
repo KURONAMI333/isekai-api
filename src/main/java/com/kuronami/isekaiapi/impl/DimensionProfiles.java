@@ -1,5 +1,6 @@
 package com.kuronami.isekaiapi.impl;
 
+import com.kuronami.isekaiapi.IsekaiApi;
 import com.kuronami.isekaiapi.api.query.DimensionProfile;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -36,13 +37,27 @@ public final class DimensionProfiles {
         var stems = server.registryAccess().lookupOrThrow(Registries.LEVEL_STEM);
         stems.listElements().forEach(ref -> {
             ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, ref.key().location());
-            out.put(dimension, from(dimension, ref.value()));
+            from(dimension, ref.value()).ifPresent(profile -> out.put(dimension, profile));
         });
         return Map.copyOf(out);
     }
 
-    /** Build one profile from a decoded level stem. */
-    public static DimensionProfile from(ResourceKey<Level> dimension, LevelStem stem) {
+    /**
+     * Build one profile from a decoded level stem.
+     *
+     * <p>Empty when the stem's dimension type is a {@code Holder.direct} with no registry key:
+     * {@link DimensionProfile} is keyed by that type, and throwing here would stop server start
+     * over a dimension Isekai only reads. Such a dimension is left out of the profile map and
+     * logged once per scan instead.
+     */
+    public static Optional<DimensionProfile> from(ResourceKey<Level> dimension, LevelStem stem) {
+        Optional<ResourceKey<DimensionType>> typeKey = stem.type().unwrapKey();
+        if (typeKey.isEmpty()) {
+            IsekaiApi.LOGGER.warn("[Isekai] dimension {} uses an inline dimension_type without a "
+                    + "registry key; it is excluded from the dimension profile map",
+                    dimension.location());
+            return Optional.empty();
+        }
         DimensionType type = stem.type().value();
         Optional<Block> defaultBlock = Optional.empty();
         Optional<Fluid> defaultFluid = Optional.empty();
@@ -53,10 +68,9 @@ public final class DimensionProfiles {
             defaultBlock = Optional.of(settings.defaultBlock().getBlock());
             defaultFluid = Optional.of(settings.defaultFluid().getFluidState().getType());
         }
-        return new DimensionProfile(
+        return Optional.of(new DimensionProfile(
                 dimension,
-                stem.type().unwrapKey().orElseThrow(
-                        () -> new IllegalStateException("dimension type has no key: " + stem.type())),
+                typeKey.get(),
                 type.minY(),
                 type.height(),
                 type.logicalHeight(),
@@ -72,6 +86,6 @@ public final class DimensionProfiles {
                 type.hasRaids(),
                 seaLevel,
                 defaultBlock,
-                defaultFluid);
+                defaultFluid));
     }
 }
