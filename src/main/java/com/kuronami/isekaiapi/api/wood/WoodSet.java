@@ -307,6 +307,15 @@ public final class WoodSet {
     /** Selects parts and options, then registers them into the consumer's registries. */
     public static final class Builder {
 
+        /**
+         * Serializes {@link BlockSetType#register} / {@link WoodType#register} across every wood
+         * set built through Isekai. Both write into vanilla's static (and, on NeoForge, concurrent)
+         * maps, so two mods constructing wood sets on parallel threads would race there. The lock
+         * covers only these two calls, so registration order relative to other holders is
+         * unchanged.
+         */
+        private static final Object REGISTRATION_LOCK = new Object();
+
         private final ResourceLocation id;
 
         private MapColor planksColor = MapColor.WOOD;
@@ -592,14 +601,17 @@ public final class WoodSet {
             final String name = id.toString();
             // The wood type and block set type are what doors, trapdoors, buttons and signs take
             // their sounds from, so the set's sound has to reach them as well as the blocks.
-            this.blockSetType = BlockSetType.register(new BlockSetType(name, true, true, true,
-                    BlockSetType.PressurePlateSensitivity.EVERYTHING, sound,
-                    SoundEvents.WOODEN_DOOR_CLOSE, SoundEvents.WOODEN_DOOR_OPEN,
-                    SoundEvents.WOODEN_TRAPDOOR_CLOSE, SoundEvents.WOODEN_TRAPDOOR_OPEN,
-                    SoundEvents.WOODEN_PRESSURE_PLATE_CLICK_OFF, SoundEvents.WOODEN_PRESSURE_PLATE_CLICK_ON,
-                    SoundEvents.WOODEN_BUTTON_CLICK_OFF, SoundEvents.WOODEN_BUTTON_CLICK_ON));
-            this.woodType = WoodType.register(new WoodType(name, blockSetType, sound,
-                    SoundType.HANGING_SIGN, SoundEvents.FENCE_GATE_CLOSE, SoundEvents.FENCE_GATE_OPEN));
+            // Both registrations are globally serialized; see REGISTRATION_LOCK.
+            synchronized (REGISTRATION_LOCK) {
+                this.blockSetType = BlockSetType.register(new BlockSetType(name, true, true, true,
+                        BlockSetType.PressurePlateSensitivity.EVERYTHING, sound,
+                        SoundEvents.WOODEN_DOOR_CLOSE, SoundEvents.WOODEN_DOOR_OPEN,
+                        SoundEvents.WOODEN_TRAPDOOR_CLOSE, SoundEvents.WOODEN_TRAPDOOR_OPEN,
+                        SoundEvents.WOODEN_PRESSURE_PLATE_CLICK_OFF, SoundEvents.WOODEN_PRESSURE_PLATE_CLICK_ON,
+                        SoundEvents.WOODEN_BUTTON_CLICK_OFF, SoundEvents.WOODEN_BUTTON_CLICK_ON));
+                this.woodType = WoodType.register(new WoodType(name, blockSetType, sound,
+                        SoundType.HANGING_SIGN, SoundEvents.FENCE_GATE_CLOSE, SoundEvents.FENCE_GATE_OPEN));
+            }
 
             if (wantStrippedLog) {
                 this.strippedLog = blocks.registerBlock("stripped_" + path + "_log",
