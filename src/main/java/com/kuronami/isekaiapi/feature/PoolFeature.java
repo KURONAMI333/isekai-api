@@ -219,6 +219,15 @@ public class PoolFeature extends Feature<PoolFeature.Config> {
         return !state.is(BlockTags.FEATURES_CANNOT_REPLACE);
     }
 
+    /**
+     * LakeFeature:129 — the rim overwrites solid stone-like cells only. Logs and leaves are solid
+     * too, but {@code LAVA_POOL_STONE_CANNOT_REPLACE} keeps them out so a pool touching a tree
+     * lines around it instead of burying the trunk in rim_block.
+     */
+    private static boolean canLine(BlockState state) {
+        return state.isSolid() && !state.is(BlockTags.LAVA_POOL_STONE_CANNOT_REPLACE);
+    }
+
     // ------------------------------------------------------------------
     // Shape
     // ------------------------------------------------------------------
@@ -420,7 +429,7 @@ public class PoolFeature extends Feature<PoolFeature.Config> {
                     if (dy >= 0 && random.nextInt(2) == 0) {
                         continue;
                     }
-                    if (cells.get(dx, dy, dz).isSolid()) {
+                    if (canLine(cells.get(dx, dy, dz))) {
                         cells.rim(dx, dy, dz);
                     }
                 }
@@ -477,7 +486,7 @@ public class PoolFeature extends Feature<PoolFeature.Config> {
                 if (dy >= 0 && random.nextInt(2) == 0) {
                     continue;
                 }
-                if (cells.get(dx, dy, dz).isSolid()) {
+                if (canLine(cells.get(dx, dy, dz))) {
                     cells.rim(dx, dy, dz);
                 }
             }

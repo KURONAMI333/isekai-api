@@ -43,6 +43,8 @@ public final class PoolGameTests {
     private static final int SLOT_SHORE_X = 5200;
     /** A pool whose sampled radius plus shore would reach past the feature stage's 3x3 chunks. */
     private static final int SLOT_WIDE_X = 5300;
+    /** A pool that grows into a stand of logs sitting on its rim. */
+    private static final int SLOT_LOGS_X = 5400;
 
     /** The configured features all use this radius/depth; the radius is a bare int, not a provider. */
     private static final int RADIUS = 4;
@@ -140,6 +142,65 @@ public final class PoolGameTests {
         }
         if (count(level, origin, Blocks.WATER) == 0) {
             helper.fail("the shrunk radius left no water");
+            return;
+        }
+        helper.succeed();
+    }
+
+    // ------------------------------------------------------------------
+
+    /**
+     * The rim lines around wood instead of burying it. Vanilla's {@code LakeFeature} only overwrites
+     * cells that are solid <em>and</em> outside {@code lava_pool_stone_cannot_replace}, which holds
+     * logs and leaves, so a pool that reaches a tree grows its bank around the trunk. This places a
+     * log ceiling on the pool's top shell layer — the layer the rim pass writes as often as any
+     * other — and asks that not one block of it turned into {@code rim_block}.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void rimLeavesLogsAlone(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos origin = prepare(level, SLOT_LOGS_X, SLOT_Z);
+
+        int logs = 0;
+        for (int dx = -(RADIUS + 1); dx <= RADIUS + 1; dx++) {
+            for (int dz = -(RADIUS + 1); dz <= RADIUS + 1; dz++) {
+                level.setBlock(origin.offset(dx, DEPTH, dz), Blocks.OAK_LOG.defaultBlockState(), 2);
+                logs++;
+            }
+        }
+        if (!place(helper, level, "pool_default", origin)) {
+            helper.fail("the pool did not place under a log ceiling on a 6-block-thick plate");
+            return;
+        }
+
+        int buried = 0;
+        int kept = 0;
+        for (int dx = -(RADIUS + 1); dx <= RADIUS + 1; dx++) {
+            for (int dz = -(RADIUS + 1); dz <= RADIUS + 1; dz++) {
+                BlockState state = level.getBlockState(origin.offset(dx, DEPTH, dz));
+                if (state.is(Blocks.OAK_LOG)) {
+                    kept++;
+                } else if (!state.isAir()) {
+                    buried++;
+                }
+            }
+        }
+        if (buried > 0) {
+            helper.fail("the rim replaced " + buried + " of " + logs + " logs with "
+                    + level.getBlockState(origin.offset(0, DEPTH, 0)));
+            return;
+        }
+        if (kept != logs) {
+            helper.fail("only " + kept + " of " + logs + " logs survived the pool");
+            return;
+        }
+        if (count(level, origin, Blocks.SAND) == 0) {
+            helper.fail("no rim was written at all, so nothing tested the log rule");
+            return;
+        }
+        if (count(level, origin, Blocks.WATER) == 0) {
+            helper.fail("the log ceiling stopped the pool from filling");
             return;
         }
         helper.succeed();
