@@ -428,7 +428,7 @@ public final class IsekaiDimensionGameTests {
                 helper.fail("expected the spawn column to be skipped, got: " + text);
                 return;
             }
-            if (!text.contains("not generated yet")) {
+            if (!text.contains("is not loaded")) {
                 helper.fail("the skip did not say the chunk is ungenerated: " + text);
                 return;
             }

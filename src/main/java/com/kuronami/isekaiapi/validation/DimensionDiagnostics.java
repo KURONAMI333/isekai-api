@@ -45,7 +45,7 @@ import org.jetbrains.annotations.ApiStatus;
  *       are skipped rather than projected against the overworld envelope)</li>
  *   <li>the start point is buried, has no footing within 32 blocks, or stands in lava
  *       (ERROR); it is under water (WARN); the dimension has no loaded level, or its (0,0)
- *       chunk is not generated yet (SKIP, INFO). A skip never samples the column: height and
+ *       chunk is not loaded (SKIP, INFO); a generated but unloaded chunk counts as not loaded. A skip never samples the column: height and
  *       block reads would force chunk generation from a read-only diagnosis. Checked only
  *       when a worldshape is declared — that is the terrain Isekai is responsible for; an
  *       untouched dimension keeps vanilla's own spawn handling.</li>
@@ -140,11 +140,11 @@ public final class DimensionDiagnostics {
         if (!dimension.equals(Level.OVERWORLD) && !level.getChunkSource().hasChunk(0, 0)) {
             // hasChunk is the ticket-free view, so this check costs nothing. getHeightmapPos
             // and getBlockState below would both generate the chunk; a read-only diagnosis
-            // must not create world data, so an ungenerated (0,0) is reported as a skip.
+            // must not create world data, so an unloaded (0,0) is reported as a skip, whether or not it was ever generated.
             issues.add(new Issue(Severity.INFO,
                     "spawn SKIP: chunk (0,0) of " + dimension.location()
-                    + " is not generated yet — the column is not sampled (diagnosis never "
-                    + "generates chunks)"));
+                    + " is not loaded — the column is not sampled (diagnosis never loads or "
+                    + "generates chunks; stand there or /forceload it, then validate again)"));
             return;
         }
 

@@ -576,6 +576,11 @@ public final class WoodSet {
         /**
          * Registers the selected parts.
          *
+         * <p>Safe to call from parallel mod construction: the wood type and block set type that
+         * vanilla keeps in static maps are registered under one lock shared by every wood set
+         * built through Isekai. Code that calls {@code WoodType.register} directly is outside
+         * that lock.
+         *
          * @param blocks   the consumer's block register
          * @param items    the consumer's item register
          * @param entities the consumer's entity-type register; required when a boat is selected

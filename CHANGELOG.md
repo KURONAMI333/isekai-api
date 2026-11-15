@@ -22,11 +22,11 @@ and Java API stability are versioned — is in [docs/COMPATIBILITY.md](docs/COMP
 
 ### Fixed
 
-- **`/isekai validate dimension` no longer generates the chunk it inspects.** A non-overworld dimension whose (0,0) chunk has not been generated reports `spawn SKIP` (the column is not sampled) instead of reading the heightmap and blocks, both of which generate that chunk.
+- **`/isekai validate dimension` no longer generates the chunk it inspects.** A non-overworld dimension whose (0,0) chunk is not loaded reports `spawn SKIP` (the column is not sampled) instead of reading the heightmap and blocks, both of which would load or generate that chunk. Stand at (0,0) or `/forceload add 0 0` to get a verdict.
 - **A wall sign is audited under its own language key.** The species audit built each block's key from `getDescriptionId()`, and vanilla's wall sign returns the standing sign's name, so the wall key was never checked while the standing key was checked twice. A missing `<ns>:<species>_wall_sign` name (and a wall hanging sign's) is now reported.
 - **A pool lines around logs and leaves instead of burying them.** The rim now uses vanilla `LakeFeature`'s rule and only overwrites cells that are solid and outside `minecraft:lava_pool_stone_cannot_replace`, so a pool that reaches a tree banks around the trunk; a widened `shore_width` follows the same rule.
 - **`leaning` with `space_check` stops at a blocked cell in the vertical trunk.** The trunk used to skip the log and keep climbing, leaving the crown on air and the stalk attached above the hole; the crown now goes on the last log that exists.
-- **The Japanese name of a potted sapling follows vanilla's word order**: `植えられた〈樹種〉の苗木` for `block.<ns>:potted_<species>_sapling`, as in `植えられたオークの苗木`.
+- **The Japanese name of a potted sapling follows vanilla's word order**: `植えられた〈樹種〉の苗木` for `block.<ns>.potted_<species>_sapling`, as in `植えられたオークの苗木`.
 - **A `frond` crown lifted by `offset` no longer hangs off the trunk.** Leaf distance follows face contact, so lifting the crown above the top log left every frond reached only through a diagonal: the whole crown sat past the sixth step and decayed as soon as it was ticked, while untouched leaves kept their generation-time pin and hid it. The lift cells are now filled with leaves and the lift is spent from the same six-step budget as the fronds.
 
 ## [3.0.0] — 2026-10-29

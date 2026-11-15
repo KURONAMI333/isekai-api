@@ -1291,9 +1291,10 @@ Prints one line per check, including `spawn OK`/`WARN`/`ERROR`/`SKIP` for a dime
 declared worldshape: buried, no footing within 32 blocks, or lava is an error; standing under
 water is a warning; an unloaded dimension is skipped. The start point is the overworld shared
 spawn, or the (0,0) `MOTION_BLOCKING_NO_LEAVES` heightmap position for other dimensions; the line
-names which one was used. A non-overworld dimension whose (0,0) chunk has not been generated is
-reported as `SKIP` instead of sampled: the heightmap and block reads a spawn verdict needs would
-generate that chunk, and a diagnosis must not create world data.
+names which one was used. A non-overworld dimension whose (0,0) chunk is not loaded is reported as `SKIP` instead of
+sampled: the heightmap and block reads a spawn verdict needs would load or generate that chunk,
+and a diagnosis must not create world data. This includes a chunk generated earlier but unloaded
+since (for example after a restart); stand there or `/forceload add 0 0` and validate again.
 
 ---
 
