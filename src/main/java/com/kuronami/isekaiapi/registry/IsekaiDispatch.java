@@ -38,6 +38,11 @@ public final class IsekaiDispatch {
     /** Ids already warned about, so the deprecation nudge fires once per id across all worldgen threads. */
     private static final Set<String> WARNED = ConcurrentHashMap.newKeySet();
 
+    /** Forget the warn-once state so the next world reports its own legacy ids. */
+    public static void clearWarnings() {
+        WARNED.clear();
+    }
+
     /**
      * Codec for a dispatch {@code "type"} id: parses a resource location, defaulting a bare name
      * to the {@code isekai_api} namespace and normalizing the legacy {@code isekai} namespace

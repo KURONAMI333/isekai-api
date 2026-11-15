@@ -56,7 +56,12 @@ public record ApplyWorldshapeRefBiomeModifier(ResourceKey<Level> dimension) impl
         // biomes that layer claims.
         WorldshapeDescriptor worldshape = pickDescriptorForBiome(biome);
         if (worldshape == null) {
-            warnMissingOnce(dimension);
+            // A layered dimension claims only some of its biomes; every other biome landing
+            // here is the documented normal case, not a misconfiguration. Warn only when the
+            // dimension has no descriptor at all, which means the JSON did not load.
+            if (Isekai.remap().getActiveLayers(dimension).isEmpty()) {
+                warnMissingOnce(dimension);
+            }
             return;
         }
         if (!BiomeMatcher.matches(worldshape, biome)) {
@@ -109,6 +114,11 @@ public record ApplyWorldshapeRefBiomeModifier(ResourceKey<Level> dimension) impl
     }
 
     private static final java.util.Set<ResourceKey<Level>> WARNED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** Forget the warn-once state so the next world reports its own missing descriptor. */
+    public static void clearWarnings() {
+        WARNED.clear();
+    }
 
     private static void warnMissingOnce(ResourceKey<Level> dim) {
         if (WARNED.add(dim)) {

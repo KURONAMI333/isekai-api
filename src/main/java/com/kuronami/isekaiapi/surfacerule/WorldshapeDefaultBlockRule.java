@@ -79,6 +79,11 @@ public record WorldshapeDefaultBlockRule(ResourceKey<Level> dimension) implement
     private static final java.util.Set<ResourceKey<Level>> WARNED =
             java.util.concurrent.ConcurrentHashMap.newKeySet();
 
+    /** Forget the warn-once state so the next world reports its own missing descriptor. */
+    public static void clearWarnings() {
+        WARNED.clear();
+    }
+
     /** Warn once per dimension when wired but no worldshape is registered (see surface_top twin). */
     private static void warnMissingOnce(ResourceKey<Level> dim) {
         if (WARNED.add(dim)) {

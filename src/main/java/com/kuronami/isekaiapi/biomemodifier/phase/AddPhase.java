@@ -300,6 +300,11 @@ public final class AddPhase {
     /** Feature keys already reported per dimension, so the notice fires once per pair. */
     private static final Set<String> COLLAPSED_WARNED = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
+    /** Forget the warn-once state so the next world reports its own collapsed bands. */
+    public static void clearWarnings() {
+        COLLAPSED_WARNED.clear();
+    }
+
     /**
      * Report exactly once per (dimension, feature) when a terrain-relative projection has
      * collapsed onto one of its anchors — see {@link ColumnBand#collapsedAtAnchor()}. The

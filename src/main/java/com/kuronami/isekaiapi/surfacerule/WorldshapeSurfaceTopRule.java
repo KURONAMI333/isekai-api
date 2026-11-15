@@ -128,6 +128,11 @@ public record WorldshapeSurfaceTopRule(ResourceKey<Level> dimension, SurfaceRule
     private static final java.util.Set<ResourceKey<Level>> WARNED =
             java.util.concurrent.ConcurrentHashMap.newKeySet();
 
+    /** Forget the warn-once state so the next world reports its own missing descriptor. */
+    public static void clearWarnings() {
+        WARNED.clear();
+    }
+
     /**
      * Warn exactly once per dimension when this rule is wired into a surface_rule but no
      * worldshape is registered for the named dimension — otherwise the override silently

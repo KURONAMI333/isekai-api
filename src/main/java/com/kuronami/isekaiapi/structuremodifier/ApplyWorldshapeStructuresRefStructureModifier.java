@@ -93,6 +93,11 @@ public record ApplyWorldshapeStructuresRefStructureModifier(ResourceKey<Level> d
 
     private static final java.util.Set<ResourceKey<Level>> WARNED = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
+    /** Forget the warn-once state so the next world reports its own missing descriptor. */
+    public static void clearWarnings() {
+        WARNED.clear();
+    }
+
     private static void warnMissingOnce(ResourceKey<Level> dim) {
         if (WARNED.add(dim)) {
             IsekaiApi.LOGGER.warn(

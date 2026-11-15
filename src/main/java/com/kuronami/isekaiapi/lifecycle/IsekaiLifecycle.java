@@ -192,6 +192,15 @@ public final class IsekaiLifecycle {
         com.kuronami.isekaiapi.impl.CarverScope.clearAll();
         // Drop the chunk -> dimension index recorded for this world's ProtoChunks.
         com.kuronami.isekaiapi.impl.ChunkDimensionIndex.clear();
+        // Forget warn-once state so the next world reports its own missing descriptors,
+        // collapsed bands, and legacy ids instead of inheriting this world's silence.
+        com.kuronami.isekaiapi.biomemodifier.ApplyWorldshapeRefBiomeModifier.clearWarnings();
+        com.kuronami.isekaiapi.structuremodifier.ApplyWorldshapeStructuresRefStructureModifier
+                .clearWarnings();
+        com.kuronami.isekaiapi.biomemodifier.phase.AddPhase.clearWarnings();
+        com.kuronami.isekaiapi.surfacerule.WorldshapeSurfaceTopRule.clearWarnings();
+        com.kuronami.isekaiapi.surfacerule.WorldshapeDefaultBlockRule.clearWarnings();
+        com.kuronami.isekaiapi.registry.IsekaiDispatch.clearWarnings();
         // Reset degraded flag + lenient-drop tally so the next world starts with a clean bill.
         com.kuronami.isekaiapi.impl.IsekaiHealth.reset();
     }
