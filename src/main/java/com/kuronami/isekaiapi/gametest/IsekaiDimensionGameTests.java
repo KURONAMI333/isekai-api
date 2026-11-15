@@ -386,6 +386,70 @@ public final class IsekaiDimensionGameTests {
         helper.succeed();
     }
 
+    /**
+     * Validating a remapped dimension is read-only: the spawn-column check reports the ungenerated
+     * (0,0) as a skip instead of sampling it, because the heightmap and block reads it would need
+     * both generate the chunk. A diagnostic that writes world data changes the thing it measures.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void dimensionDiagnosticsDoesNotGenerateChunks(GameTestHelper helper) {
+        ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        if (nether == null) {
+            helper.fail("the nether level is not loaded");
+            return;
+        }
+        if (nether.getChunkSource().hasChunk(0, 0)) {
+            helper.fail("nether chunk (0,0) already exists before the test, so generation by the"
+                    + " diagnosis could not be told apart");
+            return;
+        }
+
+        WorldshapeDescriptor descriptor = WorldshapeDescriptor.builder()
+                .dimension(Level.NETHER)
+                .playableRange(PLAYABLE)
+                .surfaceAnchor(new SurfaceAnchor.WorldSurface())
+                .oreStrategy(new RemapStrategy.Identity())
+                .structureStrategy(new RemapStrategy.Identity())
+                .mobSpawnStrategy(new RemapStrategy.Identity())
+                .defaultStructurePredicate(new SpatialPredicate.Always())
+                .appliesTo(Set.of(Biomes.NETHER_WASTES))
+                .build();
+        Isekai.remap().declareWorldshape(descriptor);
+        try {
+            var report = com.kuronami.isekaiapi.validation.DimensionDiagnostics.validate(
+                    helper.getLevel().getServer(), Level.NETHER);
+            String text = report.issues().toString();
+            if (!report.profile().isPresent()) {
+                helper.fail("diagnostics found no nether profile: " + text);
+                return;
+            }
+            if (!text.contains("spawn SKIP")) {
+                helper.fail("expected the spawn column to be skipped, got: " + text);
+                return;
+            }
+            if (!text.contains("not generated yet")) {
+                helper.fail("the skip did not say the chunk is ungenerated: " + text);
+                return;
+            }
+            if (text.contains("spawn ERROR") || text.contains("spawn WARN")) {
+                helper.fail("an ungenerated chunk produced a spawn verdict: " + text);
+                return;
+            }
+            if (!report.isOk()) {
+                helper.fail("diagnostics reported an error for an untouched nether: " + text);
+                return;
+            }
+            if (nether.getChunkSource().hasChunk(0, 0)) {
+                helper.fail("the diagnosis generated nether chunk (0,0)");
+                return;
+            }
+        } finally {
+            Isekai.remap().removeWorldshape(Level.NETHER);
+        }
+        helper.succeed();
+    }
+
     /** Structure exclusion is keyed by the descriptor, independent of dimension bounds. */
     @PrefixGameTestTemplate(false)
     @GameTest(template = "empty3x3x3")
