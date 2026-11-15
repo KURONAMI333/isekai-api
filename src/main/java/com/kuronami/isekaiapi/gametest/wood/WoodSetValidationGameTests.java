@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import net.minecraft.Util;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -113,6 +114,66 @@ public final class WoodSetValidationGameTests {
             return;
         }
         helper.succeed();
+    }
+
+    /**
+     * A wall sign is named by its own key. Vanilla's {@code WallSignBlock#getDescriptionId} returns
+     * the standing sign's name, so reading the block's description id for the audit checked the
+     * standing key twice and never the wall key — a missing wall name went unreported. The
+     * standing-sign case is run too, so an empty result for the wall key is known to mean "the key
+     * was checked", not "the probe hid nothing".
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void wallSignNameIsCheckedUnderItsOwnKey(GameTestHelper helper) {
+        WoodSet set = example();
+        String namespace = ExampleWoodMod.MOD_ID;
+        String wallKey = Util.makeDescriptionId("block",
+                BuiltInRegistries.BLOCK.getKey(set.wallSign().orElseThrow().get()));
+        String standingKey = Util.makeDescriptionId("block",
+                BuiltInRegistries.BLOCK.getKey(set.sign().orElseThrow().get()));
+        if (wallKey.equals(standingKey)) {
+            helper.fail("the wall sign and the standing sign share the name " + standingKey);
+            return;
+        }
+
+        JsonObject en = JsonParser.parseString(new PackProbe(resources(helper))
+                .readAsset(ResourceLocation.fromNamespaceAndPath(namespace, "lang/en_us.json"))
+                .orElseThrow()).getAsJsonObject();
+        if (!en.has(wallKey) || !en.has(standingKey)) {
+            helper.fail("the example language file does not carry both keys (" + wallKey + ", "
+                    + standingKey + "), so hiding one proves nothing");
+            return;
+        }
+
+        String standing = onlyLanguageFinding(WoodSetAudit.run(namespace,
+                new WithoutLanguageKeyProbe(new PackProbe(resources(helper)), namespace, standingKey)));
+        if (standing == null || !standing.contains(standingKey)) {
+            helper.fail("hiding " + standingKey + " was not reported: " + standing);
+            return;
+        }
+
+        String wall = onlyLanguageFinding(WoodSetAudit.run(namespace,
+                new WithoutLanguageKeyProbe(new PackProbe(resources(helper)), namespace, wallKey)));
+        if (wall == null) {
+            helper.fail("hiding " + wallKey + " was not reported, so the wall sign name is not"
+                    + " checked under its own key");
+            return;
+        }
+        if (!wall.contains(wallKey)) {
+            helper.fail("the finding names something other than " + wallKey + ": " + wall);
+            return;
+        }
+        helper.succeed();
+    }
+
+    /** The single LANGUAGE finding's message, or {@code null} if there is not exactly one. */
+    private static String onlyLanguageFinding(WoodSetAudit.Report report) {
+        if (report.findings().size() != 1) {
+            return null;
+        }
+        WoodSetAudit.Finding finding = report.findings().get(0);
+        return finding.kind() == WoodSetAudit.Kind.LANGUAGE ? finding.message() : null;
     }
 
     /**
@@ -310,6 +371,62 @@ public final class WoodSetValidationGameTests {
             if (item == untaggedPlanks && tag.equals(ItemTags.PLANKS)) {
                 return false;
             }
+            return delegate.inItemTag(item, tag);
+        }
+    }
+
+    /** Serves {@code lang/en_us.json} without the named keys, as a generator that forgot them would. */
+    private static final class WithoutLanguageKeyProbe implements WoodSetProbe {
+
+        private final WoodSetProbe delegate;
+        private final Set<String> hidden;
+        private final ResourceLocation language;
+
+        private WithoutLanguageKeyProbe(WoodSetProbe delegate, String namespace, String... keys) {
+            this.delegate = delegate;
+            this.hidden = Set.of(keys);
+            this.language = ResourceLocation.fromNamespaceAndPath(namespace, "lang/en_us.json");
+        }
+
+        @Override
+        public boolean seesData(String namespace) {
+            return delegate.seesData(namespace);
+        }
+
+        @Override
+        public boolean seesAssets(String namespace) {
+            return delegate.seesAssets(namespace);
+        }
+
+        @Override
+        public Optional<String> readData(ResourceLocation id) {
+            return delegate.readData(id);
+        }
+
+        @Override
+        public Optional<String> readAsset(ResourceLocation id) {
+            if (!id.equals(language)) {
+                return delegate.readAsset(id);
+            }
+            return delegate.readAsset(id).map(text -> {
+                JsonObject json = JsonParser.parseString(text).getAsJsonObject();
+                hidden.forEach(json::remove);
+                return json.toString();
+            });
+        }
+
+        @Override
+        public Map<ResourceLocation, String> listData(String namespace, String directory) {
+            return delegate.listData(namespace, directory);
+        }
+
+        @Override
+        public boolean inBlockTag(Block block, TagKey<Block> tag) {
+            return delegate.inBlockTag(block, tag);
+        }
+
+        @Override
+        public boolean inItemTag(Item item, TagKey<Item> tag) {
             return delegate.inItemTag(item, tag);
         }
     }

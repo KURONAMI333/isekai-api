@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import javax.annotation.Nullable;
+import net.minecraft.Util;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -692,7 +693,12 @@ public final class WoodSetAudit {
         private List<Named<String>> languageKeys() {
             List<Named<String>> keys = new ArrayList<>();
             for (Named<Block> named : blocks) {
-                keys.add(new Named<>(named.label(), named.value().getDescriptionId()));
+                // getDescriptionId() is not the block's own key for wall signs: vanilla's
+                // WallSignBlock/WallHangingSignBlock override it with the standing sign item's
+                // id, which both skipped the wall key and counted the standing key twice. Build
+                // the key from the registry id, the same rule the generator uses.
+                ResourceLocation id = BuiltInRegistries.BLOCK.getKey(named.value());
+                keys.add(new Named<>(named.label(), Util.makeDescriptionId("block", id)));
             }
             for (Named<Item> named : items) {
                 // Block items take the block's name; only item-only parts need their own key.
