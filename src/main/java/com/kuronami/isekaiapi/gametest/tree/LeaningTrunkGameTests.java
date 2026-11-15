@@ -221,6 +221,49 @@ public final class LeaningTrunkGameTests {
     }
 
     /**
+     * An occupied cell in the vertical trunk ends the trunk there. The stalk may not resume from
+     * above a cell that refused a log, and every returned crown site has to sit on wood that
+     * exists — the old code skipped the log and still hung a crown on that air cell.
+     */
+    @PrefixGameTestTemplate(false)
+    @GameTest(template = "empty3x3x3")
+    public static void blockedVerticalTrunkCrownsItsLastLog(GameTestHelper helper) {
+        TreeConfiguration config = config(helper, OLD_SHAPE);
+        BlockPos origin = new BlockPos(0, 100, 0);
+        // The lean only starts in the top two iterations (y = 4 or 5 for a 6-high trunk), so this
+        // cell is part of the straight section for every direction and seed.
+        BlockPos blocked = origin.above(2);
+
+        Map<BlockPos, BlockState> writes = new LinkedHashMap<>();
+        List<BlockPos> sites = attachments(config, new FakeLevel(Set.of(blocked)), origin, writes);
+        if (writes.containsKey(blocked)) {
+            helper.fail("space_check logged the occupied cell " + blocked);
+            return;
+        }
+        if (sites.isEmpty()) {
+            helper.fail("blocking the vertical trunk left the tree with no crown at all");
+            return;
+        }
+        for (BlockPos site : sites) {
+            if (!writes.containsKey(site)) {
+                helper.fail("a crown sits at " + site + " where no log was placed; logs: "
+                        + writes.keySet());
+                return;
+            }
+            if (sideways(origin, site) != 0) {
+                helper.fail("the stalk resumed past the blocked cell: " + sites);
+                return;
+            }
+        }
+        if (!writes.containsKey(blocked.below())) {
+            helper.fail("the crown is not on the last log below the blocked cell; logs: "
+                    + writes.keySet());
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
      * {@code slant_curve} lengthens each step, so the same {@code lean_length} reaches further. The
      * horizontal budget bounds that reach, so the curved stalk cannot also keep the straight one's
      * crown count — it is cut one step before its last intended site. What must hold is that the

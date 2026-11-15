@@ -47,9 +47,10 @@ import org.jetbrains.annotations.ApiStatus;
  * (for example {@code lean_length} 13-16 at {@code slant_curve} 1.0) is cut at the same limit, so
  * the walked shape is always the shape the region can hold.
  *
- * <p>{@code space_check} makes the lean stop where the next block is occupied, so the crown stays
- * on the vertical trunk instead of floating in mid-air next to a neighbour. Setting it to
- * {@code false} restores the old behaviour of attaching a crown even where no log could be placed.
+ * <p>{@code space_check} makes the trunk stop where the next block is occupied, in the vertical
+ * section as well as the stalk, and puts the crown on the last log that exists, so the crown never
+ * floats next to a neighbour or above a missing log. Setting it to {@code false} restores the old
+ * behaviour of attaching a crown even where no log could be placed.
  */
 @ApiStatus.Internal
 public class LeaningTrunkPlacer extends TrunkPlacer {
@@ -177,24 +178,52 @@ public class LeaningTrunkPlacer extends TrunkPlacer {
             setDirtAt(level, blockSetter, random, cursor.below(), config);
         }
 
-        // vertical trunk that begins to lean near the top
+        // vertical trunk that begins to lean near the top. With space_check on, a cell that
+        // cannot take a log ends the trunk there and the crown goes on the last log that exists,
+        // the same rule the stalk below and CurvedTrunkPlacer use. The old code skipped the log
+        // and still hung leaves at that cell, leaving a crown with no wood under it.
+        BlockPos lastLog = null;
+        boolean trunkBlocked = false;
         for (int y = 0; y <= top; y++) {
             if (y + 1 >= top + random.nextInt(2)) {
                 cursor.move(lean);
                 travelled++;
             }
-            if (TreeFeature.validTreePos(level, cursor)) {
-                this.placeLog(level, blockSetter, random, cursor, config);
-            }
-            if (y >= this.minHeightForLeaves) {
+            if (this.placeLog(level, blockSetter, random, cursor, config)) {
+                lastLog = cursor.immutable();
+                if (y >= this.minHeightForLeaves) {
+                    attachments.add(new FoliagePlacer.FoliageAttachment(lastLog, 0, false));
+                }
+            } else if (this.spaceCheck) {
+                trunkBlocked = true;
+                break;
+            } else if (y >= this.minHeightForLeaves) {
+                // space_check off keeps the old shape: a crown cell even where no log was placed
                 attachments.add(new FoliagePlacer.FoliageAttachment(cursor.immutable(), 0, false));
             }
             cursor.move(Direction.UP);
         }
 
+        // A blocked vertical trunk leaves nothing to lean from: crown the last log and stop, so
+        // the stalk cannot resume from the cell that refused a log.
+        if (trunkBlocked) {
+            if (lastLog == null) {
+                return attachments;
+            }
+            FoliagePlacer.FoliageAttachment crown =
+                    new FoliagePlacer.FoliageAttachment(lastLog, 0, false);
+            if (this.tipCrownOnly) {
+                return Lists.newArrayList(crown);
+            }
+            if (attachments.isEmpty()
+                    || !attachments.get(attachments.size() - 1).pos().equals(lastLog)) {
+                attachments.add(crown);
+            }
+            return attachments;
+        }
+
         // near-horizontal leaning stalk; crown drapes along it
         int leanLen = this.leanLength.sample(random);
-        BlockPos lastLog = null;
         FoliagePlacer.FoliageAttachment tip = null;
         lean:
         for (int i = 0; i <= leanLen; i++) {
