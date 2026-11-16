@@ -365,6 +365,7 @@ omitted from the builder chain.
 | `/isekai dump structure <id>` | Single-structure query |
 | `/isekai survey <structure> [radius]` | Replay placement over a square of chunks (default radius 64, max 128): candidate chunks, placements, and the gate that rejected the rest. Runs on the server thread inside the command, so the run blocks the tick it started in (radius 128 is 66,049 chunks). Writes `<world>/isekai/survey/<ns>_<path>-r<radius>.json` |
 | `/isekai survey blocks <block\|#tag> [radius] [center <x y z>] [biome <biome\|#tag>]` | Generate the square (default radius 8, max 32) and count matching blocks per chunk: tree count, block count, mean/median/min/max, empty share, top-10% concentration and a histogram. One tree = one six-connected group of blocks inside a chunk. One chunk generates per tick and generation is synchronous (tens of ms per fresh chunk), so TPS drops for the length of the run; one run per server at a time. Writes `<world>/isekai/survey/blocks-<target>-r<radius>.json`; generates terrain to disk |
+| `/isekai survey biomes <radius> [center <x y z>] [y <y>]` | Sample every 4-block column of a disc through the biome source without generating chunks: biome shares, patch sizes (median, p90) and the six climate axes as percentiles. Writes `<world>/isekai/survey/biomes-<dimension>-r<radius>-<x>_<y>_<z>.json` (radius 16–4096) |
 | `/isekai fit <structure> [pos]` | The 3x3 surface grid under one chunk beside the gate limits, the verdict, and each template variant's Y span. Writes `<world>/isekai/fit/<ns>_<path>-<chunkX>_<chunkZ>.json` |
 
 All subcommands require permission level 2 (operators).
@@ -428,7 +429,7 @@ Isekai ships neutral mathematical primitives instead of named helpers. Every con
 
 ## Downloads and support
 
-Downloads: [CurseForge](https://www.curseforge.com/minecraft/mc-mods/isekai-api) · [GitHub Releases](https://github.com/KURONAMI333/isekai-api/releases/tag/v2.2.0).
+Downloads: [CurseForge](https://www.curseforge.com/minecraft/mc-mods/isekai-api) · [GitHub Releases](https://github.com/KURONAMI333/isekai-api/releases/tag/v3.0.0).
 
 For bugs and questions, comment on the [CurseForge page](https://www.curseforge.com/minecraft/mc-mods/isekai-api) or DM [@kuronami333 on X](https://x.com/kuronami333).
 
