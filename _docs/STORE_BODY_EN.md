@@ -13,9 +13,9 @@ Isekai API is a library for datapack authors, pack makers and mod developers. It
 
 ## Checking a world
 
-- `/isekai validate <namespace>` checks your JSON and your wood sets (loot tables, tags, recipes, models, textures, language keys) in one pass.
-- `/isekai validate dimension <id>` reports a dimension's build height, rules that match no biome, and whether the start point is safe.
-- `/isekai survey biomes <radius>` measures a seed's biome shares and patch sizes without generating chunks. `/isekai survey <structure>` and `/isekai fit <structure>` show where a structure can spawn and which check rejected the rest.
+- `/isekai validate`, given your namespace, checks your JSON and your wood sets (loot tables, tags, recipes, models, textures, language keys) in one pass.
+- `/isekai validate dimension` reports a dimension's build height, rules that match no biome, and whether the start point is safe.
+- `/isekai survey biomes` measures a seed's biome shares and patch sizes over a radius without generating chunks. `/isekai survey` and `/isekai fit`, given a structure, show where a structure can spawn and which check rejected the rest.
 
 All commands need operator permission (level 2).
 
